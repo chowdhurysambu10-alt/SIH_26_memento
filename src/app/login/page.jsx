@@ -1,445 +1,319 @@
-// Momento — Team SIH26043
-// Backend: NestJS + Supabase
-// Login endpoint: POST /api/v1/auth/login
-// Token stored in localStorage as 'supabase_access_token'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Momento — National Collaboration Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body style="margin: 0; padding: 0; background: #f3f0ff; font-family: 'Inter', sans-serif;">
+  <div id="root"></div>
 
-import { useState, useEffect } from "react";
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+    const API_BASE_URL = "http://localhost:3000/api/v1";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000/api/v1";
+    const ROLES = [
+      { id: "student", label: "Student", icon: "🎓" },
+      { id: "institution", label: "Institution", icon: "🏛️" },
+      { id: "admin", label: "Admin", icon: "🛡️" },
+      { id: "citizen", label: "Public", icon: "👥" }
+    ];
 
-// Role display config — maps backend role strings to UI labels
-const ROLE_CONFIG = {
-  citizen:          { label: "Citizen / Public",      icon: "👥", color: "#5f5e5a", bg: "#f1efe8" },
-  pri_ulb_official: { label: "Panchayat / ULB",       icon: "🏛️", color: "#0f6e56", bg: "#e1f5ee" },
-  university_admin: { label: "University Admin",       icon: "🎓", color: "#1d6ed8", bg: "#e8f0fe" },
-  faculty:          { label: "Faculty",                icon: "👨‍🏫", color: "#0369a1", bg: "#e0f2fe" },
-  student:          { label: "Student",                icon: "📚", color: "#6d28d9", bg: "#ede9fe" },
-  industry_partner: { label: "Industry Partner",       icon: "🏢", color: "#b45309", bg: "#fef3c7" },
-  govt_viewer:      { label: "Govt. Authority",        icon: "🛡️", color: "#991b1b", bg: "#fee2e2" },
-  super_admin:      { label: "Super Admin",            icon: "⚙️", color: "#374151", bg: "#f3f4f6" },
-};
+    function App() {
+      const [isSignUp, setIsSignUp] = useState(false);
+      const [activeRole, setActiveRole] = useState(ROLES[0]);
+      
+      const [name, setName] = useState("");
+      const [orgName, setOrgName] = useState(""); 
+      const [email, setEmail] = useState("");
+      const [password, setPassword] = useState("");
+      const [confirmPassword, setConfirmPassword] = useState("");
+      const [showPass, setShowPass] = useState(false);
+      
+      const [loading, setLoading] = useState(false);
+      const [error, setError] = useState("");
+      const [user, setUser] = useState(null);
 
-export default function MomentoLogin() {
-  const [email, setEmail]       = useState("");
-  const [password, setPassword] = useState("");
-  const [showPass, setShowPass] = useState(false);
-  const [errors, setErrors]     = useState({});
-  const [loading, setLoading]   = useState(false);
-  const [user, setUser]         = useState(null);
-  const [checkingSession, setCheckingSession] = useState(true);
-
-  // On mount: check if user already logged in
-  useEffect(() => {
-    const token = localStorage.getItem("supabase_access_token");
-    if (token) {
-      fetch(`${API_BASE_URL}/users/me`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-        .then((r) => r.json())
-        .then((res) => {
-          if (res?.data) setUser(res.data);
-          else localStorage.removeItem("supabase_access_token");
-        })
-        .catch(() => localStorage.removeItem("supabase_access_token"))
-        .finally(() => setCheckingSession(false));
-    } else {
-      setCheckingSession(false);
-    }
-  }, []);
-
-  function validate() {
-    const e = {};
-    if (!email.trim())   e.email    = "Email daalo.";
-    if (!password)       e.password = "Password daalo.";
-    return e;
-  }
-
-  async function handleLogin() {
-    const v = validate();
-    if (Object.keys(v).length) { setErrors(v); return; }
-
-    setLoading(true);
-    setErrors({});
-
-    try {
-      const res = await fetch(`${API_BASE_URL}/auth/login`, {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ email: email.trim(), password }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        // Backend error codes se sahi message dikhao
-        if (res.status === 401 || data?.errorCode === "INVALID_CREDENTIALS") {
-          setErrors({ auth: "Invalid email ya password. Dobara try karo." });
-        } else {
-          setErrors({ auth: data?.message || "Login failed. Backend se error aaya." });
+      useEffect(() => {
+        const token = localStorage.getItem("supabase_access_token");
+        const savedUser = localStorage.getItem("user_data");
+        if (token && savedUser) {
+          try { setUser(JSON.parse(savedUser)); } catch (e) {}
         }
-        return;
+      }, []);
+
+      const resetForm = () => {
+        setError("");
+        setPassword("");
+        setConfirmPassword("");
+      };
+
+      const handleAuth = async (e) => {
+        e?.preventDefault();
+        setError("");
+
+        if (!email.trim() || !password) {
+          return setError("All credentials are required.");
+        }
+
+        if (isSignUp) {
+          if (!name.trim()) return setError("Full Name is required.");
+          if (activeRole.id !== "citizen" && !orgName.trim()) {
+            return setError("Institution/Organization Name is required for this role.");
+          }
+          if (password.length < 6) return setError("Password must be at least 6 characters.");
+          if (password !== confirmPassword) return setError("Passwords do not match!");
+        }
+
+        setLoading(true);
+
+        try {
+          const endpoint = isSignUp ? `${API_BASE_URL}/auth/signup` : `${API_BASE_URL}/auth/login`;
+          const payload = isSignUp 
+            ? { 
+                email: email.trim(), 
+                password, 
+                name: name.trim(), 
+                role: activeRole.id,
+                organization: orgName.trim()
+              }
+            : { email: email.trim(), password };
+
+          const res = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+
+          const data = await res.json();
+
+          if (!res.ok) {
+            setError(data?.message || (isSignUp ? "Registration failed. Email might exist." : "Invalid credentials."));
+            return;
+          }
+
+          const session = data?.data?.session;
+          const userData = data?.data?.user;
+
+          if (session?.access_token) {
+            localStorage.setItem("supabase_access_token", session.access_token);
+            localStorage.setItem("supabase_refresh_token", session.refresh_token || "");
+          }
+          if (userData) {
+            localStorage.setItem("user_data", JSON.stringify(userData));
+            setUser(userData);
+          }
+        } catch (err) {
+          setError("Backend unreachable. Ensure NestJS is running on localhost:3000.");
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const handleLogout = () => {
+        localStorage.clear();
+        setUser(null);
+        setName("");
+        setOrgName("");
+        setEmail("");
+        resetForm();
+      };
+
+      if (user) {
+        return (
+          <div style={styles.container}>
+            <div style={styles.card}>
+              <div style={styles.header}>
+                <div style={styles.logoBox}>🌐</div>
+                <div>
+                  <div style={styles.title}>Momento</div>
+                  <div style={styles.sub}>by Team Momento · SIH26043</div>
+                </div>
+              </div>
+              <div style={{ padding: "30px 24px", textAlign: "center" }}>
+                <div style={{ fontSize: 40, marginBottom: 10 }}>🎉</div>
+                <h3 style={{ margin: "0 0 8px" }}>Welcome, {user.name || "User"}!</h3>
+                <p style={{ color: "#666", fontSize: 13, margin: "0 0 16px" }}>{user.email}</p>
+                <div style={styles.badge}>Role: {user.role || activeRole.label}</div>
+                <div style={{ marginTop: 24 }}>
+                  <button onClick={handleLogout} style={styles.logoutBtn}>← Sign out</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
       }
 
-      // Success — JWT token save karo
-      const { session, user: userData } = data.data;
-      localStorage.setItem("supabase_access_token",  session.access_token);
-      localStorage.setItem("supabase_refresh_token", session.refresh_token);
-      localStorage.setItem("supabase_expires_at",    String(session.expires_at));
-      setUser(userData);
-
-    } catch (err) {
-      setErrors({ auth: "Backend se connect nahi ho pa raha. Server chal raha hai? (localhost:3000)" });
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function handleLogout() {
-    localStorage.removeItem("supabase_access_token");
-    localStorage.removeItem("supabase_refresh_token");
-    localStorage.removeItem("supabase_expires_at");
-    setUser(null);
-    setEmail("");
-    setPassword("");
-    setErrors({});
-  }
-
-  // ─── Loading state (session check) ────────────────────────
-  if (checkingSession) {
-    return (
-      <div style={styles.page}>
-        <div style={{ color: "#888", fontSize: 14 }}>⏳ Session check ho raha hai…</div>
-      </div>
-    );
-  }
-
-  // ─── Success / Dashboard Screen ───────────────────────────
-  if (user) {
-    const rc = ROLE_CONFIG[user.role] || ROLE_CONFIG.citizen;
-    return (
-      <div style={styles.page}>
-        <div style={styles.card}>
-          {/* Header */}
-          <div style={styles.cardHeader}>
-            <div style={styles.logoRow}>
+      return (
+        <div style={styles.container}>
+          <div style={styles.card}>
+            {/* Header */}
+            <div style={styles.header}>
               <div style={styles.logoBox}>🌐</div>
               <div>
-                <div style={styles.platformName}>Momento</div>
-                <div style={styles.platformSub}>by Team Momento · SIH26043</div>
-              </div>
-            </div>
-          </div>
-
-          {/* User info */}
-          <div style={{ ...styles.cardBody, textAlign: "center", paddingTop: 28 }}>
-            <div style={{ width: 64, height: 64, borderRadius: "50%", background: rc.bg,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                margin: "0 auto 14px", fontSize: 28 }}>
-              {rc.icon}
-            </div>
-
-            <div style={{ fontSize: 19, fontWeight: 700, color: "#1a1a1a", marginBottom: 4 }}>
-              Login successful!
-            </div>
-            <div style={{ fontSize: 14, color: "#555", marginBottom: 4 }}>
-              Welcome, <span style={{ color: rc.color, fontWeight: 600 }}>{user.name}</span>
-            </div>
-            <div style={{ fontSize: 12, color: "#888", marginBottom: 6 }}>{user.email}</div>
-
-            {/* Role badge */}
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 6,
-                padding: "5px 14px", borderRadius: 20, background: rc.bg, color: rc.color,
-                fontSize: 12, fontWeight: 600, marginBottom: 6 }}>
-              {rc.icon} {rc.label}
-            </div>
-
-            {/* Verified status */}
-            <div style={{ marginBottom: 20 }}>
-              {user.verified ? (
-                <span style={{ fontSize: 12, color: "#16a34a", background: "#dcfce7",
-                    padding: "3px 10px", borderRadius: 12 }}>✅ Verified Account</span>
-              ) : (
-                <span style={{ fontSize: 12, color: "#d97706", background: "#fef3c7",
-                    padding: "3px 10px", borderRadius: 12 }}>⏳ Pending Verification</span>
-              )}
-            </div>
-
-            {/* User details */}
-            <div style={styles.detailBox}>
-              {user.district && (
-                <div style={styles.detailRow}>
-                  <span style={styles.detailLabel}>📍 District</span>
-                  <span style={styles.detailVal}>{user.district}</span>
-                </div>
-              )}
-              {user.org_id && (
-                <div style={styles.detailRow}>
-                  <span style={styles.detailLabel}>🏛️ Institution</span>
-                  <span style={styles.detailVal}>{user.institutions?.name || user.org_id}</span>
-                </div>
-              )}
-              <div style={styles.detailRow}>
-                <span style={styles.detailLabel}>🔑 Role</span>
-                <span style={{ ...styles.detailVal, fontFamily: "monospace", fontSize: 11 }}>{user.role}</span>
+                <div style={styles.title}>Momento</div>
+                <div style={styles.sub}>by Team Momento · SIH26043</div>
               </div>
             </div>
 
-            <button onClick={handleLogout} style={styles.logoutBtn}>← Sign out</button>
-          </div>
-        </div>
-        <div style={styles.demoNote}>Momento · Connected to NestJS + Supabase backend</div>
-      </div>
-    );
-  }
+            <div style={{ padding: "24px 28px" }}>
+              {/* Login / Signup Toggle */}
+              <div style={styles.toggleContainer}>
+                <button
+                  type="button"
+                  onClick={() => { setIsSignUp(false); resetForm(); }}
+                  style={{ ...styles.toggleBtn, background: !isSignUp ? "#fff" : "transparent", boxShadow: !isSignUp ? "0 2px 4px rgba(0,0,0,0.1)" : "none", color: !isSignUp ? "#111" : "#666" }}
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setIsSignUp(true); resetForm(); }}
+                  style={{ ...styles.toggleBtn, background: isSignUp ? "#fff" : "transparent", boxShadow: isSignUp ? "0 2px 4px rgba(0,0,0,0.1)" : "none", color: isSignUp ? "#111" : "#666" }}
+                >
+                  Register
+                </button>
+              </div>
 
-  // ─── Login Screen ─────────────────────────────────────────
-  return (
-    <div style={styles.page}>
-      <div style={styles.card}>
-        {/* Header */}
-        <div style={styles.cardHeader}>
-          <div style={styles.logoRow}>
-            <div style={styles.logoBox}>🌐</div>
-            <div>
-              <div style={styles.platformName}>Momento</div>
-              <div style={styles.platformSub}>by Team Momento · SIH26043</div>
+              {/* Role Tabs */}
+              <div style={styles.roleGrid}>
+                {ROLES.map((r) => {
+                  const isActive = activeRole.id === r.id;
+                  return (
+                    <button
+                      key={r.id}
+                      onClick={() => { setActiveRole(r); setError(""); }}
+                      style={{
+                        ...styles.roleBtn,
+                        background: isActive ? "#1a1a1a" : "transparent",
+                        color: isActive ? "#ffffff" : "#a1a1aa",
+                        opacity: isActive ? 1 : 0.45
+                      }}
+                    >
+                      <div style={{ fontSize: 24 }}>{r.icon}</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, marginTop: 4 }}>{r.label}</div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Form */}
+              <form onSubmit={handleAuth}>
+                {isSignUp && (
+                  <div style={{ marginBottom: 14 }}>
+                    <label style={styles.label}>Full Name</label>
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Enter legal name"
+                      style={styles.darkInput}
+                      required
+                    />
+                  </div>
+                )}
+
+                {isSignUp && activeRole.id !== "citizen" && (
+                  <div style={{ marginBottom: 14 }}>
+                    <label style={styles.label}>Institution / Organization Name</label>
+                    <input
+                      type="text"
+                      value={orgName}
+                      onChange={(e) => setOrgName(e.target.value)}
+                      placeholder="e.g. NIT Durgapur / Tata Steel"
+                      style={styles.darkInput}
+                      required
+                    />
+                  </div>
+                )}
+
+                <div style={{ marginBottom: 14 }}>
+                  <label style={styles.label}>Email / User ID</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="name@domain.com"
+                    style={styles.darkInput}
+                    required
+                  />
+                </div>
+
+                <div style={{ marginBottom: isSignUp ? 14 : 20 }}>
+                  <label style={styles.label}>Password</label>
+                  <div style={{ position: "relative" }}>
+                    <input
+                      type={showPass ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Enter password"
+                      style={{ ...styles.darkInput, paddingRight: 45 }}
+                      required
+                    />
+                    <button type="button" onClick={() => setShowPass(!showPass)} style={styles.eyeBtn}>
+                      {showPass ? "🙈" : "👁️"}
+                    </button>
+                  </div>
+                </div>
+
+                {isSignUp && (
+                  <div style={{ marginBottom: 20 }}>
+                    <label style={styles.label}>Confirm Password</label>
+                    <input
+                      type={showPass ? "text" : "password"}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Re-enter password"
+                      style={styles.darkInput}
+                      required
+                    />
+                  </div>
+                )}
+
+                {error && <div style={styles.errorBanner}>⚠️ {error}</div>}
+
+                <button type="submit" disabled={loading} style={{ ...styles.submitBtn, opacity: loading ? 0.7 : 1 }}>
+                  {loading ? "Processing..." : isSignUp ? `Register as ${activeRole.label}` : `Sign in as ${activeRole.label}`}
+                </button>
+              </form>
+              
+              <div style={styles.footerNote}>
+                🔒 SHA-256 hashed · Connected to NestJS Backend
+              </div>
             </div>
           </div>
         </div>
+      );
+    }
 
-        <div style={styles.cardBody}>
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 17, fontWeight: 700, color: "#1a1a1a", marginBottom: 4 }}>
-              Sign in to your account
-            </div>
-            <div style={{ fontSize: 13, color: "#666" }}>
-              Societal Innovation Collaboration Portal — Jharkhand
-            </div>
-          </div>
+    const styles = {
+      container: { minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" },
+      card: { width: "100%", maxWidth: 460, background: "#ffffff", borderRadius: 20, overflow: "hidden", boxShadow: "0 10px 30px rgba(91, 54, 245, 0.12)" },
+      header: { background: "#5b36f5", padding: "20px 24px", display: "flex", alignItems: "center", gap: 14 },
+      logoBox: { width: 44, height: 44, background: "rgba(255,255,255,0.2)", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 },
+      title: { fontSize: 20, fontWeight: 700, color: "#fff" },
+      sub: { fontSize: 13, color: "rgba(255,255,255,0.8)", marginTop: 2 },
+      toggleContainer: { display: "flex", background: "#f3f4f6", padding: 4, borderRadius: 10, marginBottom: 20 },
+      toggleBtn: { flex: 1, padding: "8px 0", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "0.2s" },
+      roleGrid: { display: "flex", justifyContent: "space-between", marginBottom: 24, padding: "0 10px" },
+      roleBtn: { flex: 1, border: "none", borderRadius: 12, padding: "12px 0", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", transition: "0.2s" },
+      label: { display: "block", fontSize: 13, fontWeight: 600, color: "#333", marginBottom: 6 },
+      darkInput: { width: "100%", padding: "12px 14px", background: "#1e1e1e", color: "#f1f1f1", border: "none", borderRadius: 8, fontSize: 14, outline: "none", boxSizing: "border-box" },
+      eyeBtn: { position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "#2a2a2a", border: "none", borderRadius: 6, cursor: "pointer", padding: "4px 8px" },
+      submitBtn: { width: "100%", padding: "12px", background: "#f3f4f6", border: "none", color: "#333", fontSize: 15, fontWeight: 600, cursor: "pointer", borderRadius: 8, transition: "0.2s" },
+      badge: { display: "inline-block", padding: "6px 16px", borderRadius: 20, background: "#ede9fe", color: "#5b36f5", fontWeight: 600, fontSize: 13 },
+      logoutBtn: { padding: "8px 20px", border: "1px solid #ddd", background: "#fff", borderRadius: 8, cursor: "pointer" },
+      errorBanner: { background: "#fee2e2", color: "#b91c1c", padding: "10px", borderRadius: 8, fontSize: 13, marginBottom: 14 },
+      footerNote: { textAlign: "center", fontSize: 11, color: "#888", marginTop: 20 }
+    };
 
-          {/* Email */}
-          <div style={styles.fieldGroup}>
-            <label style={styles.label}>Email address</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => { setEmail(e.target.value); setErrors((p) => ({ ...p, email: null, auth: null })); }}
-              placeholder="you@example.com"
-              style={{ ...styles.input, ...(errors.email ? styles.inputError : {}) }}
-              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-            />
-            {errors.email && <div style={styles.errMsg}>{errors.email}</div>}
-          </div>
-
-          {/* Password */}
-          <div style={styles.fieldGroup}>
-            <label style={styles.label}>Password</label>
-            <div style={{ position: "relative" }}>
-              <input
-                type={showPass ? "text" : "password"}
-                value={password}
-                onChange={(e) => { setPassword(e.target.value); setErrors((p) => ({ ...p, password: null, auth: null })); }}
-                placeholder="Min. 6 characters"
-                style={{ ...styles.input, paddingRight: 44, ...(errors.password || errors.auth ? styles.inputError : {}) }}
-                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-              />
-              <button onClick={() => setShowPass(!showPass)} style={styles.eyeBtn} aria-label="Toggle password">
-                {showPass ? "🙈" : "👁️"}
-              </button>
-            </div>
-            {errors.password && <div style={styles.errMsg}>{errors.password}</div>}
-          </div>
-
-          {/* Auth / network error */}
-          {errors.auth && (
-            <div style={{ ...styles.errMsg, background: "#fef2f2", border: "1px solid #fecaca",
-                borderRadius: 8, padding: "10px 12px", marginBottom: 12, fontSize: 13 }}>
-              ⚠️ {errors.auth}
-            </div>
-          )}
-
-          {/* Login button */}
-          <button
-            onClick={handleLogin}
-            disabled={loading}
-            style={{ ...styles.loginBtn, opacity: loading ? 0.75 : 1, cursor: loading ? "not-allowed" : "pointer" }}
-          >
-            {loading ? "Signing in…" : "Sign in"}
-          </button>
-
-          {/* Roles info */}
-          <div style={{ marginTop: 20, padding: "12px 14px", background: "#f8f9fa",
-              border: "1px solid #e2e8f0", borderRadius: 8 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: "#555", marginBottom: 8 }}>
-              Supported roles on this platform:
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {Object.entries(ROLE_CONFIG).map(([key, r]) => (
-                <span key={key} style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10,
-                    background: r.bg, color: r.color, fontWeight: 500 }}>
-                  {r.icon} {r.label}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div style={styles.demoNote}>
-            🔒 Connected to <code style={{ fontSize: 10, background: "#f1f5f9", padding: "1px 5px", borderRadius: 4 }}>
-              POST /api/v1/auth/login
-            </code> · JWT stored in localStorage
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Styles ──────────────────────────────────────────────────
-const styles = {
-  page: {
-    minHeight: "100vh",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "#f3f0ff",
-    padding: "1.5rem 1rem",
-    fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif",
-  },
-  card: {
-    background: "#ffffff",
-    borderRadius: 16,
-    boxShadow: "0 4px 24px rgba(109,40,217,.12), 0 1px 4px rgba(0,0,0,.06)",
-    width: "100%",
-    maxWidth: 440,
-    overflow: "hidden",
-  },
-  cardHeader: {
-    background: "linear-gradient(135deg, #6d28d9 0%, #4f46e5 100%)",
-    padding: "20px 24px 16px",
-  },
-  logoRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: 12,
-  },
-  logoBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    background: "rgba(255,255,255,0.2)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: 18,
-  },
-  platformName: {
-    fontSize: 17,
-    fontWeight: 700,
-    color: "#ffffff",
-    letterSpacing: "-0.3px",
-  },
-  platformSub: {
-    fontSize: 12,
-    color: "rgba(255,255,255,0.75)",
-    marginTop: 2,
-  },
-  cardBody: {
-    padding: "22px 24px 24px",
-  },
-  fieldGroup: {
-    marginBottom: 14,
-  },
-  label: {
-    display: "block",
-    fontSize: 13,
-    fontWeight: 500,
-    color: "#374151",
-    marginBottom: 5,
-  },
-  input: {
-    width: "100%",
-    padding: "9px 12px",
-    border: "1px solid #d0d5dd",
-    borderRadius: 8,
-    fontSize: 14,
-    color: "#111",
-    background: "#fff",
-    outline: "none",
-    fontFamily: "inherit",
-    boxSizing: "border-box",
-    transition: "border-color 0.15s, box-shadow 0.15s",
-  },
-  inputError: {
-    borderColor: "#ef4444",
-  },
-  eyeBtn: {
-    position: "absolute",
-    right: 10,
-    top: "50%",
-    transform: "translateY(-50%)",
-    background: "none",
-    border: "none",
-    cursor: "pointer",
-    fontSize: 16,
-    padding: 2,
-  },
-  errMsg: {
-    fontSize: 12,
-    color: "#ef4444",
-    marginTop: 4,
-  },
-  loginBtn: {
-    width: "100%",
-    padding: "11px",
-    color: "#fff",
-    border: "none",
-    borderRadius: 8,
-    fontSize: 14,
-    fontWeight: 600,
-    background: "linear-gradient(135deg, #6d28d9, #4f46e5)",
-    transition: "opacity 0.15s",
-    fontFamily: "inherit",
-  },
-  logoutBtn: {
-    padding: "8px 22px",
-    background: "none",
-    border: "1px solid #d0d5dd",
-    borderRadius: 8,
-    cursor: "pointer",
-    fontSize: 13,
-    color: "#555",
-    fontFamily: "inherit",
-  },
-  detailBox: {
-    background: "#f8f9fa",
-    border: "1px solid #e2e8f0",
-    borderRadius: 8,
-    padding: "12px 14px",
-    marginBottom: 20,
-    textAlign: "left",
-  },
-  detailRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "4px 0",
-    borderBottom: "1px solid #f0f0f0",
-  },
-  detailLabel: {
-    fontSize: 12,
-    color: "#888",
-  },
-  detailVal: {
-    fontSize: 13,
-    fontWeight: 500,
-    color: "#333",
-  },
-  demoNote: {
-    fontSize: 11,
-    color: "#888",
-    textAlign: "center",
-    marginTop: 14,
-  },
-};
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
