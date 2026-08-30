@@ -381,7 +381,8 @@ textarea:focus {
     flex-shrink: 0;
 }
 
-.problem-item:hover .problem-actions {
+.problem-item:hover .problem-actions,
+.feed-item:hover .problem-actions {
     opacity: 1;
 }
 
@@ -788,7 +789,7 @@ textarea:focus {
 .stats-overview {
     grid-area: overview;
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 16px;
 }
 

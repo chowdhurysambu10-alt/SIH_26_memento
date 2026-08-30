@@ -3,10 +3,31 @@
 
 <head>
     <meta charset="UTF-8">
+    <script>
+        // Silently block VS Code Live Server from auto-reloading the page
+        const OriginalWebSocket = window.WebSocket;
+        window.WebSocket = function(url, protocols) {
+            const ws = new OriginalWebSocket(url, protocols);
+            Object.defineProperty(ws, 'onmessage', {
+                set(listener) {
+                    this._listener = function(event) {
+                        if (typeof event.data === 'string' && event.data === 'reload') {
+                            console.log('Blocked Live Server auto-reload. Press F5 to reload manually.');
+                            return;
+                        }
+                        if (listener) listener.call(this, event);
+                    };
+                    ws.addEventListener('message', this._listener);
+                },
+                get() { return this._listener; }
+            });
+            return ws;
+        };
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Jharkhand Innovation Portal</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=4">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
@@ -20,6 +41,23 @@
                 <a href="#" class="nav-link">Community</a>
                 <a href="#" class="nav-link">Helpdesk</a>
                 <a href="#" class="nav-link">About</a>
+                <div class="user-menu-container" id="user-menu-container" style="position: relative; display: none;">
+                    <button id="nav-user-profile" class="nav-link btn btn-outline" style="color: var(--text-primary); padding: 6px 16px; border-radius: 6px; font-weight: 500; border: 1px solid var(--border); display: flex; align-items: center; gap: 8px; cursor: pointer; background: transparent;">
+                        <span id="user-name-display">User Name</span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </button>
+                    <div id="user-dropdown" class="user-dropdown" style="display: none; position: absolute; right: 0; top: 100%; margin-top: 8px; background: white; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 250px; z-index: 1000; padding: 16px; text-align: left;">
+                        <div style="border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 12px;">
+                            <p style="font-weight: 600; margin: 0 0 4px 0;" id="dropdown-user-name">User Name</p>
+                            <p style="font-size: 13px; color: #64748b; margin: 0;" id="dropdown-user-email">user@example.com</p>
+                        </div>
+                        <div style="margin-bottom: 16px;">
+                            <p style="font-size: 13px; margin: 0 0 4px 0;"><span style="color: #64748b;">Role:</span> <span id="dropdown-user-role" style="font-weight: 500; text-transform: capitalize;">User</span></p>
+                        </div>
+                        <button id="nav-logout" class="btn btn-outline" style="width: 100%; color: #ef4444; border-color: #fca5a5; background: transparent;">Log Out</button>
+                    </div>
+                </div>
+                <a href="login.html" id="nav-login" class="nav-link btn btn-primary" style="color: white; padding: 6px 16px; border-radius: 6px; font-weight: 500;">Sign In</a>
             </nav>
     </header>
 
@@ -85,10 +123,20 @@
                 </div>
             </div>
 
-            <!-- Submissions vs Resolved Chart -->
-            <div class="stats-card stats-chart-card">
-                <h3>Submitted vs Resolved</h3>
-                <canvas id="submissions-chart"></canvas>
+            <div class="stats-chart-card" style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; background: transparent; border: none; padding: 0; box-shadow: none;">
+                <!-- Submissions vs Resolved Chart -->
+                <div class="stats-card" style="margin-bottom: 0;">
+                    <h3>Submitted vs Resolved</h3>
+                    <canvas id="submissions-chart"></canvas>
+                </div>
+
+                <!-- My Posted Problems -->
+                <div class="stats-card" style="margin-bottom: 0;">
+                    <h3>My Posted Problems</h3>
+                    <div id="stats-my-problems" class="challenge-list" style="max-height: 400px; overflow-y: auto;">
+                        <p>Loading your problems...</p>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
@@ -160,6 +208,7 @@
         </section>
     </div>
 
+
     <!-- Floating Action Button -->
     <button id="open-post-modal" class="btn btn-primary floating-action-btn" title="Post a Challenge">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
@@ -169,7 +218,7 @@
         </svg>
     </button>
 
-    <script src="script.js"></script>
+    <script src="script.js?v=6"></script>
 </body>
 
 </html>

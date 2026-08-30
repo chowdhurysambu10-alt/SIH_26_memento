@@ -3,11 +3,89 @@ const API_URL = 'http://localhost:3000/api/v1';
 
 
 document.addEventListener('DOMContentLoaded', async () => {
+    // Prevent the site from triggering any reloads unless manually confirmed by the user
+    window.addEventListener('beforeunload', (e) => {
+        // Cancel the event and show the browser's native confirmation dialog
+        e.preventDefault();
+        e.returnValue = '';
+    });
+
     // 1. Wipe backend memory on page refresh (as requested)
+    // Removed because this causes data loss on every live server reload
+    /* 
     try {
         await fetch(`${API_URL}/reset`, { method: 'POST' });
     } catch (e) {
         console.error("Failed to reset:", e);
+    }
+    */
+
+    let authToken = localStorage.getItem('supabase_access_token') || null;
+    let currentUser = JSON.parse(localStorage.getItem('user_data') || 'null');
+
+    const navLoginBtn = document.getElementById('nav-login');
+    const userMenuContainer = document.getElementById('user-menu-container');
+    const navUserProfile = document.getElementById('nav-user-profile');
+    const userNameDisplay = document.getElementById('user-name-display');
+    const userDropdown = document.getElementById('user-dropdown');
+    const dropdownUserName = document.getElementById('dropdown-user-name');
+    const dropdownUserEmail = document.getElementById('dropdown-user-email');
+    const dropdownUserRole = document.getElementById('dropdown-user-role');
+    const navLogout = document.getElementById('nav-logout');
+
+    // Auth modals (if any)
+    const authModal = document.getElementById('auth-modal');
+    const closeAuthModal = document.getElementById('close-auth-modal');
+    const loginForm = document.getElementById('login-form');
+
+    function updateAuthUI() {
+        if (authToken && currentUser) {
+            if (navLoginBtn) navLoginBtn.style.display = 'none';
+            if (userMenuContainer) {
+                userMenuContainer.style.display = 'block';
+                userNameDisplay.textContent = currentUser.name || 'User';
+                dropdownUserName.textContent = currentUser.name || 'User';
+                dropdownUserEmail.textContent = currentUser.email || 'No email provided';
+                dropdownUserRole.textContent = currentUser.role || 'User';
+            }
+        } else {
+            if (navLoginBtn) navLoginBtn.style.display = 'block';
+            if (userMenuContainer) userMenuContainer.style.display = 'none';
+        }
+    }
+
+    updateAuthUI();
+
+    if (navUserProfile) {
+        navUserProfile.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (userDropdown.style.display === 'none') {
+                userDropdown.style.display = 'block';
+            } else {
+                userDropdown.style.display = 'none';
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (userMenuContainer && !userMenuContainer.contains(e.target) && userDropdown) {
+                userDropdown.style.display = 'none';
+            }
+        });
+    }
+
+    if (navLogout) {
+        navLogout.addEventListener('click', (e) => {
+            e.preventDefault();
+            localStorage.removeItem('supabase_access_token');
+            localStorage.removeItem('supabase_refresh_token');
+            localStorage.removeItem('user_data');
+            authToken = null;
+            currentUser = null;
+            if (userDropdown) userDropdown.style.display = 'none';
+            updateAuthUI();
+            loadFeed();
+        });
     }
 
     const form = document.getElementById('challenge-form');
@@ -21,7 +99,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const uploadLabelText = document.getElementById('upload-label-text');
     const previewContainer = document.getElementById('preview-container');
     const submitBtn = document.getElementById('submit-btn');
-    
+
     let selectedFiles = [];
 
     const openModalBtn = document.getElementById('open-post-modal');
@@ -40,8 +118,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     function loadFeed(query = '') {
         feedList.innerHTML = '<p class="empty-state">Loading...</p>';
         const url = query ? `${API_URL}/challenges?page=1&limit=20&search=${encodeURIComponent(query)}` : `${API_URL}/challenges?page=1&limit=20`;
-        
-        fetch(url)
+
+        const headers = authToken ? { 'Authorization': `Bearer ${authToken}` } : {};
+
+        fetch(url, { headers })
             .then(r => r.json())
             .then(data => renderFeed(data.data))
             .catch(() => {
@@ -102,8 +182,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         const statsDistricts = document.getElementById('stats-districts');
         const statsCategories = document.getElementById('stats-categories');
         const statsTrending = document.getElementById('stats-trending');
+        const statsMyProblems = document.getElementById('stats-my-problems');
 
         try {
+            const savedUser = JSON.parse(localStorage.getItem('user_data'));
+
             const [overviewRes, distRes, catRes, trendingRes] = await Promise.all([
                 fetch(`${API_URL}/analytics/overview`),
                 fetch(`${API_URL}/analytics/by-district`),
@@ -155,6 +238,83 @@ document.addEventListener('DOMContentLoaded', async () => {
                     statsTrending.innerHTML = '<p>No trending problems found.</p>';
                 }
             }
+
+            if (savedUser && savedUser.id && statsMyProblems) {
+                try {
+                    const myProbsRes = await fetch(`${API_URL}/challenges?limit=50`);
+                    if (myProbsRes.ok) {
+                        const payload = await myProbsRes.json();
+                        const myData = (payload.data || []).filter(c => c.submitted_by === savedUser.id);
+
+                        // Append 'My Posts' to the overview cards
+                        const overviewDiv = document.getElementById('stats-overview');
+                        if (overviewDiv) {
+                            overviewDiv.innerHTML += `<div class="stat-box" style="background: #e0f2fe; border-color: #7dd3fc;"><h4>My Posts</h4><p>${myData.length}</p></div>`;
+                        }
+
+                        if (myData.length) {
+                            statsMyProblems.innerHTML = '';
+                            myData.forEach(challenge => {
+                                const card = document.createElement('div');
+                                card.className = 'feed-item';
+
+                                const actionsHtml = `
+                                    <div class="problem-actions" style="margin-top: 10px; display: flex; gap: 8px;">
+                                        <button class="action-btn edit-my-post" data-id="${challenge.id}">Edit</button>
+                                        <button class="action-btn delete-btn delete-my-post" data-id="${challenge.id}">Delete</button>
+                                    </div>
+                                `;
+
+                                card.innerHTML = `
+                                    <div class="feed-meta">
+                                        <span class="status">${challenge.status} • ${challenge.district || 'Unknown'}</span>
+                                    </div>
+                                    <h3>${challenge.title}</h3>
+                                    <p>${challenge.description.length > 100 ? challenge.description.substring(0, 100) + '...' : challenge.description}</p>
+                                    ${actionsHtml}
+                                `;
+
+                                // Attach event listeners
+                                const editBtn = card.querySelector('.edit-my-post');
+                                const delBtn = card.querySelector('.delete-my-post');
+
+                                editBtn.addEventListener('click', () => {
+                                    document.getElementById('title').value = challenge.title || '';
+                                    document.getElementById('district').value = challenge.district || '';
+                                    document.getElementById('description').value = challenge.description || '';
+                                    document.getElementById('solution').value = '';
+
+                                    form.dataset.editId = challenge.id;
+                                    submitBtn.textContent = 'Update Challenge';
+                                    if (postModal) postModal.classList.add('active');
+                                });
+
+                                delBtn.addEventListener('click', () => {
+                                    if (!confirm('Are you sure you want to delete this challenge?')) return;
+                                    const headers = authToken ? { 'Authorization': `Bearer ${authToken}` } : {};
+                                    fetch(`${API_URL}/challenges/${challenge.id}`, { method: 'DELETE', headers })
+                                        .then(() => {
+                                            // Re-load stats and feed to reflect deletion
+                                            loadStatistics();
+                                            fetch(`${API_URL}/challenges?page=1&limit=20`, { headers })
+                                                .then(r => r.json())
+                                                .then(d => renderFeed(d.data));
+                                        });
+                                });
+
+                                statsMyProblems.appendChild(card);
+                            });
+                        } else {
+                            statsMyProblems.innerHTML = '<p>You have not posted any problems yet.</p>';
+                        }
+                    }
+                } catch (e) {
+                    statsMyProblems.innerHTML = '<p>Error loading your problems.</p>';
+                }
+            } else if (statsMyProblems) {
+                statsMyProblems.innerHTML = '<p>Please log in to view your problems.</p>';
+            }
+
         } catch (e) {
             console.error('Error fetching statistics:', e);
             statsOverview.innerHTML = '<p>Error loading stats.</p>';
@@ -285,12 +445,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (btnCameraCapture) btnCameraCapture.addEventListener('click', () => {
         if (!cameraStream) return;
-        
+
         cameraCanvas.width = cameraVideo.videoWidth;
         cameraCanvas.height = cameraVideo.videoHeight;
         const ctx = cameraCanvas.getContext('2d');
         ctx.drawImage(cameraVideo, 0, 0, cameraCanvas.width, cameraCanvas.height);
-        
+
         cameraCanvas.toBlob((blob) => {
             if (blob) {
                 const file = new File([blob], `capture_${Date.now()}.jpg`, { type: 'image/jpeg' });
@@ -350,17 +510,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
         uploadLabelText.textContent = `${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''} selected`;
-        
+
         selectedFiles.forEach((file, index) => {
             const url = URL.createObjectURL(file);
             const wrapper = document.createElement('div');
             wrapper.className = 'preview-wrapper';
-            
+
             const el = file.type.startsWith('video/')
                 ? Object.assign(document.createElement('video'), { src: url, controls: true })
                 : Object.assign(document.createElement('img'), { src: url, alt: 'preview' });
             el.className = 'media-preview';
-            
+
             const removeBtn = document.createElement('button');
             removeBtn.type = 'button';
             removeBtn.className = 'remove-media-btn';
@@ -371,7 +531,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 selectedFiles.splice(index, 1);
                 renderPreviews();
             });
-            
+
             wrapper.appendChild(el);
             wrapper.appendChild(removeBtn);
             previewContainer.appendChild(wrapper);
@@ -402,10 +562,28 @@ document.addEventListener('DOMContentLoaded', async () => {
         submitBtn.disabled = true;
         feedList.innerHTML = '<div class="feed-item"><p>Running AI Routing...</p></div>';
 
+        const headers = authToken ? { 'Authorization': `Bearer ${authToken}` } : {};
+
         try {
-            const res = await fetch(`${API_URL}/challenges`, { method: 'POST', body: formData });
+            const editId = form.dataset.editId;
+            let res;
+            if (editId) {
+                // For editing, we might just send JSON since media upload on edit isn't fully set up, but let's just send JSON for simplicity or FormData
+                res = await fetch(`${API_URL}/challenges/${editId}`, {
+                    method: 'PATCH',
+                    headers: { ...headers, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: titleVal,
+                        district: distVal,
+                        description: fullDesc
+                    })
+                });
+            } else {
+                res = await fetch(`${API_URL}/challenges`, { method: 'POST', body: formData, headers });
+            }
+
             if (!res.ok) throw new Error(`Server error ${res.status}`);
-            
+
             // Re-fetch challenges
             const freshRes = await fetch(`${API_URL}/challenges?page=1&limit=20`);
             const data = await freshRes.json();
@@ -419,6 +597,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </div>`;
         } finally {
             form.reset();
+            delete form.dataset.editId;
             selectedFiles = [];
             previewContainer.innerHTML = '';
             uploadLabelText.textContent = 'Click to upload photo or video';
@@ -458,17 +637,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             card.appendChild(meta);
             card.appendChild(title);
             card.appendChild(pDesc);
-            
+
             if (challenge.media_urls && challenge.media_urls.length > 0) {
                 const row = document.createElement('div');
                 row.className = 'media-row';
                 challenge.media_urls.forEach(url => {
-                    const mediaUrl = url.startsWith('http') 
-                        ? url 
-                        : (url.startsWith('/api/v1') 
-                            ? `http://localhost:3000${url}` 
+                    const mediaUrl = url.startsWith('http')
+                        ? url
+                        : (url.startsWith('/api/v1')
+                            ? `http://localhost:3000${url}`
                             : `${API_URL}${url.startsWith('/') ? '' : '/'}${url}`);
-                    
+
                     if (mediaUrl.endsWith('.mp4') || mediaUrl.endsWith('.mov')) {
                         const vid = document.createElement('video');
                         vid.src = mediaUrl;
@@ -494,60 +673,121 @@ document.addEventListener('DOMContentLoaded', async () => {
             const supportBtn = document.createElement('button');
             supportBtn.className = 'interaction-btn support-btn';
             let currentSupportCount = challenge.support_count || 0;
-            
-            // Check if already supported from localStorage
-            let supportedChallenges = JSON.parse(localStorage.getItem('supportedChallenges') || '[]');
-            let supported = supportedChallenges.includes(challenge.id);
-            
-            if (supported) {
-                supportBtn.innerHTML = `<span>Supported (${currentSupportCount})</span>`;
-                supportBtn.classList.add('active');
-            } else {
-                supportBtn.innerHTML = `<span>Support (${currentSupportCount})</span>`;
-            }
+            let supported = challenge.has_supported === 1;
 
-            supportBtn.addEventListener('click', async () => {
-                if(supported) return; // Prevent multiple clicks
-                
+            supportBtn.type = 'button';
+
+            const renderSupportBtn = () => {
+                if (supported) {
+                    supportBtn.innerHTML = `<span>Supported (${currentSupportCount})</span>`;
+                    supportBtn.classList.add('active');
+                } else {
+                    supportBtn.innerHTML = `<span>Support (${currentSupportCount})</span>`;
+                    supportBtn.classList.remove('active');
+                }
+            };
+
+            renderSupportBtn();
+
+            let isSupporting = false;
+            supportBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                if (!authToken) {
+                    alert('You must be logged in to support a challenge.');
+                    return;
+                }
+
+                if (isSupporting) return;
+
+                // Optimistic UI update
+                const prevSupported = supported;
+                const prevCount = currentSupportCount;
+
+                supported = !supported;
+                currentSupportCount += supported ? 1 : -1;
+                renderSupportBtn();
+
+                isSupporting = true;
+
+                const headers = { 'Authorization': `Bearer ${authToken}` };
+
                 try {
-                    const res = await fetch(`${API_URL}/challenges/${challenge.id}/support`, { method: 'POST' });
+                    const res = await fetch(`${API_URL}/challenges/${challenge.id}/support`, { method: 'POST', headers });
                     if (res.ok) {
                         const payload = await res.json();
-                        const newCount = payload.data?.support_count || (currentSupportCount + 1);
-                        currentSupportCount = newCount;
-                        supportBtn.innerHTML = `<span>Supported (${currentSupportCount})</span>`;
-                        supportBtn.classList.add('active');
-                        supported = true;
-                        
-                        // Persist support
-                        supportedChallenges.push(challenge.id);
-                        localStorage.setItem('supportedChallenges', JSON.stringify(supportedChallenges));
+                        const result = payload.data || payload;
+
+                        currentSupportCount = result.support_count;
+                        supported = result.supported;
+                        renderSupportBtn();
+                    } else {
+                        // Revert on error
+                        supported = prevSupported;
+                        currentSupportCount = prevCount;
+                        renderSupportBtn();
+                        const errData = await res.json();
+                        alert(errData.message || 'Error supporting challenge');
                     }
                 } catch (err) {
+                    // Revert on error
+                    supported = prevSupported;
+                    currentSupportCount = prevCount;
+                    renderSupportBtn();
                     console.error('Error supporting challenge:', err);
+                } finally {
+                    isSupporting = false;
                 }
             });
 
-            // Action Buttons (Edit/Delete)
-            const actions = document.createElement('div');
-            actions.className = 'problem-actions';
-            actions.style.marginLeft = 'auto';
-            const delBtn = document.createElement('button');
-            delBtn.className = 'action-btn delete-btn';
-            delBtn.title = 'Delete';
-            delBtn.innerHTML = 'Delete';
-            delBtn.addEventListener('click', () => {
-                fetch(`${API_URL}/challenges/${challenge.id}`, { method: 'DELETE' })
-                    .then(() => {
-                        fetch(`${API_URL}/challenges?page=1&limit=20`)
-                            .then(r => r.json())
-                            .then(data => renderFeed(data.data));
-                    });
-            });
-            actions.appendChild(delBtn);
-
             interactionRow.appendChild(supportBtn);
-            interactionRow.appendChild(actions);
+
+            // Action Buttons (Edit/Delete) - only for creator
+            if (currentUser && challenge.submitted_by === currentUser.id) {
+                const actions = document.createElement('div');
+                actions.className = 'problem-actions';
+                actions.style.marginLeft = 'auto';
+
+                const editBtn = document.createElement('button');
+                editBtn.className = 'action-btn';
+                editBtn.title = 'Edit';
+                editBtn.innerHTML = 'Edit';
+                editBtn.style.marginRight = '8px';
+                editBtn.addEventListener('click', () => {
+                    // Populate modal
+                    document.getElementById('title').value = challenge.title || '';
+                    document.getElementById('district').value = challenge.district || '';
+                    document.getElementById('description').value = challenge.description || '';
+                    document.getElementById('solution').value = '';
+
+                    form.dataset.editId = challenge.id; // Store ID for edit mode
+                    submitBtn.textContent = 'Update Challenge';
+
+                    if (postModal) postModal.classList.add('active');
+                });
+
+                const delBtn = document.createElement('button');
+                delBtn.className = 'action-btn delete-btn';
+                delBtn.title = 'Delete';
+                delBtn.innerHTML = 'Delete';
+                delBtn.addEventListener('click', () => {
+                    if (!confirm('Are you sure you want to delete this challenge?')) return;
+
+                    const headers = authToken ? { 'Authorization': `Bearer ${authToken}` } : {};
+                    fetch(`${API_URL}/challenges/${challenge.id}`, { method: 'DELETE', headers })
+                        .then(() => {
+                            fetch(`${API_URL}/challenges?page=1&limit=20`, { headers })
+                                .then(r => r.json())
+                                .then(data => renderFeed(data.data));
+                        });
+                });
+
+                actions.appendChild(editBtn);
+                actions.appendChild(delBtn);
+                interactionRow.appendChild(actions);
+            }
+
             card.appendChild(interactionRow);
 
             feedList.appendChild(card);
@@ -559,8 +799,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!confirm('Delete this challenge? This cannot be undone.')) return;
         btn.textContent = 'processing...';
         btn.disabled = true;
+        const headers = authToken ? { 'Authorization': `Bearer ${authToken}` } : {};
         try {
-            const res = await fetch(`${API_URL}/submission/${id}`, { method: 'DELETE' });
+            const res = await fetch(`${API_URL}/submission/${id}`, { method: 'DELETE', headers });
             const data = await res.json();
             renderFeed(data.clusters);
         } catch (err) {
@@ -582,11 +823,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const mediaContainer = document.createElement('div');
         mediaContainer.className = 'edit-media-container';
-        
+
         const mediaHeader = document.createElement('div');
         mediaHeader.className = 'edit-media-header';
         mediaHeader.innerHTML = '<span class="edit-media-title">Media Attached</span>';
-        
+
         const addMediaBtn = document.createElement('button');
         addMediaBtn.type = 'button';
         addMediaBtn.className = 'btn btn-outline';
@@ -601,7 +842,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             };
             if (uploadAreaTrigger) uploadAreaTrigger.click(); // Open popup
         });
-        
+
         mediaHeader.appendChild(addMediaBtn);
         mediaContainer.appendChild(mediaHeader);
 
@@ -611,16 +852,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         function renderEditMedia() {
             editPreviewContainer.innerHTML = '';
-            
+
             // Render existing media
             keptMedia.forEach((m, index) => {
                 const wrapper = document.createElement('div');
                 wrapper.className = 'preview-wrapper';
-                const el = m.isVideo 
+                const el = m.isVideo
                     ? Object.assign(document.createElement('video'), { src: `${API_URL}${m.url}`, controls: true })
                     : Object.assign(document.createElement('img'), { src: `${API_URL}${m.url}` });
                 el.className = 'media-preview';
-                
+
                 const removeBtn = document.createElement('button');
                 removeBtn.type = 'button';
                 removeBtn.className = 'remove-media-btn';
@@ -629,7 +870,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     keptMedia.splice(index, 1);
                     renderEditMedia();
                 });
-                
+
                 wrapper.appendChild(el);
                 wrapper.appendChild(removeBtn);
                 editPreviewContainer.appendChild(wrapper);
@@ -644,7 +885,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     ? Object.assign(document.createElement('video'), { src: url, controls: true })
                     : Object.assign(document.createElement('img'), { src: url });
                 el.className = 'media-preview';
-                
+
                 const removeBtn = document.createElement('button');
                 removeBtn.type = 'button';
                 removeBtn.className = 'remove-media-btn';
@@ -653,13 +894,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                     editNewFiles.splice(index, 1);
                     renderEditMedia();
                 });
-                
+
                 wrapper.appendChild(el);
                 wrapper.appendChild(removeBtn);
                 editPreviewContainer.appendChild(wrapper);
             });
         }
-        
+
         renderEditMedia();
 
         const saveBtn = document.createElement('button');
@@ -683,7 +924,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         textSpan.replaceWith(wrapper);
         li.querySelector('.problem-actions').style.display = 'none';
-        
+
         // Hide media row if present
         const mediaRow = li.querySelector('.media-row');
         if (mediaRow) mediaRow.style.display = 'none';
@@ -702,15 +943,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!newText) return;
             saveBtn.textContent = 'processing...';
             saveBtn.disabled = true;
-            
+
             const formData = new FormData();
             formData.append('text', newText);
             formData.append('kept_media', keptMedia.map(m => m.id).join(','));
             editNewFiles.forEach(f => formData.append('media', f));
+            const headers = authToken ? { 'Authorization': `Bearer ${authToken}` } : {};
 
             try {
                 const res = await fetch(`${API_URL}/submission/${problem.id}`, {
                     method: 'PATCH',
+                    headers: headers,
                     body: formData
                 });
                 const data = await res.json();
