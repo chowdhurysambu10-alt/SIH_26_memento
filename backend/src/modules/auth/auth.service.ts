@@ -63,11 +63,11 @@ export class AuthService {
     }
 
     // 3. Issue session tokens
-    const { data: sessionData, error: sessionError } =
-      await admin.auth.signInWithPassword({
-        email: dto.email,
-        password: dto.password,
-      });
+    const anonClient = this.supabaseService.getAnonClient();
+    const { data: sessionData } = await anonClient.auth.signInWithPassword({
+      email: dto.email,
+      password: dto.password,
+    });
 
     return {
       user: {
@@ -85,8 +85,9 @@ export class AuthService {
 
   async login(dto: LoginDto) {
     const admin = this.supabaseService.getAdminClient();
+    const anonClient = this.supabaseService.getAnonClient();
 
-    const { data, error } = await admin.auth.signInWithPassword({
+    const { data, error } = await anonClient.auth.signInWithPassword({
       email: dto.email,
       password: dto.password,
     });

@@ -38,6 +38,18 @@ export class SupabaseService implements OnModuleInit {
   }
 
   /**
+   * Returns public Supabase client for authentication operations.
+   */
+  getAnonClient(): SupabaseClient {
+    return createClient(this.supabaseUrl, this.anonKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+  }
+
+  /**
    * Returns a Supabase client scoped to the provided User Bearer Token (Respects Postgres RLS).
    */
   getUserClient(accessToken: string): SupabaseClient {

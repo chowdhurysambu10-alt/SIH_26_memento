@@ -86,7 +86,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
       }
       onSuccess();
     } catch (err: any) {
-      setError(err.message || (isSignUp ? 'Registration failed.' : 'Invalid credentials.'));
+      if (!isSignUp && (err.message?.includes('Invalid') || err.message?.includes('401') || err.statusCode === 401)) {
+        setError('Invalid email or password. If you are new to the portal, please click the "Register" tab above to create an account.');
+      } else {
+        setError(err.message || (isSignUp ? 'Registration failed.' : 'Invalid credentials.'));
+      }
     } finally {
       setLoading(false);
     }
