@@ -48,4 +48,9 @@ export class FilterChallengeDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @ApiPropertyOptional({ description: 'Sort criteria: support, priority, or recent', example: 'support' })
+  @IsOptional()
+  @IsString()
+  sort_by?: 'support' | 'priority' | 'recent';
 }
