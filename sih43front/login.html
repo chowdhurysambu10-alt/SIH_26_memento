@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign In — Momento Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body style="margin: 0; padding: 0; background: #f8fafc; font-family: 'Inter', sans-serif;">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+    const API_BASE_URL = "http://localhost:3000/api/v1";
+
+    // SVG Icon components
+    const Icon = ({ children, size = 22, color = "currentColor" }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{children}</svg>
+    );
+
+    const GlobeIcon = ({ size = 28, color = "#fff" }) => (
+      <Icon size={size} color={color}><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></Icon>
+    );
+
+    const StudentIcon = ({ size = 22, color = "currentColor" }) => (
+      <Icon size={size} color={color}><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 1.1 2.7 3 6 3s6-1.9 6-3v-5"/></Icon>
+    );
+
+    const BuildingIcon = ({ size = 22, color = "currentColor" }) => (
+      <Icon size={size} color={color}><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4M8 6h.01M16 6h.01M12 6h.01M12 10h.01M8 10h.01M16 10h.01M12 14h.01M8 14h.01M16 14h.01"/></Icon>
+    );
+
+    const ShieldIcon = ({ size = 22, color = "currentColor" }) => (
+      <Icon size={size} color={color}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></Icon>
+    );
+
+    const UsersIcon = ({ size = 22, color = "currentColor" }) => (
+      <Icon size={size} color={color}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></Icon>
+    );
+
+    const CheckCircleIcon = ({ size = 48, color = "#2563eb" }) => (
+      <Icon size={size} color={color}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></Icon>
+    );
+
+    const EyeIcon = ({ size = 16, color = "#64748b" }) => (
+      <Icon size={size} color={color}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></Icon>
+    );
+
+    const EyeOffIcon = ({ size = 16, color = "#64748b" }) => (
+      <Icon size={size} color={color}><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></Icon>
+    );
+
+    const AlertIcon = ({ size = 16, color = "#b91c1c" }) => (
+      <Icon size={size} color={color}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></Icon>
+    );
+
+    const ArrowIcon = ({ size = 14, color = "rgba(255,255,255,0.9)" }) => (
+      <Icon size={size} color={color}><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></Icon>
+    );
+
+    const roleIconMap = {
+      student: StudentIcon,
+      institution: BuildingIcon,
+      admin: ShieldIcon,
+      citizen: UsersIcon
+    };
+
+    const ROLES = [
+      { id: "student", label: "Student" },
+      { id: "institution", label: "Institution" },
+      { id: "admin", label: "Admin" },
+      { id: "citizen", label: "Public" }
+    ];
+
+    function App() {
+      const [isSignUp, setIsSignUp] = useState(false);
+      const [activeRole, setActiveRole] = useState(ROLES[0]);
+      
+      const [name, setName] = useState("");
+      const [orgName, setOrgName] = useState(""); 
+      const [email, setEmail] = useState("");
+      const [password, setPassword] = useState("");
+      const [confirmPassword, setConfirmPassword] = useState("");
+      const [showPass, setShowPass] = useState(false);
+      
+      const [loading, setLoading] = useState(false);
+      const [error, setError] = useState("");
+      const [user, setUser] = useState(null);
+
+      useEffect(() => {
+        const token = localStorage.getItem("supabase_access_token");
+        const savedUser = localStorage.getItem("user_data");
+        if (token && savedUser) {
+          try { setUser(JSON.parse(savedUser)); } catch (e) {}
+        }
+      }, []);
+
+      const resetForm = () => {
+        setError("");
+        setPassword("");
+        setConfirmPassword("");
+      };
+
+      const handleAuth = async (e) => {
+        e?.preventDefault();
+        setError("");
+
+        if (!email.trim() || !password) {
+          return setError("All credentials are required.");
+        }
+
+        if (isSignUp) {
+          if (!name.trim()) return setError("Full Name is required.");
+          if (activeRole.id !== "citizen" && !orgName.trim()) {
+            return setError("Institution/Organization Name is required for this role.");
+          }
+          
+          const passRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+          if (!passRegex.test(password)) {
+            return setError("Password must be at least 8 characters and contain 1 uppercase, 1 lowercase, 1 number, and 1 special character.");
+          }
+
+          if (password !== confirmPassword) return setError("Passwords do not match!");
+        }
+
+        setLoading(true);
+
+        try {
+          const endpoint = isSignUp ? `${API_BASE_URL}/auth/signup` : `${API_BASE_URL}/auth/login`;
+          const payload = isSignUp 
+            ? { 
+                email: email.trim(), 
+                password, 
+                name: name.trim(), 
+                role: activeRole.id,
+                organization: orgName.trim()
+              }
+            : { email: email.trim(), password };
+
+          const res = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+
+          const data = await res.json();
+
+          if (!res.ok) {
+            setError(data?.message || (isSignUp ? "Registration failed. Email might exist." : "Invalid credentials."));
+            return;
+          }
+
+          const session = data?.session || data?.data?.session;
+          const userData = data?.user || data?.data?.user;
+
+          if (session?.access_token) {
+            localStorage.setItem("supabase_access_token", session.access_token);
+            localStorage.setItem("supabase_refresh_token", session.refresh_token || "");
+          }
+          if (userData) {
+            localStorage.setItem("user_data", JSON.stringify(userData));
+            setUser(userData);
+          }
+        } catch (err) {
+          setError("Backend unreachable. Ensure NestJS is running on localhost:3000.");
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const handleLogout = () => {
+        localStorage.clear();
+        setUser(null);
+        setName("");
+        setOrgName("");
+        setEmail("");
+        resetForm();
+      };
+
+      if (user) {
+        return (
+          <div style={styles.pageWrapper}>
+            <div style={styles.brandPanel}>
+              <div>
+                <div style={{ marginBottom: 16 }}><GlobeIcon size={48} color="#fff" /></div>
+                <h1 style={{ fontSize: 32, fontWeight: 700, color: "#fff", margin: "0 0 8px" }}>Momento</h1>
+                <p style={{ fontSize: 15, color: "rgba(255,255,255,0.8)", margin: 0, lineHeight: 1.6 }}>Societal Innovation & Collaboration Platform</p>
+                <p style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", marginTop: 8 }}>by Team Momento · SIH26043</p>
+              </div>
+            </div>
+            <div style={styles.formPanel}>
+              <div style={styles.formInner}>
+                <div style={{ textAlign: "center", marginBottom: 32 }}>
+                  <div style={{ marginBottom: 12 }}><CheckCircleIcon size={48} color="#2563eb" /></div>
+                  <h2 style={{ fontSize: 28, fontWeight: 700, color: "#0f172a", margin: "0 0 8px" }}>Welcome, {user.name || "User"}!</h2>
+                  <p style={{ color: "#64748b", fontSize: 15, margin: "0 0 20px" }}>{user.email}</p>
+                  <div style={styles.badge}>Role: {user.role || activeRole.label}</div>
+                  <div style={{ marginTop: 32, display: "flex", gap: "12px", justifyContent: "center" }}>
+                    <button onClick={handleLogout} style={styles.logoutBtn}>← Sign out</button>
+                    <button onClick={() => window.location.href = 'index.html'} style={{...styles.submitBtn, width: "auto", padding: "12px 28px"}}>Go to Dashboard →</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      }
+      const passRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+      const showPasswordError = isSignUp && password.length > 0 && !passRegex.test(password);
+
+      return (
+        <div style={styles.pageWrapper}>
+          <div style={styles.brandPanel}>
+            <div>
+              <div style={{ marginBottom: 16 }}><GlobeIcon size={48} color="#fff" /></div>
+              <h1 style={{ fontSize: 32, fontWeight: 700, color: "#fff", margin: "0 0 8px" }}>Momento</h1>
+              <p style={{ fontSize: 15, color: "rgba(255,255,255,0.8)", margin: 0, lineHeight: 1.6 }}>Societal Innovation &<br/>Collaboration Platform</p>
+              <p style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", marginTop: 8 }}>by Team Momento · SIH26043</p>
+              <div style={{ marginTop: 40, padding: "16px 20px", background: "rgba(255,255,255,0.1)", borderRadius: 12, backdropFilter: "blur(8px)" }}>
+                <p style={{ color: "rgba(255,255,255,0.9)", fontSize: 13, margin: 0, lineHeight: 1.6, display: "flex", alignItems: "center", gap: 8 }}><ArrowIcon /> Connect with citizens, institutions & government bodies to solve real societal challenges across India.</p>
+              </div>
+            </div>
+          </div>
+          <div style={styles.formPanel}>
+            <div style={styles.formInner}>
+              <a href="index.html" style={{ display: "inline-block", marginBottom: 24, color: "#64748b", textDecoration: "none", fontSize: "14px", fontWeight: 500, transition: "color 0.2s" }}>← Back to Home</a>
+              <h2 style={{ fontSize: 28, fontWeight: 700, color: "#0f172a", margin: "0 0 4px" }}>{isSignUp ? "Create your account" : "Welcome back"}</h2>
+              <p style={{ color: "#64748b", fontSize: 15, margin: "0 0 32px" }}>{isSignUp ? "Join the platform and start collaborating" : "Sign in to continue to your dashboard"}</p>
+              {/* Login / Signup Toggle */}
+              <div style={styles.toggleContainer}>
+                <button
+                  type="button"
+                  onClick={() => { setIsSignUp(false); resetForm(); }}
+                  style={{ ...styles.toggleBtn, background: !isSignUp ? "#fff" : "transparent", boxShadow: !isSignUp ? "0 2px 4px rgba(0,0,0,0.08)" : "none", color: !isSignUp ? "#0f172a" : "#64748b" }}
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setIsSignUp(true); resetForm(); }}
+                  style={{ ...styles.toggleBtn, background: isSignUp ? "#fff" : "transparent", boxShadow: isSignUp ? "0 2px 4px rgba(0,0,0,0.08)" : "none", color: isSignUp ? "#0f172a" : "#64748b" }}
+                >
+                  Register
+                </button>
+              </div>
+
+              {/* Role Tabs */}
+              <div style={styles.roleGrid}>
+                {ROLES.map((r) => {
+                  const isActive = activeRole.id === r.id;
+                  return (
+                    <button
+                      key={r.id}
+                      onClick={() => { setActiveRole(r); setError(""); }}
+                      style={{
+                        ...styles.roleBtn,
+                        background: isActive ? "#2563eb" : "#f1f5f9",
+                        color: isActive ? "#ffffff" : "#64748b",
+                        opacity: isActive ? 1 : 0.7,
+                        border: isActive ? "none" : "1px solid #e2e8f0"
+                      }}
+                    >
+                      <div>{React.createElement(roleIconMap[r.id], { size: 22, color: isActive ? "#ffffff" : "#64748b" })}</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, marginTop: 4 }}>{r.label}</div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Form */}
+              <form onSubmit={handleAuth}>
+                {isSignUp && (
+                  <div style={{ marginBottom: 14 }}>
+                    <label style={styles.label}>Full Name</label>
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Enter legal name"
+                      style={styles.input}
+                      required
+                    />
+                  </div>
+                )}
+
+                {isSignUp && activeRole.id !== "citizen" && (
+                  <div style={{ marginBottom: 14 }}>
+                    <label style={styles.label}>Institution / Organization Name</label>
+                    <input
+                      type="text"
+                      value={orgName}
+                      onChange={(e) => setOrgName(e.target.value)}
+                      placeholder="e.g. NIT Durgapur / Tata Steel"
+                      style={styles.input}
+                      required
+                    />
+                  </div>
+                )}
+
+                <div style={{ marginBottom: 14 }}>
+                  <label style={styles.label}>Email / User ID</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="name@domain.com"
+                    style={styles.input}
+                    required
+                  />
+                </div>
+
+                <div style={{ marginBottom: isSignUp ? 14 : 20 }}>
+                  <label style={styles.label}>Password</label>
+                  <div style={{ position: "relative" }}>
+                    <input
+                      type={showPass ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Enter password"
+                      style={{ ...styles.input, paddingRight: 45 }}
+                      required
+                    />
+                    <button type="button" onClick={() => setShowPass(!showPass)} style={styles.eyeBtn}>
+                      {showPass ? <EyeOffIcon /> : <EyeIcon />}
+                    </button>
+                  </div>
+                  {showPasswordError && (
+                    <div style={{ color: "#b91c1c", fontSize: 12, marginTop: 6, display: "flex", gap: 4, alignItems: "center" }}>
+                      <AlertIcon size={14} /> Must be 8+ chars, 1 uppercase, 1 lowercase, 1 number, 1 special char.
+                    </div>
+                  )}
+                </div>
+
+                {isSignUp && (
+                  <div style={{ marginBottom: 20 }}>
+                    <label style={styles.label}>Confirm Password</label>
+                    <input
+                      type={showPass ? "text" : "password"}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Re-enter password"
+                      style={styles.input}
+                      required
+                    />
+                  </div>
+                )}
+
+                {error && <div style={{...styles.errorBanner, display: "flex", alignItems: "center", gap: 8}}><AlertIcon /> {error}</div>}
+
+                <button type="submit" disabled={loading} style={{ ...styles.submitBtn, opacity: loading ? 0.7 : 1, padding: "14px", fontSize: 16 }}>
+                  {loading ? "Processing..." : isSignUp ? `Register as ${activeRole.label}` : `Sign in as ${activeRole.label}`}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const styles = {
+      pageWrapper: { display: "flex", minHeight: "100vh", width: "100%" },
+      brandPanel: { width: "42%", background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 50%, #1e40af 100%)", display: "flex", alignItems: "center", justifyContent: "center", padding: "60px 48px", position: "relative", overflow: "hidden" },
+      formPanel: { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 48px", background: "#ffffff", overflowY: "auto" },
+      formInner: { width: "100%", maxWidth: 480 },
+      toggleContainer: { display: "flex", background: "#f1f5f9", padding: 5, borderRadius: 12, marginBottom: 28 },
+      toggleBtn: { flex: 1, padding: "10px 0", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: "pointer", transition: "0.2s" },
+      roleGrid: { display: "flex", justifyContent: "space-between", marginBottom: 28, gap: 10 },
+      roleBtn: { flex: 1, border: "none", borderRadius: 12, padding: "14px 0", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", transition: "all 0.2s" },
+      label: { display: "block", fontSize: 14, fontWeight: 500, color: "#0f172a", marginBottom: 8 },
+      input: { width: "100%", padding: "12px 16px", background: "#ffffff", color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 15, outline: "none", boxSizing: "border-box", transition: "border-color 0.2s, box-shadow 0.2s" },
+      eyeBtn: { position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 6, cursor: "pointer", padding: "5px 10px", color: "#64748b" },
+      submitBtn: { width: "100%", padding: "14px", background: "#2563eb", border: "none", color: "#ffffff", fontSize: 16, fontWeight: 600, cursor: "pointer", borderRadius: 8, transition: "background 0.2s" },
+      badge: { display: "inline-block", padding: "8px 20px", borderRadius: 20, background: "#dbeafe", color: "#2563eb", fontWeight: 600, fontSize: 14 },
+      logoutBtn: { padding: "10px 24px", border: "1px solid #e2e8f0", background: "#fff", borderRadius: 8, cursor: "pointer", color: "#0f172a", fontWeight: 500, fontSize: 14 },
+      errorBanner: { background: "#fee2e2", color: "#b91c1c", padding: "12px 14px", borderRadius: 8, fontSize: 14, marginBottom: 16 }
+    };
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

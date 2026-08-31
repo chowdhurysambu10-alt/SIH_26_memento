@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <script>
+        // Silently block VS Code Live Server from auto-reloading the page
+        const OriginalWebSocket = window.WebSocket;
+        window.WebSocket = function(url, protocols) {
+            const ws = new OriginalWebSocket(url, protocols);
+            Object.defineProperty(ws, 'onmessage', {
+                set(listener) {
+                    this._listener = function(event) {
+                        if (typeof event.data === 'string' && event.data === 'reload') {
+                            console.log('Blocked Live Server auto-reload. Press F5 to reload manually.');
+                            return;
+                        }
+                        if (listener) listener.call(this, event);
+                    };
+                    ws.addEventListener('message', this._listener);
+                },
+                get() { return this._listener; }
+            });
+            return ws;
+        };
+    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jharkhand Innovation Portal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css?v=4">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">Memento</div>
+            <nav class="header-nav">
+                <a href="#" id="nav-feed" class="nav-link active">Feed</a>
+                <a href="#" id="nav-statistics" class="nav-link">Statistics</a>
+                <a href="#" class="nav-link">Community</a>
+                <a href="#" class="nav-link">Helpdesk</a>
+                <a href="#" class="nav-link">About</a>
+                <div class="user-menu-container" id="user-menu-container" style="position: relative; display: none;">
+                    <button id="nav-user-profile" class="nav-link btn btn-outline" style="color: var(--text-primary); padding: 6px 16px; border-radius: 6px; font-weight: 500; border: 1px solid var(--border); display: flex; align-items: center; gap: 8px; cursor: pointer; background: transparent;">
+                        <span id="user-name-display">User Name</span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </button>
+                    <div id="user-dropdown" class="user-dropdown" style="display: none; position: absolute; right: 0; top: 100%; margin-top: 8px; background: white; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 250px; z-index: 1000; padding: 16px; text-align: left;">
+                        <div style="border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 12px;">
+                            <p style="font-weight: 600; margin: 0 0 4px 0;" id="dropdown-user-name">User Name</p>
+                            <p style="font-size: 13px; color: #64748b; margin: 0;" id="dropdown-user-email">user@example.com</p>
+                        </div>
+                        <div style="margin-bottom: 16px;">
+                            <p style="font-size: 13px; margin: 0 0 4px 0;"><span style="color: #64748b;">Role:</span> <span id="dropdown-user-role" style="font-weight: 500; text-transform: capitalize;">User</span></p>
+                        </div>
+                        <button id="nav-logout" class="btn btn-outline" style="width: 100%; color: #ef4444; border-color: #fca5a5; background: transparent;">Log Out</button>
+                    </div>
+                </div>
+                <a href="login.html" id="nav-login" class="nav-link btn btn-primary" style="color: white; padding: 6px 16px; border-radius: 6px; font-weight: 500;">Sign In</a>
+            </nav>
+    </header>
+
+    <div class="search-container">
+        <div class="search-bar-wrapper">
+            <div class="search-input-container">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round" class="search-icon">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="search-input" placeholder="Search challenges, solutions, or tags..."
+                    class="search-input">
+            </div>
+            <button id="search-btn" class="btn btn-primary">Search</button>
+        </div>
+    </div>
+
+    <main class="main-layout" style="max-width: 1000px; margin: 0 auto; padding: 0 20px;">
+        <!-- Live Feed -->
+        <section id="feed-section" class="feed-section">
+            <div class="feed-header">
+                <h2>Recent Challenges</h2>
+            </div>
+
+            <div class="challenge-list" id="feed-list"></div>
+        </section>
+    </main>
+
+    <!-- Statistics Section - completely independent, full width -->
+    <section id="statistics-section" style="display: none; width: 100%; padding: 20px 20px 40px;">
+        <div class="feed-header" style="margin-bottom: 24px;">
+            <h2>Analytics Dashboard</h2>
+        </div>
+
+        <div class="statistics-dashboard" id="statistics-dashboard">
+            <!-- Overview Stats -->
+            <div class="stats-overview" id="stats-overview">
+                <p>Loading overview...</p>
+            </div>
+
+            <!-- Breakdown by District -->
+            <div class="stats-card">
+                <h3>Challenges by District</h3>
+                <div id="stats-districts">
+                    <p>Loading districts...</p>
+                </div>
+            </div>
+
+            <!-- Breakdown by Category -->
+            <div class="stats-card">
+                <h3>Challenges by Category</h3>
+                <div id="stats-categories">
+                    <p>Loading categories...</p>
+                </div>
+            </div>
+
+            <!-- Trending / Most Supported Problems -->
+            <div class="stats-card">
+                <h3>Trending / Most Supported Problems (Top 50)</h3>
+                <div id="stats-trending" class="challenge-list">
+                    <p>Loading trending problems...</p>
+                </div>
+            </div>
+
+            <div class="stats-chart-card" style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; background: transparent; border: none; padding: 0; box-shadow: none;">
+                <!-- Submissions vs Resolved Chart -->
+                <div class="stats-card" style="margin-bottom: 0;">
+                    <h3>Submitted vs Resolved</h3>
+                    <canvas id="submissions-chart"></canvas>
+                </div>
+
+                <!-- My Posted Problems -->
+                <div class="stats-card" style="margin-bottom: 0;">
+                    <h3>My Posted Problems</h3>
+                    <div id="stats-my-problems" class="challenge-list" style="max-height: 400px; overflow-y: auto;">
+                        <p>Loading your problems...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Camera Modal -->
+    <div id="camera-modal" class="modal-overlay">
+        <div class="card modal-content" style="max-width: 400px; padding: 20px; text-align: center;">
+            <h2>Camera</h2>
+            <video id="camera-video" autoplay playsinline
+                style="width: 100%; border-radius: 8px; margin: 10px 0; background: #000;"></video>
+            <canvas id="camera-canvas" style="display: none;"></canvas>
+            <div style="display: flex; gap: 10px; justify-content: center; margin-top: 10px;">
+                <button type="button" id="btn-camera-capture" class="btn btn-primary w-100">Capture</button>
+                <button type="button" id="btn-camera-cancel" class="btn btn-outline w-100">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Submit Form -->
+    <div id="post-modal" class="modal-overlay">
+        <section class="card submission-section modal-content">
+            <button id="close-post-modal" class="modal-close">&times;</button>
+            <h2>Submit a Local Challenge</h2>
+            <p class="subtitle">Report an issue for academic &amp; industry innovation.</p>
+
+            <form id="challenge-form">
+                <div class="input-group">
+                    <label for="title">Title *</label>
+                    <input type="text" id="title" class="input-field" placeholder="Briefly describe the challenge..."
+                        required>
+                </div>
+
+                <div class="input-group">
+                    <label for="district">District *</label>
+                    <input type="text" id="district" class="input-field" placeholder="e.g. Kolkata, Howrah..." required>
+                </div>
+
+                <div class="input-group">
+                    <label for="description">Detailed Description *</label>
+                    <textarea id="description" rows="4" placeholder="Briefly describe the problem and its location..."
+                        required></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="solution">Preferred Solution</label>
+                    <textarea id="solution" rows="3"
+                        placeholder="Suggest a way to resolve this challenge (optional)..."></textarea>
+                </div>
+
+                <div class="form-group media-upload-group">
+                    <span class="form-label">Add Media</span>
+                    <label class="upload-area" id="upload-area-trigger">
+                        <span id="upload-label-text">Click to upload photo or video</span>
+                    </label>
+                    <div class="upload-popup" id="upload-popup">
+                        <button type="button" class="popup-option" id="btn-camera">Camera</button>
+                        <button type="button" class="popup-option" id="btn-gallery">Gallery</button>
+                    </div>
+                    <!-- Hidden inputs -->
+                    <input type="file" id="media-input-gallery" accept="image/*,video/*" multiple
+                        class="media-input-hidden">
+                    <input type="file" id="media-input-camera" accept="image/*,video/*" capture="environment"
+                        class="media-input-hidden">
+                    <div id="preview-container"></div>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100" id="submit-btn">Submit Challenge</button>
+            </form>
+        </section>
+    </div>
+
+
+    <!-- Floating Action Button -->
+    <button id="open-post-modal" class="btn btn-primary floating-action-btn" title="Post a Challenge">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+    </button>
+
+    <script src="script.js?v=6"></script>
+</body>
+
+</html>
