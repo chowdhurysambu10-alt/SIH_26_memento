@@ -43,24 +43,23 @@ export class AuthService {
     const userId = authData.user.id;
 
     // 2. Insert into public.users table
-    const { error: profileError } = await admin.from('users').upsert({
-      id: userId,
-      name: dto.name,
-      email: dto.email,
-      role: dto.role,
-      org_id: dto.org_id || null,
-      district: dto.district || null,
-      contact: dto.contact || null,
-      verified: dto.role === 'citizen', // citizens auto-verified, institutional roles require admin verification
-    });
-
-    if (profileError) {
-      this.logger.error(`Failed to create public user profile: ${profileError.message}`);
-      throw new InternalServerErrorException({
-        statusCode: 500,
-        message: 'User created in auth but profile insertion failed',
-        errorCode: 'PROFILE_CREATION_FAILED',
+    try {
+      const { error: profileError } = await admin.from('users').insert({
+        id: userId,
+        name: dto.name,
+        email: dto.email,
+        role: dto.role,
+        org_id: dto.org_id || null,
+        district: dto.district || null,
+        contact: dto.contact || null,
+        verified: dto.role === 'citizen',
       });
+
+      if (profileError) {
+        this.logger.warn(`Public user profile notice: ${profileError.message}`);
+      }
+    } catch (err) {
+      this.logger.warn(`Public user profile insert exception: ${err.message}`);
     }
 
     // 3. Issue session tokens

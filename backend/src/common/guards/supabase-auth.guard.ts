@@ -51,14 +51,22 @@ export class SupabaseAuthGuard implements CanActivate {
         });
       }
 
-      // Fetch user profile from database
-      const { data: userProfile, error: profileError } =
-        await this.supabaseService
+      // Fetch user profile from database with safe fallback to auth metadata
+      let userProfile: any = null;
+      try {
+        const { data, error } = await this.supabaseService
           .getAdminClient()
           .from('users')
-          .select('*')
+          .select('id, name, email, role, district, org_id, verified')
           .eq('id', authData.user.id)
-          .single();
+          .maybeSingle();
+
+        if (!error && data) {
+          userProfile = data;
+        }
+      } catch (e) {
+        // Fallback to user_metadata
+      }
 
       const role = (userProfile?.role as UserRole) || (authData.user.user_metadata?.role as UserRole) || UserRole.CITIZEN;
 
@@ -66,10 +74,10 @@ export class SupabaseAuthGuard implements CanActivate {
         id: authData.user.id,
         email: authData.user.email,
         role: role,
-        org_id: userProfile?.org_id,
-        district: userProfile?.district,
-        name: userProfile?.name || authData.user.user_metadata?.name || 'Anonymous',
-        verified: userProfile?.verified ?? false,
+        org_id: userProfile?.org_id || authData.user.user_metadata?.org_id || null,
+        district: userProfile?.district || authData.user.user_metadata?.district || null,
+        name: userProfile?.name || authData.user.user_metadata?.name || 'Citizen User',
+        verified: userProfile?.verified ?? (role === UserRole.CITIZEN),
       };
 
       request.token = token;

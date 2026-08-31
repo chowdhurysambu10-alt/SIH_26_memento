@@ -26,6 +26,7 @@ import { UpdateStatusDto } from './dto/update-status.dto';
 import { SupabaseAuthGuard } from '../../common/guards/supabase-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { UserRole } from '../../common/constants/roles.enum';
 
@@ -51,6 +52,7 @@ export class ChallengesController {
   }
 
   @Get()
+  @Public()
   @ApiOperation({
     summary: 'List challenges with pagination, filters (category, district, status), and RLS enforcement',
   })
@@ -63,6 +65,7 @@ export class ChallengesController {
   }
 
   @Get(':id')
+  @Public()
   @ApiOperation({ summary: 'Get details of a single challenge by ID' })
   async getChallengeById(
     @Param('id') id: string,
@@ -82,6 +85,17 @@ export class ChallengesController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.challengesService.overrideRouting(id, dto, user);
+  }
+
+  @Post(':id/support')
+  @ApiOperation({
+    summary: 'Support / Like a challenge to elevate its priority ranking in the feed',
+  })
+  async toggleSupport(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.challengesService.toggleSupport(id, user);
   }
 
   @Patch(':id/status')

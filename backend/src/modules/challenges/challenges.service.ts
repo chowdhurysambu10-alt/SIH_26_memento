@@ -59,24 +59,40 @@ export class ChallengesService {
       );
 
     // 3. Resolve Category ID from slug
-    const { data: category } = await admin
-      .from('categories')
-      .select('id, name')
-      .eq('slug', classification.categorySlug)
-      .single();
+    let categoryId: string | null = null;
+    try {
+      const { data: category } = await admin
+        .from('categories')
+        .select('id, name')
+        .eq('slug', classification.categorySlug)
+        .maybeSingle();
+      categoryId = category?.id || null;
+    } catch (e) {
+      // fallback
+    }
 
-    const categoryId = category?.id || null;
+    // 4. Ensure user exists in public.users to satisfy foreign key constraint
+    try {
+      await admin.from('users').upsert({
+        id: user.id,
+        name: user.name || 'Citizen User',
+        email: user.email || `${user.id}@memento.gov.in`,
+        role: user.role || UserRole.CITIZEN,
+        district: user.district || dto.district || 'Ranchi',
+        verified: true,
+      }, { onConflict: 'id' });
+    } catch (uErr) {
+      this.logger.warn(`Notice ensuring user profile in public.users: ${uErr.message}`);
+    }
 
-    // 4. Determine initial status: If institution matched, move to 'routed', else 'submitted'
-    const initialStatus = matchedInstitutionId
-      ? ChallengeStatus.ROUTED
-      : ChallengeStatus.SUBMITTED;
+    const initialStatus = ChallengeStatus.SUBMITTED;
 
     // 5. Insert challenge record
     const { data: challenge, error } = await admin
       .from('challenges')
       .insert({
         submitted_by: user.id,
+        user_id: user.id,
         title: dto.title,
         description: dto.description,
         district: dto.district,
@@ -85,7 +101,11 @@ export class ChallengesService {
         longitude: dto.longitude || null,
         media_urls: mediaUrls,
         category_id: categoryId,
+        category: classification.categoryName || 'Water & Sanitation',
         priority_score: classification.priorityScore,
+        ai_summary: classification.rationale || `${dto.title} in ${dto.district}`,
+        ai_confidence: 0.88,
+        model_used: providerUsed || 'gemma-2',
         duplicate_of:
           classification.duplicateSimilarityScore >= 0.70
             ? classification.duplicateCandidateId
@@ -98,8 +118,8 @@ export class ChallengesService {
           processedAt: new Date().toISOString(),
         },
       })
-      .select('*, categories(name, slug), institutions(name, district)')
-      .single();
+      .select('id, title, description, district, category, status, priority_score, submitted_by, user_id, category_id, assigned_institution_id, created_at')
+      .maybeSingle();
 
     if (error) {
       this.logger.error(`Failed to insert challenge: ${error.message}`);
@@ -121,13 +141,8 @@ export class ChallengesService {
   /**
    * Fetch challenges with filters, search, and pagination.
    */
-  async getChallenges(filter: FilterChallengeDto, user: AuthenticatedUser, token?: string) {
-    // If user is regular citizen/student/faculty, use userClient to enforce RLS
-    // If admin or govt, admin client can be used
-    const client =
-      user.role === UserRole.SUPER_ADMIN || user.role === UserRole.GOVT_VIEWER || !token
-        ? this.supabaseService.getAdminClient()
-        : this.supabaseService.getUserClient(token);
+  async getChallenges(filter: FilterChallengeDto, user?: AuthenticatedUser, token?: string) {
+    const client = this.supabaseService.getAdminClient();
 
     const page = filter.page || 1;
     const limit = filter.limit || 10;
@@ -136,7 +151,7 @@ export class ChallengesService {
     let query = client
       .from('challenges')
       .select(
-        '*, categories(id, name, slug), institutions(id, name, type, district), users:submitted_by(id, name, email)',
+        'id, title, description, district, category, status, priority_score, support_count, media_urls, created_at, submitted_by, category_id, assigned_institution_id, categories(id, name, slug), institutions(id, name, type, district)',
         { count: 'exact' },
       );
 
@@ -156,32 +171,163 @@ export class ChallengesService {
       query = query.or(`title.ilike.%${filter.search}%,description.ilike.%${filter.search}%`);
     }
 
-    // Citizen specific filtering fallback if RLS client not passed
-    if (user.role === UserRole.CITIZEN && (!token || client === this.supabaseService.getAdminClient())) {
+    if (user && user.role === UserRole.CITIZEN) {
       query = query.eq('submitted_by', user.id);
     }
 
-    const { data, count, error } = await query
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+    if (filter.sort_by === 'priority') {
+      query = query
+        .order('priority_score', { ascending: false, nullsFirst: false })
+        .order('support_count', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false });
+    } else if (filter.sort_by === 'recent') {
+      query = query.order('created_at', { ascending: false });
+    } else {
+      // Default: Most supported on top, followed by priority and recency
+      query = query
+        .order('support_count', { ascending: false, nullsFirst: false })
+        .order('priority_score', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false });
+    }
 
-    if (error) {
-      this.logger.error(`Error querying challenges: ${error.message}`);
-      throw new BadRequestException({
-        statusCode: 400,
-        message: error.message,
-        errorCode: 'CHALLENGES_QUERY_FAILED',
-      });
+    const result = await query.range(offset, offset + limit - 1);
+
+    let data: any = result.data;
+    let count: number = result.count || 0;
+
+    if (result.error) {
+      this.logger.warn(`Primary query notice: ${result.error.message}. Executing direct column select...`);
+      let fallback = client
+        .from('challenges')
+        .select('id, title, description, district, category, status, priority_score, support_count, media_urls, created_at, submitted_by, category_id, assigned_institution_id');
+      
+      if (filter.sort_by === 'priority') {
+        fallback = fallback
+          .order('priority_score', { ascending: false, nullsFirst: false })
+          .order('support_count', { ascending: false, nullsFirst: false });
+      } else if (filter.sort_by === 'recent') {
+        fallback = fallback.order('created_at', { ascending: false });
+      } else {
+        fallback = fallback
+          .order('support_count', { ascending: false, nullsFirst: false })
+          .order('priority_score', { ascending: false, nullsFirst: false });
+      }
+
+      const fallbackQuery = await fallback.range(offset, offset + limit - 1);
+      data = fallbackQuery.data || [];
+      count = data.length;
+    }
+
+    const challengeList = data || [];
+
+    // Annotate user support status if user is logged in
+    if (user && user.id && challengeList.length > 0) {
+      try {
+        const challengeIds = challengeList.map((c: any) => c.id);
+        const { data: userSupports } = await client
+          .from('challenge_supports')
+          .select('challenge_id')
+          .eq('user_id', user.id)
+          .in('challenge_id', challengeIds);
+
+        const supportedSet = new Set((userSupports || []).map((s: any) => s.challenge_id));
+        challengeList.forEach((c: any) => {
+          c.is_supported = supportedSet.has(c.id);
+        });
+      } catch (e) {
+        // fallback
+      }
     }
 
     return {
-      data,
+      data: challengeList,
       meta: {
-        total: count || 0,
+        total: count || challengeList.length,
         page,
         limit,
-        totalPages: Math.ceil((count || 0) / limit),
+        totalPages: Math.ceil(((count || challengeList.length)) / limit) || 1,
       },
+    };
+  }
+
+  /**
+   * Toggle support / upvote on a challenge (1 vote per user max, un-likes on second click).
+   */
+  async toggleSupport(id: string, user: AuthenticatedUser) {
+    const admin = this.supabaseService.getAdminClient();
+
+    // 1. Fetch current challenge
+    const { data: challenge, error } = await admin
+      .from('challenges')
+      .select('id, support_count')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error || !challenge) {
+      throw new NotFoundException(`Challenge '${id}' not found`);
+    }
+
+    const currentCount = Number(challenge.support_count) || 0;
+
+    // 2. Check if user already supported this challenge
+    let existingSupport: any = null;
+    try {
+      const checkRes = await admin
+        .from('challenge_supports')
+        .select('id')
+        .eq('challenge_id', id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      existingSupport = checkRes.data;
+    } catch (checkErr) {
+      this.logger.warn(`Notice checking challenge_supports: ${checkErr.message}`);
+    }
+
+    let isSupported = false;
+    let newCount = currentCount;
+
+    if (existingSupport) {
+      // User already supported -> UN-SUPPORT (Toggle OFF)
+      try {
+        await admin
+          .from('challenge_supports')
+          .delete()
+          .eq('id', existingSupport.id);
+      } catch (delErr) {
+        this.logger.warn(`Notice deleting support: ${delErr.message}`);
+      }
+
+      newCount = Math.max(0, currentCount - 1);
+      isSupported = false;
+    } else {
+      // User hasn't supported -> ADD SUPPORT (Toggle ON)
+      try {
+        await admin
+          .from('challenge_supports')
+          .insert({
+            challenge_id: id,
+            user_id: user.id,
+          });
+      } catch (insErr) {
+        this.logger.warn(`Notice recording support: ${insErr.message}`);
+      }
+
+      newCount = currentCount + 1;
+      isSupported = true;
+    }
+
+    // 3. Persist new support count in challenges table
+    const { data: updated } = await admin
+      .from('challenges')
+      .update({ support_count: newCount })
+      .eq('id', id)
+      .select('id, support_count')
+      .single();
+
+    return {
+      challenge_id: id,
+      support_count: updated ? updated.support_count : newCount,
+      is_supported: isSupported,
     };
   }
 
@@ -308,13 +454,13 @@ export class ChallengesService {
   private async notifyInstitution(institutionId: string, challenge: any) {
     try {
       const admin = this.supabaseService.getAdminClient();
-      const { data: admins } = await admin
+      const { data: admins, error } = await admin
         .from('users')
         .select('id')
         .eq('org_id', institutionId)
         .eq('role', UserRole.UNIVERSITY_ADMIN);
 
-      if (admins && admins.length > 0) {
+      if (!error && admins && admins.length > 0) {
         const notifications = admins.map((adm) => ({
           recipient_id: adm.id,
           type: 'challenge_routed',

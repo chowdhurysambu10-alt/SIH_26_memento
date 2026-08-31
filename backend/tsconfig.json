@@ -22,5 +22,7 @@
       "@modules/*": ["src/modules/*"],
       "@config/*": ["src/config/*"]
     }
-  }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "supabase"]
 }

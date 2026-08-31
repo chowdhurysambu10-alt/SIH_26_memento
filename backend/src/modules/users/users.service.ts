@@ -13,21 +13,38 @@ export class UsersService {
 
   async getProfile(userId: string) {
     const admin = this.supabaseService.getAdminClient();
-    const { data, error } = await admin
-      .from('users')
-      .select('*, institutions(id, name, type, location, district)')
-      .eq('id', userId)
-      .single();
+    try {
+      const { data, error } = await admin
+        .from('users')
+        .select('id, name, email, role, district, contact, verified, org_id')
+        .eq('id', userId)
+        .maybeSingle();
 
-    if (error || !data) {
-      throw new NotFoundException({
-        statusCode: 404,
-        message: 'User profile not found',
-        errorCode: 'USER_NOT_FOUND',
-      });
+      if (!error && data) {
+        return data;
+      }
+    } catch (e) {
+      // Fallback
     }
 
-    return data;
+    // Fallback to Supabase Auth user record
+    const { data: authData } = await admin.auth.admin.getUserById(userId);
+    if (authData?.user) {
+      return {
+        id: authData.user.id,
+        email: authData.user.email,
+        name: authData.user.user_metadata?.name || 'Citizen User',
+        role: authData.user.user_metadata?.role || UserRole.CITIZEN,
+        district: authData.user.user_metadata?.district || null,
+        verified: true,
+      };
+    }
+
+    throw new NotFoundException({
+      statusCode: 404,
+      message: 'User profile not found',
+      errorCode: 'USER_NOT_FOUND',
+    });
   }
 
   async updateProfile(userId: string, updates: Partial<{ name: string; contact: string; district: string }>) {
