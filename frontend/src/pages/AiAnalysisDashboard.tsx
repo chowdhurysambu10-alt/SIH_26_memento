@@ -36,7 +36,7 @@ export const AiAnalysisDashboard: React.FC = () => {
   // Override Modal State
   const [selectedChallenge, setSelectedChallenge] = useState<DashboardChallenge | null>(null);
   const [overrideCategory, setOverrideCategory] = useState<string>('Water & Sanitation');
-  const [overridePriority, setOverridePriority] = useState<number>(75);
+
   const [overrideNotes, setOverrideNotes] = useState<string>('');
   const [savingOverride, setSavingOverride] = useState<boolean>(false);
 
@@ -59,7 +59,7 @@ export const AiAnalysisDashboard: React.FC = () => {
   const openOverrideModal = (c: DashboardChallenge) => {
     setSelectedChallenge(c);
     setOverrideCategory(c.category || 'Water & Sanitation');
-    setOverridePriority(Number(c.priority_score) || 75);
+
     setOverrideNotes('');
   };
 
@@ -77,7 +77,6 @@ export const AiAnalysisDashboard: React.FC = () => {
       await dashboardsApi.overrideAiClassification(
         selectedChallenge.id,
         overrideCategory,
-        overridePriority,
         overrideNotes
       );
 
@@ -88,7 +87,7 @@ export const AiAnalysisDashboard: React.FC = () => {
             ? {
                 ...c,
                 category: overrideCategory,
-                priority_score: overridePriority,
+
                 model_used: 'human_override',
                 ai_confidence: 1.0,
               }
@@ -124,7 +123,7 @@ export const AiAnalysisDashboard: React.FC = () => {
             AI Analysis & Reviewer Override
           </h1>
           <p style={{ color: '#64748b', fontSize: '14.5px', marginTop: '4px' }}>
-            Automated Gemma-2 & local Ollama inferences with human-in-the-loop validation.
+            Automated Gemma-2 inferences with human-in-the-loop validation.
           </p>
         </div>
 
@@ -168,7 +167,7 @@ export const AiAnalysisDashboard: React.FC = () => {
                   <th style={{ padding: '14px 18px' }}>Challenge Title</th>
                   <th style={{ padding: '14px 18px' }}>AI Category</th>
                   <th style={{ padding: '14px 18px' }}>Confidence</th>
-                  <th style={{ padding: '14px 18px' }}>Priority</th>
+
                   <th style={{ padding: '14px 18px' }}>AI Summary</th>
                   <th style={{ padding: '14px 18px' }}>Model</th>
                   <th style={{ padding: '14px 18px' }}>Status</th>
@@ -178,16 +177,14 @@ export const AiAnalysisDashboard: React.FC = () => {
               <tbody>
                 {filteredChallenges.map((c) => {
                   const confidence = c.ai_confidence !== undefined ? Number(c.ai_confidence) : 0.88;
-                  const priority = Number(c.priority_score) || 50;
+
                   const model = c.model_used || 'gemma-2';
                   const isExpanded = expandedSummaryId === c.id;
 
                   // Status logic:
-                  // Pending analysis if no score, Needs human review if confidence < 0.6, else Analyzed
+                  // Needs human review if confidence < 0.6, else Analyzed
                   let statusBadge = { label: 'Analyzed', color: '#15803d', bg: '#dcfce7', icon: CheckCircle };
-                  if (!c.priority_score && c.priority_score !== 0) {
-                    statusBadge = { label: 'Pending analysis', color: '#854d0e', bg: '#fef9c3', icon: Clock };
-                  } else if (confidence < 0.6) {
+                  if (confidence < 0.6) {
                     statusBadge = { label: 'Needs human review', color: '#b91c1c', bg: '#fee2e2', icon: AlertTriangle };
                   }
 
@@ -213,11 +210,7 @@ export const AiAnalysisDashboard: React.FC = () => {
                         </div>
                       </td>
 
-                      <td style={{ padding: '16px 18px' }}>
-                        <span className="tag tag-hot" style={{ fontWeight: 700 }}>
-                          {priority.toFixed(1)}/100
-                        </span>
-                      </td>
+
 
                       <td style={{ padding: '16px 18px', maxWidth: '240px', color: '#475569', fontSize: '13px' }}>
                         {c.ai_summary ? (
@@ -306,7 +299,7 @@ export const AiAnalysisDashboard: React.FC = () => {
               Manual AI Override
             </h3>
             <p style={{ color: '#64748b', fontSize: '13.5px', marginBottom: '20px' }}>
-              Override AI assigned category and priority score for <strong>"{selectedChallenge.title}"</strong>.
+              Override AI assigned category for <strong>"{selectedChallenge.title}"</strong>.
             </p>
 
             <form onSubmit={handleSaveOverride}>
@@ -319,17 +312,7 @@ export const AiAnalysisDashboard: React.FC = () => {
                 </select>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Priority Score (1 - 100): {overridePriority}</label>
-                <input
-                  type="range"
-                  min="1"
-                  max="100"
-                  value={overridePriority}
-                  onChange={(e) => setOverridePriority(Number(e.target.value))}
-                  style={{ width: '100%' }}
-                />
-              </div>
+
 
               <div className="form-group">
                 <label className="form-label">Reviewer Notes (Logged in Audit Log)</label>

@@ -2,13 +2,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { ClassificationService } from './classification.service';
 import { GemmaApiProvider } from './providers/gemma-api.provider';
-import { OllamaProvider } from './providers/ollama.provider';
 import { SupabaseService } from '../supabase/supabase.service';
 
 describe('ClassificationService', () => {
   let service: ClassificationService;
   let gemmaProvider: GemmaApiProvider;
-  let ollamaProvider: OllamaProvider;
 
   const mockConfigService = {
     get: jest.fn((key: string) => {
@@ -60,25 +58,18 @@ describe('ClassificationService', () => {
     classifyAndDetectDuplicates: jest.fn(),
   };
 
-  const mockOllamaProvider = {
-    name: 'Ollama (Self-Hosted Gemma)',
-    classifyAndDetectDuplicates: jest.fn(),
-  };
-
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ClassificationService,
         { provide: ConfigService, useValue: mockConfigService },
         { provide: GemmaApiProvider, useValue: mockGemmaProvider },
-        { provide: OllamaProvider, useValue: mockOllamaProvider },
         { provide: SupabaseService, useValue: mockSupabaseService },
       ],
     }).compile();
 
     service = module.get<ClassificationService>(ClassificationService);
     gemmaProvider = module.get<GemmaApiProvider>(GemmaApiProvider);
-    ollamaProvider = module.get<OllamaProvider>(OllamaProvider);
   });
 
   afterEach(() => {
@@ -89,7 +80,6 @@ describe('ClassificationService', () => {
     mockGemmaProvider.classifyAndDetectDuplicates.mockResolvedValueOnce({
       categorySlug: 'water',
       categoryName: 'Water & Sanitation',
-      priorityScore: 88,
       recommendedKeywords: ['water contamination', 'arsenic'],
       duplicateCandidateId: null,
       duplicateSimilarityScore: 0.1,
@@ -104,42 +94,12 @@ describe('ClassificationService', () => {
 
     expect(result.providerUsed).toBe('GemmaAPI (Google AI Studio)');
     expect(result.classification.categorySlug).toBe('water');
-    expect(result.classification.priorityScore).toBe(88);
     expect(result.matchedInstitutionId).toBe('univ-bit');
   });
 
-  it('should fall back to Ollama provider if Gemma API fails', async () => {
-    mockGemmaProvider.classifyAndDetectDuplicates.mockRejectedValueOnce(
-      new Error('HTTP 429 Rate Limit Exceeded'),
-    );
-
-    mockOllamaProvider.classifyAndDetectDuplicates.mockResolvedValueOnce({
-      categorySlug: 'agriculture',
-      categoryName: 'Agriculture',
-      priorityScore: 82,
-      recommendedKeywords: ['soil health', 'crops'],
-      duplicateCandidateId: null,
-      duplicateSimilarityScore: 0.05,
-      rationale: 'Crop disease in Ranchi fields',
-    });
-
-    const result = await service.processChallenge(
-      'Pest attack in Paddy fields',
-      'Brown plant hopper ruining crops',
-      'Ranchi',
-    );
-
-    expect(result.providerUsed).toBe('Ollama (Self-Hosted Gemma)');
-    expect(result.classification.categorySlug).toBe('agriculture');
-    expect(result.matchedInstitutionId).toBe('univ-bau');
-  });
-
-  it('should fall back to heuristic rule engine if both Gemma and Ollama fail', async () => {
+  it('should fall back to heuristic rule engine if Gemma fails', async () => {
     mockGemmaProvider.classifyAndDetectDuplicates.mockRejectedValueOnce(
       new Error('HTTP 429'),
-    );
-    mockOllamaProvider.classifyAndDetectDuplicates.mockRejectedValueOnce(
-      new Error('Connection refused'),
     );
 
     const result = await service.processChallenge(

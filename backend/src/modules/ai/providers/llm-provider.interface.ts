@@ -1,7 +1,7 @@
 export interface ClassificationResult {
   categorySlug: string;
   categoryName: string;
-  priorityScore: number; // 1 - 100
+
   recommendedKeywords: string[];
   duplicateCandidateId: string | null;
   duplicateSimilarityScore: number; // 0 - 1

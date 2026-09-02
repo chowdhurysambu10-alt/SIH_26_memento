@@ -66,6 +66,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
+    if (!window.confirm('Are you sure you want to sign out?')) return;
     localStorage.removeItem('supabase_access_token');
     localStorage.removeItem('supabase_refresh_token');
     localStorage.removeItem('user_data');

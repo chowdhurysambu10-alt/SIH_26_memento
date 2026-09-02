@@ -10,7 +10,8 @@ export interface Challenge {
   longitude?: number;
   media_urls?: string[];
   category_id?: string;
-  priority_score?: number;
+  ai_summary?: string;
+
   support_count?: number;
   status: 'submitted' | 'under_review' | 'routed' | 'team_formed' | 'in_progress' | 'completed' | 'validated' | 'rejected';
   submitted_by: string;
@@ -82,6 +83,19 @@ export const challengesApi = {
     return apiClient<Challenge>(`/challenges/${id}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ status, notes }),
+    });
+  },
+
+  updateChallenge: (id: string, data: { title?: string; description?: string }): Promise<Challenge> => {
+    return apiClient<Challenge>(`/challenges/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  deleteChallenge: (id: string): Promise<{ success: boolean; message: string }> => {
+    return apiClient<{ success: boolean; message: string }>(`/challenges/${id}`, {
+      method: 'DELETE',
     });
   },
 };

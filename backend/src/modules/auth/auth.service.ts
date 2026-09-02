@@ -18,6 +18,14 @@ export class AuthService {
   async signup(dto: SignupDto) {
     const admin = this.supabaseService.getAdminClient();
 
+    if (dto.role === 'super_admin') {
+      throw new BadRequestException({
+        statusCode: 400,
+        message: 'Registration as super_admin is restricted.',
+        errorCode: 'RESTRICTED_ROLE',
+      });
+    }
+
     // 1. Create user in Supabase Auth
     const { data: authData, error: authError } = await admin.auth.admin.createUser({
       email: dto.email,

@@ -9,7 +9,7 @@ A crowdsourcing and societal challenge resolution platform for Jharkhand. Connec
 
 The repository is structured as an orchestrated monorepo:
 - **`frontend/`**: Vite + React (TypeScript) SPA with Lucide icons and Chart.js analytics.
-- **`backend/`**: NestJS REST API Gateway with Google AI Studio (Gemma 2 / Gemini) classification engine, local Ollama failover, and Supabase PostgreSQL with RLS.
+- **`backend/`**: NestJS REST API Gateway with Google AI Studio (Gemma 2 / Gemini) classification engine, and Supabase PostgreSQL with RLS.
 - **`backend/supabase/migrations/`**: Database migrations (`001` through `006`) with RLS policies and indexes.
 
 ---

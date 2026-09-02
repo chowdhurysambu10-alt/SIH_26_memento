@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Patch,
+  Delete,
   Post,
   Query,
   Req,
@@ -23,6 +24,7 @@ import { CreateChallengeDto } from './dto/create-challenge.dto';
 import { FilterChallengeDto } from './dto/filter-challenge.dto';
 import { OverrideRoutingDto } from './dto/override-routing.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
+import { UpdateChallengeDto } from './dto/update-challenge.dto';
 import { SupabaseAuthGuard } from '../../common/guards/supabase-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -74,10 +76,29 @@ export class ChallengesController {
     return this.challengesService.getChallengeById(id, user);
   }
 
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update title and description of a challenge (owner only)' })
+  async updateChallenge(
+    @Param('id') id: string,
+    @Body() dto: UpdateChallengeDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.challengesService.updateChallenge(id, dto, user);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete a challenge (owner only)' })
+  async deleteChallenge(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.challengesService.deleteChallenge(id, user);
+  }
+
   @Post(':id/override-routing')
   @Roles(UserRole.SUPER_ADMIN, UserRole.GOVT_VIEWER)
   @ApiOperation({
-    summary: 'Override AI routing / category / score (Super Admin or Govt only)',
+    summary: 'Override AI routing / category (Super Admin or Govt only)',
   })
   async overrideRouting(
     @Param('id') id: string,
@@ -89,7 +110,7 @@ export class ChallengesController {
 
   @Post(':id/support')
   @ApiOperation({
-    summary: 'Support / Like a challenge to elevate its priority ranking in the feed',
+    summary: 'Support / Like a challenge to elevate its ranking in the feed',
   })
   async toggleSupport(
     @Param('id') id: string,

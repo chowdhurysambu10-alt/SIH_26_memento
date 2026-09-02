@@ -12,6 +12,9 @@ import {
   AlertCircle,
   Clock,
   Check,
+  X,
+  Camera,
+  Image as ImageIcon,
 } from 'lucide-react';
 
 const DISTRICTS = [
@@ -62,8 +65,11 @@ export const ProblemEntryDashboard: React.FC<{ initialTab?: 'submit' | 'claim'; 
   const [claimableList, setClaimableList] = useState<DashboardChallenge[]>([]);
   const [loadingClaims, setLoadingClaims] = useState(false);
   const [claimingId, setClaimingId] = useState<string | null>(null);
+  const [readMoreChallenge, setReadMoreChallenge] = useState<DashboardChallenge | null>(null);
+  const [showMediaOptions, setShowMediaOptions] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputCameraRef = useRef<HTMLInputElement>(null);
 
   const fetchClaims = async () => {
     setLoadingClaims(true);
@@ -189,10 +195,9 @@ export const ProblemEntryDashboard: React.FC<{ initialTab?: 'submit' | 'claim'; 
               <p style={{ fontSize: '14px', color: '#166534', margin: '0 0 10px' }}>
                 Your problem has been routed to university innovation labs across Jharkhand.
               </p>
-              {submitSuccess.priority_score && (
+              {submitSuccess.category && (
                 <div style={{ display: 'flex', gap: '10px', fontSize: '13px' }}>
-                  <span className="tag tag-hot">AI Priority: {submitSuccess.priority_score}/100</span>
-                  {submitSuccess.category && <span className="tag tag-category">Category: {submitSuccess.category}</span>}
+                  <span className="tag tag-category">Category: {submitSuccess.category}</span>
                 </div>
               )}
             </div>
@@ -246,19 +251,96 @@ export const ProblemEntryDashboard: React.FC<{ initialTab?: 'submit' | 'claim'; 
 
             <div className="form-group" style={{ marginBottom: '24px' }}>
               <label className="form-label">Evidence Media (Photo/Video)</label>
-              <div
-                className="upload-area"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <UploadCloud size={24} style={{ margin: '0 auto 8px', color: '#2563eb' }} />
-                <span style={{ fontSize: '14px', color: '#64748b' }}>
-                  {files.length > 0 ? `${files[0].name} selected` : 'Click to select media file'}
-                </span>
-              </div>
+              {files.length > 0 ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                  <span style={{ fontSize: '14px', color: '#0f172a', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {files[0].name}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFiles([]);
+                      if (fileInputRef.current) fileInputRef.current.value = '';
+                    }}
+                    style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                    title="Remove file"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+              ) : (
+                <div style={{ position: 'relative' }}>
+                  <div
+                    className="upload-area"
+                    onClick={() => setShowMediaOptions(true)}
+                  >
+                    <UploadCloud size={24} style={{ margin: '0 auto 8px', color: '#2563eb' }} />
+                    <span style={{ fontSize: '14px', color: '#64748b' }}>
+                      Click to select media file
+                    </span>
+                  </div>
+                  {showMediaOptions && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      marginTop: '8px',
+                      background: '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '12px',
+                      boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)',
+                      zIndex: 1000,
+                      width: '240px',
+                      overflow: 'hidden',
+                      display: 'flex',
+                      flexDirection: 'column'
+                    }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowMediaOptions(false);
+                          fileInputCameraRef.current?.click();
+                        }}
+                        style={{ padding: '14px 16px', background: 'none', border: 'none', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '15px', color: '#0f172a', fontWeight: 500, cursor: 'pointer', textAlign: 'left' }}
+                      >
+                        <Camera size={18} color="#2563eb" /> Take a Photo/Video
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowMediaOptions(false);
+                          fileInputRef.current?.click();
+                        }}
+                        style={{ padding: '14px 16px', background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '15px', color: '#0f172a', fontWeight: 500, cursor: 'pointer', textAlign: 'left' }}
+                      >
+                        <ImageIcon size={18} color="#2563eb" /> Choose from Gallery
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowMediaOptions(false)}
+                        style={{ padding: '10px 16px', background: '#f8fafc', border: 'none', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', color: '#64748b', cursor: 'pointer' }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
               <input
                 type="file"
                 ref={fileInputRef}
                 accept="image/*,video/*"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) setFiles([e.target.files[0]]);
+                }}
+              />
+              <input
+                type="file"
+                ref={fileInputCameraRef}
+                accept="image/*,video/*"
+                capture="environment"
                 style={{ display: 'none' }}
                 onChange={(e) => {
                   if (e.target.files && e.target.files[0]) setFiles([e.target.files[0]]);
@@ -335,15 +417,33 @@ export const ProblemEntryDashboard: React.FC<{ initialTab?: 'submit' | 'claim'; 
                           {item.category}
                         </span>
                       )}
-                      <span className="tag tag-hot">
-                        Priority: {Number(item.priority_score || 50).toFixed(1)}/100
-                      </span>
+
                     </div>
 
                     <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', margin: '6px 0' }}>
                       {item.title}
                     </h3>
-                    <p style={{ color: '#475569', fontSize: '14px', lineHeight: 1.6 }}>{item.description}</p>
+                    <p style={{ color: '#475569', fontSize: '14px', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                      {item.description && item.description.length > 150
+                        ? item.description.substring(0, 150) + '...'
+                        : item.description}
+                      {item.description && item.description.length > 150 && (
+                        <button 
+                          onClick={() => setReadMoreChallenge(item)}
+                          style={{ 
+                            background: 'none', 
+                            border: 'none', 
+                            color: '#2563eb', 
+                            cursor: 'pointer', 
+                            fontWeight: 600, 
+                            marginLeft: '4px',
+                            padding: 0 
+                          }}
+                        >
+                          Read more...
+                        </button>
+                      )}
+                    </p>
                   </div>
 
                   <button
@@ -359,6 +459,24 @@ export const ProblemEntryDashboard: React.FC<{ initialTab?: 'submit' | 'claim'; 
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {readMoreChallenge && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '600px' }}>
+            <button className="modal-close" onClick={() => setReadMoreChallenge(null)}>
+              <X size={20} />
+            </button>
+            <h3 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '16px', color: '#0f172a' }}>
+              {readMoreChallenge.title}
+            </h3>
+            <div style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: '8px' }}>
+              <p style={{ whiteSpace: 'pre-wrap', color: '#475569', fontSize: '15px', lineHeight: 1.6 }}>
+                {readMoreChallenge.description}
+              </p>
+            </div>
+          </div>
         </div>
       )}
     </div>

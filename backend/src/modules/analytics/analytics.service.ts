@@ -22,7 +22,7 @@ export class AnalyticsService {
       admin.from('institutions').select('*', { count: 'exact', head: true }),
       admin.from('project_teams').select('*', { count: 'exact', head: true }),
       admin.from('milestones').select('*', { count: 'exact', head: true }),
-      admin.from('challenges').select('status, district, category_id, priority_score'),
+      admin.from('challenges').select('status, district, category_id'),
       admin.from('categories').select('id, name, slug'),
     ]);
 
@@ -60,17 +60,13 @@ export class AnalyticsService {
   async getCategoryBreakdown() {
     const admin = this.supabaseService.getAdminClient();
     const { data: categories } = await admin.from('categories').select('id, name, slug');
-    const { data: challenges } = await admin.from('challenges').select('category_id, status, priority_score');
+    const { data: challenges } = await admin.from('challenges').select('category_id, status');
 
     return categories?.map((cat) => {
       const catChallenges = challenges?.filter((c) => c.category_id === cat.id) || [];
       const completed = catChallenges.filter((c) => c.status === 'completed' || c.status === 'validated').length;
       const inProgress = catChallenges.filter((c) => c.status === 'in_progress' || c.status === 'team_formed').length;
-      const avgPriority =
-        catChallenges.length > 0
-          ? catChallenges.reduce((acc, curr) => acc + (Number(curr.priority_score) || 0), 0) /
-            catChallenges.length
-          : 0;
+
 
       return {
         id: cat.id,
@@ -79,14 +75,13 @@ export class AnalyticsService {
         total: catChallenges.length,
         inProgress,
         completed,
-        averagePriorityScore: parseFloat(avgPriority.toFixed(1)),
       };
     });
   }
 
   async getDistrictBreakdown() {
     const admin = this.supabaseService.getAdminClient();
-    const { data: challenges } = await admin.from('challenges').select('district, status, priority_score');
+    const { data: challenges } = await admin.from('challenges').select('district, status');
 
     const districtMap: Record<
       string,

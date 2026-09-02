@@ -4,7 +4,6 @@
 -- 1. Ensure columns exist on challenges table
 ALTER TABLE IF EXISTS challenges 
   ADD COLUMN IF NOT EXISTS category TEXT,
-  ADD COLUMN IF NOT EXISTS priority_score NUMERIC(5, 2) DEFAULT 0.00,
   ADD COLUMN IF NOT EXISTS support_count INTEGER DEFAULT 0,
   ADD COLUMN IF NOT EXISTS ai_summary TEXT,
   ADD COLUMN IF NOT EXISTS ai_confidence NUMERIC(3, 2) DEFAULT 0.00,
@@ -46,9 +45,8 @@ CREATE TABLE IF NOT EXISTS challenge_assignments (
 CREATE TABLE IF NOT EXISTS ai_analysis_log (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   challenge_id UUID NOT NULL REFERENCES challenges(id) ON DELETE CASCADE,
-  model_used TEXT NOT NULL, -- 'gemma-2' | 'ollama-local' | 'human_override'
+  model_used TEXT NOT NULL, -- 'gemma-2' | 'human_override'
   ai_category TEXT,
-  ai_priority_score NUMERIC(5, 2) DEFAULT 0.00,
   ai_confidence NUMERIC(3, 2) DEFAULT 0.00,
   ai_summary TEXT,
   raw_response JSONB,
@@ -57,7 +55,7 @@ CREATE TABLE IF NOT EXISTS ai_analysis_log (
 );
 
 -- 5. Create Performance Indexes
-CREATE INDEX IF NOT EXISTS idx_challenges_priority_support ON challenges(priority_score DESC, support_count DESC);
+CREATE INDEX IF NOT EXISTS idx_challenges_support ON challenges(support_count DESC);
 CREATE INDEX IF NOT EXISTS idx_challenges_district_category ON challenges(district, category);
 CREATE INDEX IF NOT EXISTS idx_challenges_status_created ON challenges(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_challenges_user_id ON challenges(user_id);
