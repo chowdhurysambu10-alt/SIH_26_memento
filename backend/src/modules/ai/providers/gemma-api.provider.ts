@@ -54,15 +54,14 @@ Given a citizen's challenge, you must:
    - accessibility
    - public_administration
    - rural_livelihoods
-2. Assign a priority score between 1 and 100 based on severity, urgency, population impact, and safety risks.
-3. Compare against the provided list of existing challenges to determine if it is a duplicate or near-duplicate. Return duplicateCandidateId (or null if none) and duplicateSimilarityScore (0.0 to 1.0, where >=0.75 indicates duplicate).
-4. Provide 3-5 relevant keywords and a 1-sentence rationale.
+2. Compare against the provided list of existing challenges to determine if it is a duplicate or near-duplicate. Return duplicateCandidateId (or null if none) and duplicateSimilarityScore (0.0 to 1.0, where >=0.75 indicates duplicate).
+3. Provide 3-5 relevant keywords and a 1-sentence rationale.
 
 Return ONLY a valid JSON object with the following schema:
 {
   "categorySlug": "water",
   "categoryName": "Water & Sanitation",
-  "priorityScore": 85,
+
   "recommendedKeywords": ["drinking water", "arsenic", "fluoride", "tube well"],
   "duplicateCandidateId": "uuid-or-null",
   "duplicateSimilarityScore": 0.85,
@@ -151,7 +150,7 @@ ${candidateList || 'None'}
     return {
       categorySlug: slug,
       categoryName: raw.categoryName || slug.replace('_', ' ').toUpperCase(),
-      priorityScore: Math.min(100, Math.max(1, Number(raw.priorityScore) || 50)),
+
       recommendedKeywords: Array.isArray(raw.recommendedKeywords)
         ? raw.recommendedKeywords
         : [],

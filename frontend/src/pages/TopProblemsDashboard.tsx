@@ -7,10 +7,11 @@ import {
   MapPin,
   Tag,
   Clock,
-  Heart,
+
   TrendingUp,
   RotateCw,
   Award,
+  X,
 } from 'lucide-react';
 
 const DISTRICTS = [
@@ -46,6 +47,7 @@ export const TopProblemsDashboard: React.FC = () => {
   const [challenges, setChallenges] = useState<DashboardChallenge[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [visibleCount, setVisibleCount] = useState<number>(10);
+  const [readMoreChallenge, setReadMoreChallenge] = useState<DashboardChallenge | null>(null);
 
   // Filter States
   const [district, setDistrict] = useState<string>('All Districts');
@@ -105,8 +107,6 @@ export const TopProblemsDashboard: React.FC = () => {
 
         // Re-sort: highest priority score & support count
         return updated.sort((a, b) => {
-          const pDiff = (Number(b.priority_score) || 0) - (Number(a.priority_score) || 0);
-          if (pDiff !== 0) return pDiff;
           return (Number(b.support_count) || 0) - (Number(a.support_count) || 0);
         });
       });
@@ -129,7 +129,7 @@ export const TopProblemsDashboard: React.FC = () => {
             Highest Priority Problems in Jharkhand
           </h1>
           <p style={{ color: '#64748b', fontSize: '14.5px', marginTop: '4px' }}>
-            Ranked by AI Severity Score & verified community upvotes.
+            Ranked by verified community upvotes.
           </p>
         </div>
 
@@ -216,7 +216,7 @@ export const TopProblemsDashboard: React.FC = () => {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {displayedChallenges.map((challenge, index) => {
-            const score = Number(challenge.priority_score) || 50;
+
             const supports = Number(challenge.support_count) || 0;
 
             return (
@@ -269,19 +269,7 @@ export const TopProblemsDashboard: React.FC = () => {
                       </span>
                     )}
 
-                    {/* Priority Badge */}
-                    <span
-                      style={{
-                        padding: '4px 12px',
-                        borderRadius: '20px',
-                        fontWeight: 700,
-                        fontSize: '12px',
-                        background: score >= 80 ? '#fee2e2' : score >= 60 ? '#fef3c7' : '#e0e7ff',
-                        color: score >= 80 ? '#b91c1c' : score >= 60 ? '#92400e' : '#3730a3',
-                      }}
-                    >
-                      Priority: {score.toFixed(1)}/100
-                    </span>
+
 
                     <span className="status" style={{ marginLeft: 'auto' }}>
                       {(challenge.status || 'SUBMITTED').replace('_', ' ').toUpperCase()}
@@ -292,8 +280,26 @@ export const TopProblemsDashboard: React.FC = () => {
                     {challenge.title}
                   </h3>
 
-                  <p style={{ color: '#475569', fontSize: '14.5px', lineHeight: 1.6, marginBottom: '12px' }}>
-                    {challenge.description}
+                  <p style={{ color: '#475569', fontSize: '14.5px', lineHeight: 1.6, marginBottom: '12px', whiteSpace: 'pre-wrap' }}>
+                    {challenge.description && challenge.description.length > 150 
+                      ? challenge.description.substring(0, 150) + '...'
+                      : challenge.description}
+                    {challenge.description && challenge.description.length > 150 && (
+                      <button 
+                        onClick={() => setReadMoreChallenge(challenge)}
+                        style={{ 
+                          background: 'none', 
+                          border: 'none', 
+                          color: '#2563eb', 
+                          cursor: 'pointer', 
+                          fontWeight: 600, 
+                          marginLeft: '4px',
+                          padding: 0 
+                        }}
+                      >
+                        Read more...
+                      </button>
+                    )}
                   </p>
 
                   {challenge.ai_summary && (
@@ -309,7 +315,7 @@ export const TopProblemsDashboard: React.FC = () => {
                       onClick={() => handleSupport(challenge.id)}
                       style={{ color: '#ef4444' }}
                     >
-                      <Heart size={16} fill="#ef4444" />
+
                       <span>Support ({supports})</span>
                     </button>
                     <span style={{ fontSize: '12.5px', color: '#94a3b8' }}>
@@ -333,6 +339,24 @@ export const TopProblemsDashboard: React.FC = () => {
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {readMoreChallenge && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '600px' }}>
+            <button className="modal-close" onClick={() => setReadMoreChallenge(null)}>
+              <X size={20} />
+            </button>
+            <h3 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '16px', color: '#0f172a' }}>
+              {readMoreChallenge.title}
+            </h3>
+            <div style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: '8px' }}>
+              <p style={{ whiteSpace: 'pre-wrap', color: '#475569', fontSize: '15px', lineHeight: 1.6 }}>
+                {readMoreChallenge.description}
+              </p>
+            </div>
+          </div>
         </div>
       )}
     </div>

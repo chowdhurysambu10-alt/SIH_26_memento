@@ -48,7 +48,7 @@ Return ONLY a JSON object:
 {
   "categorySlug": "education|agriculture|healthcare|water|environment|energy|urban_development|accessibility|public_administration|rural_livelihoods",
   "categoryName": "string",
-  "priorityScore": 75,
+
   "recommendedKeywords": ["keyword1", "keyword2"],
   "duplicateCandidateId": null,
   "duplicateSimilarityScore": 0.0,
@@ -83,7 +83,7 @@ Return ONLY a JSON object:
       return {
         categorySlug: parsed.categorySlug || 'public_administration',
         categoryName: parsed.categoryName || 'Public Administration',
-        priorityScore: Math.min(100, Math.max(1, Number(parsed.priorityScore) || 50)),
+
         recommendedKeywords: parsed.recommendedKeywords || [],
         duplicateCandidateId: parsed.duplicateCandidateId || null,
         duplicateSimilarityScore: Math.min(1.0, Math.max(0.0, Number(parsed.duplicateSimilarityScore) || 0.0)),

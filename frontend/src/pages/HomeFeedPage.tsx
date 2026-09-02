@@ -2,21 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { Challenge, challengesApi } from '../api/challenges';
 import { SearchBar } from '../components/SearchBar';
 import { FeedItem } from '../components/FeedItem';
-import { SubmitModal } from '../components/SubmitModal';
+
 import { Lightbox } from '../components/Lightbox';
 import { useAuth } from '../context/AuthContext';
 import { Plus } from 'lucide-react';
 
-export const HomeFeedPage: React.FC<{ onNavigateLogin: () => void }> = ({ onNavigateLogin }) => {
+export const HomeFeedPage: React.FC<{ onNavigateLogin: () => void; onNavigateSubmit: () => void }> = ({ onNavigateLogin, onNavigateSubmit }) => {
   const { isAuthenticated } = useAuth();
   const [challenges, setChallenges] = useState<Challenge[]>([]);
-  const [sortBy, setSortBy] = useState<'support' | 'priority' | 'recent'>('support');
+  const [sortBy, setSortBy] = useState<'support' | 'recent'>('support');
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>('');
-  const [submitModalOpen, setSubmitModalOpen] = useState<boolean>(false);
+
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
-  const fetchChallenges = async (searchQuery?: string, customSort?: 'support' | 'priority' | 'recent') => {
+  const fetchChallenges = async (searchQuery?: string, customSort?: 'support' | 'recent') => {
     setLoading(true);
     setError('');
     const activeSort = customSort || sortBy;
@@ -27,18 +27,13 @@ export const HomeFeedPage: React.FC<{ onNavigateLogin: () => void }> = ({ onNavi
         search: searchQuery || undefined,
       });
 
-      // Sort client-side and ensure most supported / highest priority ordering
+      // Sort client-side and ensure most supported / recent ordering
       const sorted = [...data].sort((a, b) => {
-        if (activeSort === 'priority') {
-          return (Number(b.priority_score) || 0) - (Number(a.priority_score) || 0);
-        }
         if (activeSort === 'recent') {
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         }
         // Default: Most supported first
-        const sDiff = (Number(b.support_count) || 0) - (Number(a.support_count) || 0);
-        if (sDiff !== 0) return sDiff;
-        return (Number(b.priority_score) || 0) - (Number(a.priority_score) || 0);
+        return (Number(b.support_count) || 0) - (Number(a.support_count) || 0);
       });
 
       setChallenges(sorted);
@@ -59,9 +54,7 @@ export const HomeFeedPage: React.FC<{ onNavigateLogin: () => void }> = ({ onNavi
       const updated = prev.map((c) => (c.id === id ? { ...c, support_count: newCount } : c));
       if (sortBy === 'support') {
         return updated.sort((a, b) => {
-          const diff = (Number(b.support_count) || 0) - (Number(a.support_count) || 0);
-          if (diff !== 0) return diff;
-          return (Number(b.priority_score) || 0) - (Number(a.priority_score) || 0);
+          return (Number(b.support_count) || 0) - (Number(a.support_count) || 0);
         });
       }
       return updated;
@@ -69,12 +62,7 @@ export const HomeFeedPage: React.FC<{ onNavigateLogin: () => void }> = ({ onNavi
   };
 
   const handleOpenSubmit = () => {
-    if (!isAuthenticated) {
-      alert('Please sign in to submit a challenge.');
-      onNavigateLogin();
-      return;
-    }
-    setSubmitModalOpen(true);
+    onNavigateSubmit();
   };
 
   return (
@@ -102,25 +90,9 @@ export const HomeFeedPage: React.FC<{ onNavigateLogin: () => void }> = ({ onNavi
                 cursor: 'pointer',
               }}
             >
-              🔥 Most Supported
+              Most Supported
             </button>
-            <button
-              className="btn"
-              onClick={() => setSortBy('priority')}
-              style={{
-                padding: '6px 14px',
-                fontSize: '13px',
-                borderRadius: '8px',
-                background: sortBy === 'priority' ? '#ffffff' : 'transparent',
-                color: sortBy === 'priority' ? '#2563eb' : '#64748b',
-                fontWeight: sortBy === 'priority' ? 700 : 500,
-                boxShadow: sortBy === 'priority' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                border: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              ⚡ Highest Priority
-            </button>
+
             <button
               className="btn"
               onClick={() => setSortBy('recent')}
@@ -136,7 +108,7 @@ export const HomeFeedPage: React.FC<{ onNavigateLogin: () => void }> = ({ onNavi
                 cursor: 'pointer',
               }}
             >
-              🕒 Most Recent
+              Most Recent
             </button>
           </div>
         </div>
@@ -169,20 +141,7 @@ export const HomeFeedPage: React.FC<{ onNavigateLogin: () => void }> = ({ onNavi
         )}
       </main>
 
-      {/* Floating Action Button */}
-      <button
-        className="btn btn-primary floating-action-btn"
-        title="Post a Challenge"
-        onClick={handleOpenSubmit}
-      >
-        <Plus size={28} strokeWidth={2.5} />
-      </button>
 
-      <SubmitModal
-        isOpen={submitModalOpen}
-        onClose={() => setSubmitModalOpen(false)}
-        onSuccess={() => fetchChallenges()}
-      />
 
       <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
     </>

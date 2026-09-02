@@ -12,13 +12,6 @@ export class OverrideRoutingDto {
   @IsUUID()
   assigned_institution_id?: string;
 
-  @ApiPropertyOptional({ example: 92, minimum: 1, maximum: 100 })
-  @IsOptional()
-  @IsNumber()
-  @Min(1)
-  @Max(100)
-  priority_score?: number;
-
   @ApiProperty({ example: 'Re-routed to BIT Sindri due to specialized water filtration research lab.' })
   @IsString()
   @IsNotEmpty()

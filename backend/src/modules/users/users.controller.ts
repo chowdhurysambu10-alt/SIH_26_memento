@@ -6,6 +6,8 @@ import {
   Param,
   Query,
   UseGuards,
+  Delete,
+  Post,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { UsersService } from './users.service';
@@ -37,6 +39,22 @@ export class UsersController {
     return this.usersService.updateProfile(user.id, updates);
   }
 
+  @Post('me/verification-request')
+  @ApiOperation({ summary: 'Submit a verification request form (Student/Institution)' })
+  async submitVerificationRequest(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() verificationData: any,
+  ) {
+    return this.usersService.submitVerificationRequest(user.id, verificationData);
+  }
+
+  @Get('verification-requests')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.GOVT_VIEWER)
+  @ApiOperation({ summary: 'List all pending verification requests' })
+  async getVerificationRequests() {
+    return this.usersService.getVerificationRequests();
+  }
+
   @Patch(':id/verify')
   @Roles(UserRole.SUPER_ADMIN, UserRole.GOVT_VIEWER)
   @ApiOperation({ summary: 'Verify institutional account (Super Admin / Govt only)' })
@@ -57,5 +75,26 @@ export class UsersController {
     @Query('district') district?: string,
   ) {
     return this.usersService.getAllUsers(role, district);
+  }
+
+  @Patch(':id/role')
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Update user role (Super Admin only)' })
+  async updateUserRole(
+    @Param('id') targetId: string,
+    @Body('role') role: UserRole,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.usersService.updateUserRole(targetId, role, user.role);
+  }
+
+  @Delete(':id')
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Delete user (Super Admin only)' })
+  async deleteUser(
+    @Param('id') targetId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.usersService.deleteUser(targetId, user.role);
   }
 }

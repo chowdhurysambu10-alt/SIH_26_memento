@@ -1,8 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { ChevronDown, LogOut, User as UserIcon } from 'lucide-react';
+import { ChevronDown, LogOut, User as UserIcon, Bell, ShieldAlert } from 'lucide-react';
+import { NotificationsModal } from './NotificationsModal';
+import { VerificationRequestModal } from './VerificationRequestModal';
+import { useNotifications } from '../hooks/useNotifications';
 
-export type NavTab = 'feed' | 'top-problems' | 'submit' | 'ai-analysis' | 'statistics' | 'community' | 'helpdesk' | 'about' | 'login';
+export type NavTab = 'feed' | 'top-problems' | 'submit' | 'statistics' | 'community' | 'helpdesk' | 'about' | 'login' | 'admin-dashboard' | 'institution-dashboard' | 'student-dashboard';
 
 interface HeaderProps {
   activeTab: NavTab;
@@ -12,7 +15,12 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
   const { user, isAuthenticated, logout } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  
+  const { notifications } = useNotifications();
+  const unreadCount = notifications.filter(n => !n.isRead).length;
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -25,6 +33,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
   }, []);
 
   return (
+    <>
     <header className="header">
       <div className="header-content">
         <div className="logo" onClick={() => setActiveTab('feed')}>
@@ -44,18 +53,8 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
           >
             Top Problems
           </button>
-          <button
-            className={`nav-link ${activeTab === 'submit' ? 'active' : ''}`}
-            onClick={() => setActiveTab('submit')}
-          >
-            Submit / Claim
-          </button>
-          <button
-            className={`nav-link ${activeTab === 'ai-analysis' ? 'active' : ''}`}
-            onClick={() => setActiveTab('ai-analysis')}
-          >
-            AI Analysis
-          </button>
+
+
           <button
             className={`nav-link ${activeTab === 'statistics' ? 'active' : ''}`}
             onClick={() => setActiveTab('statistics')}
@@ -63,11 +62,44 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
             Statistics
           </button>
           <button
+            className={`nav-link ${activeTab === 'community' ? 'active' : ''}`}
+            onClick={() => setActiveTab('community')}
+          >
+            Community
+          </button>
+          <button
             className={`nav-link ${activeTab === 'about' ? 'active' : ''}`}
             onClick={() => setActiveTab('about')}
           >
             About
           </button>
+
+          {isAuthenticated && user?.role === 'super_admin' && (
+            <button
+              className={`nav-link ${activeTab === 'admin-dashboard' ? 'active' : ''}`}
+              onClick={() => setActiveTab('admin-dashboard')}
+            >
+              Admin Panel
+            </button>
+          )}
+
+          {isAuthenticated && (user?.role === 'university_admin' || user?.role === 'faculty') && (
+            <button
+              className={`nav-link ${activeTab === 'institution-dashboard' ? 'active' : ''}`}
+              onClick={() => setActiveTab('institution-dashboard')}
+            >
+              Institution Portal
+            </button>
+          )}
+
+          {isAuthenticated && user?.role === 'student' && (
+            <button
+              className={`nav-link ${activeTab === 'student-dashboard' ? 'active' : ''}`}
+              onClick={() => setActiveTab('student-dashboard')}
+            >
+              Student Portal
+            </button>
+          )}
 
           {isAuthenticated && user ? (
             <div style={{ position: 'relative' }} ref={dropdownRef}>
@@ -115,12 +147,46 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
                       {(user.role || 'Citizen').replace('_', ' ')}
                     </span>
                   </div>
+                  
+                  {user && !user.verified && (user.role === 'student' || user.role === 'university_admin') && (
+                    <button
+                      className="btn btn-outline w-100"
+                      style={{ marginBottom: '8px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', color: '#d97706', borderColor: '#fcd34d', background: '#fffbeb' }}
+                      onClick={() => {
+                        setIsVerificationModalOpen(true);
+                        setDropdownOpen(false);
+                      }}
+                    >
+                      <ShieldAlert size={14} /> Request Verification
+                    </button>
+                  )}
+
+                  <button
+                    className="btn btn-outline w-100"
+                    style={{ marginBottom: '8px', fontSize: '13px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                    onClick={() => {
+                      setIsNotificationsOpen(true);
+                      setDropdownOpen(false);
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Bell size={14} /> Notifications
+                    </div>
+                    {unreadCount > 0 && (
+                      <span style={{ background: '#ef4444', color: '#fff', fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '10px' }}>
+                        {unreadCount}
+                      </span>
+                    )}
+                  </button>
+
                   <button
                     className="btn btn-outline w-100"
                     style={{ color: '#ef4444', borderColor: '#fca5a5', fontSize: '13px' }}
                     onClick={() => {
-                      logout();
-                      setDropdownOpen(false);
+                      if (window.confirm("Are you sure you want to log out?")) {
+                        logout();
+                        setDropdownOpen(false);
+                      }
                     }}
                   >
                     <LogOut size={14} /> Log Out
@@ -140,5 +206,13 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
         </nav>
       </div>
     </header>
+      <NotificationsModal 
+        isOpen={isNotificationsOpen} 
+        onClose={() => setIsNotificationsOpen(false)} 
+      />
+      {isVerificationModalOpen && (
+        <VerificationRequestModal onClose={() => setIsVerificationModalOpen(false)} />
+      )}
+    </>
   );
 };

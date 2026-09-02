@@ -49,4 +49,11 @@ export const authApi = {
   getProfile: (): Promise<AuthUser> => {
     return apiClient<AuthUser>('/users/me');
   },
+
+  submitVerificationRequest: (payload: any): Promise<any> => {
+    return apiClient<any>('/users/me/verification-request', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
 };

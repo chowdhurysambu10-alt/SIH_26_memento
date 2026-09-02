@@ -32,7 +32,7 @@ body {
 .header {
   background: var(--bg-card);
   border-bottom: 1px solid var(--border);
-  padding: 16px 0;
+  padding: 16px 0 0 0;
   position: sticky;
   top: 0;
   z-index: 100;
@@ -42,16 +42,16 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 0 24px;
+  width: 100%;
+  max-width: 100%;
+  padding: 0 32px;
 }
 
 .logo {
-  font-size: 22px;
-  font-weight: 700;
+  font-size: 32px;
+  font-weight: 800;
   color: var(--primary);
-  letter-spacing: -0.5px;
+  letter-spacing: -1px;
   cursor: pointer;
 }
 
@@ -59,6 +59,7 @@ body {
   display: flex;
   gap: 24px;
   align-items: center;
+  margin-top: 0px;
 }
 
 .nav-link {
@@ -95,33 +96,42 @@ body {
 }
 
 .search-input-container {
-  position: relative;
+  display: flex;
+  align-items: center;
   flex: 1;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0 14px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s;
+}
+
+.search-input-container:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
 .search-icon {
-  position: absolute;
-  left: 14px;
-  top: 50%;
-  transform: translateY(-50%);
   color: var(--text-muted);
+  flex-shrink: 0;
+  margin-right: 8px;
+  display: block;
 }
 
-.search-input {
+.search-input-container .search-input {
   width: 100%;
-  padding: 12px 14px 12px 42px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: #ffffff;
+  padding: 12px 0;
+  border: none !important;
+  background: transparent !important;
   font-size: 15px;
   outline: none;
-  transition: all 0.2s;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  box-shadow: none !important;
 }
 
-.search-input:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+.search-input-container .search-input:focus {
+  box-shadow: none !important;
+  border: none !important;
 }
 
 /* Layout */
@@ -155,7 +165,7 @@ body {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 24px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
   transition: transform 0.2s, box-shadow 0.2s;
   animation: fadeIn 0.3s ease-out;
 }
@@ -377,11 +387,14 @@ body {
 }
 
 /* Forms */
-.input-group, .form-group {
+.input-group,
+.form-group {
   margin-bottom: 16px;
 }
 
-.input-group label, .form-group label, .form-label {
+.input-group label,
+.form-group label,
+.form-label {
   display: block;
   font-size: 14px;
   font-weight: 600;
@@ -389,7 +402,10 @@ body {
   margin-bottom: 6px;
 }
 
-.input-field, input:not([type="file"]), select, textarea {
+.input-field,
+input:not([type="file"]),
+select,
+textarea {
   width: 100%;
   padding: 11px 14px;
   border: 1px solid var(--border);
@@ -400,7 +416,10 @@ body {
   background: #ffffff;
 }
 
-.input-field:focus, input:not([type="file"]):focus, select:focus, textarea:focus {
+.input-field:focus,
+input:not([type="file"]):focus,
+select:focus,
+textarea:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
@@ -509,7 +528,7 @@ body {
   border-radius: 12px;
   padding: 24px 20px;
   text-align: center;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
 }
 
 .stat-box h4 {
@@ -531,18 +550,27 @@ body {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 24px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
   max-height: 540px;
-  overflow-y: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
-.stats-card h3 {
+.stats-card>h3 {
   font-size: 17px;
   font-weight: 700;
-  margin-bottom: 16px;
+  margin: 0;
+  padding: 20px 24px 16px;
   border-bottom: 1px solid var(--border);
-  padding-bottom: 12px;
+  flex-shrink: 0;
+  background: var(--bg-card);
+}
+
+.stats-card-content {
+  padding: 16px 24px 24px;
+  overflow-y: auto;
+  flex: 1;
 }
 
 .stat-row {
@@ -558,14 +586,22 @@ body {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @media (max-width: 768px) {
   .statistics-dashboard {
     grid-template-columns: 1fr;
   }
+
   .header-nav {
     gap: 12px;
   }

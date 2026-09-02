@@ -102,7 +102,7 @@ export class ChallengesService {
         media_urls: mediaUrls,
         category_id: categoryId,
         category: classification.categoryName || 'Water & Sanitation',
-        priority_score: classification.priorityScore,
+
         ai_summary: classification.rationale || `${dto.title} in ${dto.district}`,
         ai_confidence: 0.88,
         model_used: providerUsed || 'gemma-2',
@@ -118,7 +118,7 @@ export class ChallengesService {
           processedAt: new Date().toISOString(),
         },
       })
-      .select('id, title, description, district, category, status, priority_score, submitted_by, user_id, category_id, assigned_institution_id, created_at')
+      .select('id, title, description, district, category, status, submitted_by, user_id, category_id, assigned_institution_id, created_at')
       .maybeSingle();
 
     if (error) {
@@ -151,7 +151,7 @@ export class ChallengesService {
     let query = client
       .from('challenges')
       .select(
-        'id, title, description, district, category, status, priority_score, support_count, media_urls, created_at, submitted_by, category_id, assigned_institution_id, categories(id, name, slug), institutions(id, name, type, district)',
+        'id, title, description, district, category, status, support_count, media_urls, created_at, submitted_by, category_id, assigned_institution_id, categories(id, name, slug), institutions(id, name, type, district)',
         { count: 'exact' },
       );
 
@@ -175,18 +175,12 @@ export class ChallengesService {
       query = query.eq('submitted_by', user.id);
     }
 
-    if (filter.sort_by === 'priority') {
-      query = query
-        .order('priority_score', { ascending: false, nullsFirst: false })
-        .order('support_count', { ascending: false, nullsFirst: false })
-        .order('created_at', { ascending: false });
-    } else if (filter.sort_by === 'recent') {
+    if (filter.sort_by === 'recent') {
       query = query.order('created_at', { ascending: false });
     } else {
       // Default: Most supported on top, followed by priority and recency
       query = query
         .order('support_count', { ascending: false, nullsFirst: false })
-        .order('priority_score', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false });
     }
 
@@ -199,18 +193,13 @@ export class ChallengesService {
       this.logger.warn(`Primary query notice: ${result.error.message}. Executing direct column select...`);
       let fallback = client
         .from('challenges')
-        .select('id, title, description, district, category, status, priority_score, support_count, media_urls, created_at, submitted_by, category_id, assigned_institution_id');
+        .select('id, title, description, district, category, status, support_count, media_urls, created_at, submitted_by, category_id, assigned_institution_id');
       
-      if (filter.sort_by === 'priority') {
-        fallback = fallback
-          .order('priority_score', { ascending: false, nullsFirst: false })
-          .order('support_count', { ascending: false, nullsFirst: false });
-      } else if (filter.sort_by === 'recent') {
+      if (filter.sort_by === 'recent') {
         fallback = fallback.order('created_at', { ascending: false });
       } else {
         fallback = fallback
-          .order('support_count', { ascending: false, nullsFirst: false })
-          .order('priority_score', { ascending: false, nullsFirst: false });
+          .order('support_count', { ascending: false, nullsFirst: false });
       }
 
       const fallbackQuery = await fallback.range(offset, offset + limit - 1);
@@ -357,6 +346,78 @@ export class ChallengesService {
   }
 
   /**
+   * Update title or description of a challenge (Only Owner can do this).
+   */
+  async updateChallenge(id: string, dto: any, user: AuthenticatedUser) {
+    const admin = this.supabaseService.getAdminClient();
+    
+    // Check challenge exists and user is owner
+    const existing = await this.getChallengeById(id, user);
+    
+    if (existing.submitted_by !== user.id && existing.user_id !== user.id) {
+      throw new ForbiddenException({
+        statusCode: 403,
+        message: 'Only the author of this challenge can edit it',
+        errorCode: 'FORBIDDEN_EDIT',
+      });
+    }
+
+    const { data, error } = await admin
+      .from('challenges')
+      .update({
+        title: dto.title !== undefined ? dto.title : existing.title,
+        description: dto.description !== undefined ? dto.description : existing.description,
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      throw new BadRequestException({
+        statusCode: 400,
+        message: error.message,
+        errorCode: 'CHALLENGE_UPDATE_FAILED',
+      });
+    }
+
+    return data;
+  }
+
+  /**
+   * Delete a challenge (Only Owner can do this).
+   */
+  async deleteChallenge(id: string, user: AuthenticatedUser) {
+    const admin = this.supabaseService.getAdminClient();
+    
+    // Check challenge exists and user is owner
+    const existing = await this.getChallengeById(id, user);
+    
+    if (existing.submitted_by !== user.id && existing.user_id !== user.id && user.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException({
+        statusCode: 403,
+        message: 'Only the author or Super Admin can delete this challenge',
+        errorCode: 'FORBIDDEN_DELETE',
+      });
+    }
+
+    // Cascade delete is usually handled by DB, but we delete the record here.
+    const { error } = await admin
+      .from('challenges')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      throw new BadRequestException({
+        statusCode: 400,
+        message: error.message,
+        errorCode: 'CHALLENGE_DELETE_FAILED',
+      });
+    }
+
+    return { success: true, message: 'Challenge deleted successfully' };
+  }
+
+  /**
    * Super Admin / Govt Override for AI Routing.
    */
   async overrideRouting(
@@ -390,7 +451,7 @@ export class ChallengesService {
 
     if (dto.category_id) updatePayload.category_id = dto.category_id;
     if (dto.assigned_institution_id) updatePayload.assigned_institution_id = dto.assigned_institution_id;
-    if (dto.priority_score) updatePayload.priority_score = dto.priority_score;
+
 
     if (dto.assigned_institution_id && existing.status === ChallengeStatus.SUBMITTED) {
       updatePayload.status = ChallengeStatus.ROUTED;
@@ -467,7 +528,7 @@ export class ChallengesService {
           payload: {
             challenge_id: challenge.id,
             title: challenge.title,
-            priority_score: challenge.priority_score,
+
             district: challenge.district,
           },
         }));

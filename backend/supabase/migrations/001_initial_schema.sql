@@ -115,7 +115,6 @@ CREATE TABLE IF NOT EXISTS challenges (
     latitude NUMERIC(10, 7),
     longitude NUMERIC(10, 7),
     media_urls TEXT[] NOT NULL DEFAULT '{}',
-    priority_score NUMERIC(5, 2) NOT NULL DEFAULT 0.00 CHECK (priority_score >= 0 AND priority_score <= 100),
     duplicate_of UUID REFERENCES challenges(id) ON DELETE SET NULL,
     assigned_institution_id UUID REFERENCES institutions(id) ON DELETE SET NULL,
     ai_classification JSONB,

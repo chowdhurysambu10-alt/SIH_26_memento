@@ -102,32 +102,32 @@ export class ClassificationService {
   ): ClassificationResult {
     const text = `${title} ${description}`.toLowerCase();
 
-    const categoryKeywords: Record<string, { slug: string; name: string; score: number }> = {
-      water: { slug: 'water', name: 'Water & Sanitation', score: 80 },
-      arsenic: { slug: 'water', name: 'Water & Sanitation', score: 85 },
-      sanitation: { slug: 'water', name: 'Water & Sanitation', score: 70 },
-      school: { slug: 'education', name: 'Education', score: 75 },
-      teacher: { slug: 'education', name: 'Education', score: 70 },
-      student: { slug: 'education', name: 'Education', score: 65 },
-      crop: { slug: 'agriculture', name: 'Agriculture', score: 80 },
-      farmer: { slug: 'agriculture', name: 'Agriculture', score: 80 },
-      irrigation: { slug: 'agriculture', name: 'Agriculture', score: 85 },
-      hospital: { slug: 'healthcare', name: 'Healthcare', score: 90 },
-      doctor: { slug: 'healthcare', name: 'Healthcare', score: 85 },
-      malnutrition: { slug: 'healthcare', name: 'Healthcare', score: 95 },
-      forest: { slug: 'environment', name: 'Environment & Forestry', score: 75 },
-      pollution: { slug: 'environment', name: 'Environment & Forestry', score: 80 },
-      solar: { slug: 'energy', name: 'Clean Energy', score: 65 },
-      electricity: { slug: 'energy', name: 'Clean Energy', score: 70 },
-      road: { slug: 'urban_development', name: 'Urban Infrastructure', score: 75 },
-      drainage: { slug: 'urban_development', name: 'Urban Infrastructure', score: 75 },
-      disability: { slug: 'accessibility', name: 'Accessibility & Inclusion', score: 80 },
-      handicap: { slug: 'accessibility', name: 'Accessibility & Inclusion', score: 80 },
-      livelihood: { slug: 'rural_livelihoods', name: 'Rural Livelihoods', score: 75 },
-      handicraft: { slug: 'rural_livelihoods', name: 'Rural Livelihoods', score: 70 },
+    const categoryKeywords: Record<string, { slug: string; name: string }> = {
+      water: { slug: 'water', name: 'Water & Sanitation' },
+      arsenic: { slug: 'water', name: 'Water & Sanitation' },
+      sanitation: { slug: 'water', name: 'Water & Sanitation' },
+      school: { slug: 'education', name: 'Education' },
+      teacher: { slug: 'education', name: 'Education' },
+      student: { slug: 'education', name: 'Education' },
+      crop: { slug: 'agriculture', name: 'Agriculture' },
+      farmer: { slug: 'agriculture', name: 'Agriculture' },
+      irrigation: { slug: 'agriculture', name: 'Agriculture' },
+      hospital: { slug: 'healthcare', name: 'Healthcare' },
+      doctor: { slug: 'healthcare', name: 'Healthcare' },
+      malnutrition: { slug: 'healthcare', name: 'Healthcare' },
+      forest: { slug: 'environment', name: 'Environment & Forestry' },
+      pollution: { slug: 'environment', name: 'Environment & Forestry' },
+      solar: { slug: 'energy', name: 'Clean Energy' },
+      electricity: { slug: 'energy', name: 'Clean Energy' },
+      road: { slug: 'urban_development', name: 'Urban Infrastructure' },
+      drainage: { slug: 'urban_development', name: 'Urban Infrastructure' },
+      disability: { slug: 'accessibility', name: 'Accessibility & Inclusion' },
+      handicap: { slug: 'accessibility', name: 'Accessibility & Inclusion' },
+      livelihood: { slug: 'rural_livelihoods', name: 'Rural Livelihoods' },
+      handicraft: { slug: 'rural_livelihoods', name: 'Rural Livelihoods' },
     };
 
-    let matched = { slug: 'public_administration', name: 'Public Administration', score: 60 };
+    let matched = { slug: 'public_administration', name: 'Public Administration' };
     for (const [kw, data] of Object.entries(categoryKeywords)) {
       if (text.includes(kw)) {
         matched = data;
@@ -159,7 +159,7 @@ export class ClassificationService {
     return {
       categorySlug: matched.slug,
       categoryName: matched.name,
-      priorityScore: matched.score,
+
       recommendedKeywords: Array.from(inputWords).slice(0, 5),
       duplicateCandidateId: maxSim >= 0.65 ? bestDupId : null,
       duplicateSimilarityScore: parseFloat(maxSim.toFixed(2)),
