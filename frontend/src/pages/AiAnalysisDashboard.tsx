@@ -123,7 +123,7 @@ export const AiAnalysisDashboard: React.FC = () => {
             AI Analysis & Reviewer Override
           </h1>
           <p style={{ color: '#64748b', fontSize: '14.5px', marginTop: '4px' }}>
-            Automated Gemma-2 & local Ollama inferences with human-in-the-loop validation.
+            Automated Gemma-2 inferences with human-in-the-loop validation.
           </p>
         </div>
 

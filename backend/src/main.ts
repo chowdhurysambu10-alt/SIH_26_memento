@@ -45,10 +45,10 @@ async function bootstrap() {
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Societal Innovation Collaboration Portal API')
     .setDescription(
-      `Backend API for crowdsourcing, AI classifying (Gemma 2 / Ollama), routing, and collaboratively solving local societal challenges across Jharkhand.\n\n` +
+      `Backend API for crowdsourcing, AI classifying (Gemma 2), routing, and collaboratively solving local societal challenges across Jharkhand.\n\n` +
       `Features:\n` +
       `- **Authentication & RLS**: 8 Roles (Citizen, PRI/ULB, University Admin, Faculty, Student, Industry Partner, Govt Viewer, Super Admin)\n` +
-      `- **AI Routing Engine**: Google AI Studio Gemma API with local Ollama fallback\n` +
+      `- **AI Routing Engine**: Google AI Studio Gemma API\n` +
       `- **Lifecycle State Machine**: submitted ➔ under_review ➔ routed ➔ team_formed ➔ in_progress ➔ completed ➔ validated\n` +
       `- **Collaboration**: University Teams, Industry Proposals, and Milestone Deliverable Workflows\n` +
       `- **Realtime Notifications**: Supabase Realtime event push\n` +

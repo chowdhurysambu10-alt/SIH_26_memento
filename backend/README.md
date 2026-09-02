@@ -1,7 +1,7 @@
 # Societal Innovation Collaboration Portal - Backend API
 
 > **Smart India Hackathon (SIH) Backend Solution**  
-> Scalable, AI-driven backend for crowdsourcing societal challenges across Jharkhand, classifying and deduplicating them using Google AI Studio Gemma models (with self-hosted Ollama fallback), and routing them to universities and industry partners for collaborative execution.
+> Scalable, AI-driven backend for crowdsourcing societal challenges across Jharkhand, classifying and deduplicating them using Google AI Studio Gemma models, and routing them to universities and industry partners for collaborative execution.
 
 ---
 
@@ -11,7 +11,7 @@
 - **Database & Auth**: [Supabase](https://supabase.com) (Free Tier PostgreSQL + Row Level Security + Supabase Auth)
 - **Media & File Storage**: Supabase Storage (`challenge-media` bucket)
 - **Realtime Push Notifications**: Supabase Realtime Channels (Postgres CDC WebSockets)
-- **AI Classification & Deduplication**: [Google AI Studio](https://aistudio.google.com) (Gemma 2 9B / 27B free tier) + Swappable **Ollama** Fallback Layer
+- **AI Classification & Deduplication**: [Google AI Studio](https://aistudio.google.com) (Gemma 2 9B / 27B free tier)
 - **API Documentation**: OpenAPI / Swagger UI (`@nestjs/swagger`)
 
 ---
@@ -39,7 +39,7 @@ SIH_26_memento/
 │   │   ├── supabase/                      # Supabase Admin & User-scoped clients, Storage uploads
 │   │   ├── auth/                          # Signup (with role assignment) & Login
 │   │   ├── users/                         # User profiles & institutional verification
-│   │   ├── ai/                            # LLM Abstraction (GemmaApiProvider, OllamaProvider, ClassificationService)
+│   │   ├── ai/                            # LLM Abstraction (GemmaApiProvider, ClassificationService)
 │   │   ├── challenges/                    # Challenge CRUD, media upload, AI routing, overrides
 │   │   ├── collaboration/                 # Teams, proposals, industry engagements, milestones
 │   │   ├── notifications/                 # Notifications management & real-time dispatcher
@@ -81,10 +81,6 @@ DEFAULT_AI_PROVIDER=gemma
 GEMMA_API_KEY=your-google-ai-studio-gemini-or-gemma-key
 GEMMA_MODEL=gemma-2-9b-it
 GEMMA_API_URL=https://generativelanguage.googleapis.com/v1beta/models
-
-# Ollama Fallback (Optional self-hosted instance)
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=gemma2:9b
 ```
 
 ### 3. Run Database Migrations in Supabase
@@ -116,7 +112,7 @@ npm test
 ## ⚠️ Free-Tier Guidelines & Limitations
 
 1. **Google AI Studio Gemma API Rate Limits (15 RPM free tier)**:
-   - Built-in failover: If Google AI Studio returns HTTP 429 or times out, `ClassificationService` automatically falls back to your self-hosted Ollama Gemma instance or the local heuristic rule engine, ensuring zero service interruptions.
+   - Built-in failover: If Google AI Studio returns HTTP 429 or times out, `ClassificationService` automatically falls back to the local heuristic rule engine, ensuring zero service interruptions.
 2. **Supabase Inactivity Pausing (Free Tier)**:
    - Free Supabase projects pause after 7 days of inactivity. Setting up a free GitHub Action cron job to ping `GET /api/v1/analytics/overview` keeps the database warm.
 3. **No Heavy Redis/BullMQ Required**:

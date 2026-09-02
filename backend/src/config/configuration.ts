@@ -14,9 +14,5 @@ export default () => ({
       model: process.env.GEMMA_MODEL || 'gemma-2-9b-it',
       apiUrl: process.env.GEMMA_API_URL || 'https://generativelanguage.googleapis.com/v1beta/models',
     },
-    ollama: {
-      baseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
-      model: process.env.OLLAMA_MODEL || 'gemma2:9b',
-    },
   },
 });

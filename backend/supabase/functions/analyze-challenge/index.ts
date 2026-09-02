@@ -1,5 +1,8 @@
+// @ts-nocheck
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.8';
+
+declare const Deno: any;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -23,7 +26,6 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
     const gemmaApiKey = Deno.env.get('GEMMA_API_KEY') || Deno.env.get('GEMINI_API_KEY') || '';
-    const ollamaBaseUrl = Deno.env.get('OLLAMA_BASE_URL') || 'http://localhost:11434';
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const body: ChallengePayload = await req.json();
@@ -83,59 +85,30 @@ Return strictly a JSON object with this format:
       aiResult = JSON.parse(text);
       modelUsed = 'gemma-2';
     } catch (gemmaErr) {
-      console.warn('Primary Gemma provider failed:', gemmaErr.message, 'Trying Ollama local fallback...');
+      console.warn('Primary Gemma provider failed:', gemmaErr.message, 'Using deterministic heuristic classifier...');
+      
+      // Heuristic fallback
+      const descLower = `${title} ${description}`.toLowerCase();
+      let cat = 'Public Administration';
 
-      // 2. Fallback to local Ollama
-      try {
-        const ollamaReq = await fetch(`${ollamaBaseUrl}/api/generate`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: 'gemma2:9b',
-            prompt: `${systemPrompt}\n\n${userContent}`,
-            stream: false,
-            format: 'json',
-          }),
-        });
-
-        if (!ollamaReq.ok) throw new Error(`Ollama responded with HTTP ${ollamaReq.status}`);
-
-        const ollamaData = await ollamaReq.json();
-        rawResponse = ollamaData;
-        aiResult = JSON.parse(ollamaData.response || '{}');
-        modelUsed = 'ollama-local';
-      } catch (ollamaErr) {
-        console.warn('Ollama fallback also failed. Using deterministic heuristic classifier...');
-        // Heuristic fallback
-        const descLower = `${title} ${description}`.toLowerCase();
-        let cat = 'Public Administration';
-
-
-        if (descLower.includes('water') || descLower.includes('sanitation') || descLower.includes('drainage')) {
-          cat = 'Water & Sanitation';
-
-        } else if (descLower.includes('school') || descLower.includes('teacher') || descLower.includes('student')) {
-          cat = 'Education';
-
-        } else if (descLower.includes('hospital') || descLower.includes('doctor') || descLower.includes('health') || descLower.includes('medicine')) {
-          cat = 'Healthcare';
-
-        } else if (descLower.includes('crop') || descLower.includes('farmer') || descLower.includes('irrigation')) {
-          cat = 'Agriculture';
-
-        } else if (descLower.includes('road') || descLower.includes('pothole') || descLower.includes('traffic') || descLower.includes('bridge')) {
-          cat = 'Urban Infrastructure';
-
-        }
-
-        aiResult = {
-          category: cat,
-
-          confidence: 0.75,
-          summary: `${title} reported in ${district || 'Jharkhand'} requiring societal intervention.`,
-        };
-        modelUsed = 'heuristic-engine';
+      if (descLower.includes('water') || descLower.includes('sanitation') || descLower.includes('drainage')) {
+        cat = 'Water & Sanitation';
+      } else if (descLower.includes('school') || descLower.includes('teacher') || descLower.includes('student')) {
+        cat = 'Education';
+      } else if (descLower.includes('hospital') || descLower.includes('doctor') || descLower.includes('health') || descLower.includes('medicine')) {
+        cat = 'Healthcare';
+      } else if (descLower.includes('crop') || descLower.includes('farmer') || descLower.includes('irrigation')) {
+        cat = 'Agriculture';
+      } else if (descLower.includes('road') || descLower.includes('pothole') || descLower.includes('traffic') || descLower.includes('bridge')) {
+        cat = 'Urban Infrastructure';
       }
+
+      aiResult = {
+        category: cat,
+        confidence: 0.75,
+        summary: `${title} reported in ${district || 'Jharkhand'} requiring societal intervention.`,
+      };
+      modelUsed = 'heuristic-engine';
     }
 
     // Sanitize values

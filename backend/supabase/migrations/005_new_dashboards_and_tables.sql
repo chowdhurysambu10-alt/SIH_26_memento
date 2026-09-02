@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS challenge_assignments (
 CREATE TABLE IF NOT EXISTS ai_analysis_log (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   challenge_id UUID NOT NULL REFERENCES challenges(id) ON DELETE CASCADE,
-  model_used TEXT NOT NULL, -- 'gemma-2' | 'ollama-local' | 'human_override'
+  model_used TEXT NOT NULL, -- 'gemma-2' | 'human_override'
   ai_category TEXT,
   ai_confidence NUMERIC(3, 2) DEFAULT 0.00,
   ai_summary TEXT,

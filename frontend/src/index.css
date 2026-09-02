@@ -602,7 +602,99 @@ textarea:focus {
     grid-template-columns: 1fr;
   }
 
-  .header-nav {
+  /* Header Fixes */
+  .header-content {
+    flex-direction: column;
+    padding: 12px 16px;
     gap: 12px;
+  }
+  .header-nav {
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  /* Force inline grids to stack */
+  div[style*="display: grid"],
+  div[style*="display: 'grid'"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Portals Layout (Admin, Institution, Student) */
+  /* Main Container */
+  div[style*="height: 100vh"] {
+    flex-direction: column !important;
+    height: 100vh !important;
+  }
+
+  /* Sidebar */
+  aside[style*="width: 260px"],
+  aside[style*="width: 80px"],
+  aside[style*="width:260px"],
+  aside[style*="width:80px"] {
+    width: 100vw !important;
+    height: auto !important;
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    z-index: 1000 !important;
+    padding: 8px !important;
+  }
+
+  /* Sidebar Logo and Top Header */
+  aside > div:first-child {
+    display: none !important;
+  }
+
+  /* Sidebar Navigation */
+  aside nav {
+    flex-direction: row !important;
+    padding: 0 !important;
+    overflow-x: auto !important;
+    flex: 1 !important;
+  }
+
+  aside nav button {
+    flex-shrink: 0 !important;
+    justify-content: center !important;
+    padding: 12px !important;
+  }
+  
+  /* Hide labels on mobile sidebar */
+  aside nav span {
+    display: none !important;
+  }
+
+  /* Bottom Actions in Sidebar (Logout, Home) */
+  aside > div:last-child {
+    display: flex !important;
+    flex-direction: row !important;
+    padding: 0 !important;
+    border-top: none !important;
+    border-left: 1px solid #1e293b !important;
+    margin-left: 8px !important;
+    padding-left: 8px !important;
+  }
+  
+  aside > div:last-child button {
+    padding: 12px !important;
+    width: auto !important;
+  }
+  
+  aside > div:last-child span {
+    display: none !important;
+  }
+
+  /* Main Scrollable Area */
+  main[style*="flex: 1"],
+  main[style*="flex:1"] {
+    padding-bottom: 70px !important; /* space for bottom nav */
+  }
+
+  /* Problem Entry layout */
+  .media-row {
+    justify-content: center;
   }
 }
