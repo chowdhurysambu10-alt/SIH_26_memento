@@ -6,7 +6,7 @@ export interface DashboardChallenge {
   description: string;
   district: string;
   category?: string;
-  priority_score?: number;
+
   support_count?: number;
   status: 'submitted' | 'under_action' | 'resolved' | 'under_review' | 'claimed' | 'in_progress' | 'completed';
   user_id?: string;
@@ -31,7 +31,7 @@ export interface DashboardChallenge {
     id: string;
     model_used: string;
     ai_category: string;
-    ai_priority_score: number;
+
     ai_confidence: number;
     ai_summary: string;
     created_at: string;
@@ -59,7 +59,7 @@ export interface AiLogEntry {
   challenge_id: string;
   model_used: string;
   ai_category: string;
-  ai_priority_score: number;
+
   ai_confidence: number;
   ai_summary: string;
   created_at: string;
@@ -76,7 +76,7 @@ export const dashboardsApi = {
     if (filter.limit) qs.set('limit', String(filter.limit));
     if (filter.offset) qs.set('offset', String(filter.offset));
     
-    // Query challenges sorted by priority_score DESC
+
     const endpoint = `/challenges${qs.toString() ? `?${qs.toString()}` : ''}`;
     const result = await apiClient<any>(endpoint);
     let items = Array.isArray(result) ? result : (Array.isArray(result?.data) ? result.data : []);
@@ -91,10 +91,8 @@ export const dashboardsApi = {
       });
     }
 
-    // Sort: priority_score DESC, fallback support_count DESC
+    // Sort: support_count DESC
     return items.sort((a: any, b: any) => {
-      const pDiff = (Number(b.priority_score) || 0) - (Number(a.priority_score) || 0);
-      if (pDiff !== 0) return pDiff;
       return (Number(b.support_count) || 0) - (Number(a.support_count) || 0);
     });
   },
@@ -118,7 +116,7 @@ export const dashboardsApi = {
     return apiClient<any>(`/challenges/${challengeId}/status`, {
       method: 'PATCH',
       body: JSON.stringify({
-        status: 'under_action',
+        status: 'team_formed',
         notes: notes || 'Claimed by institutional research team',
       }),
     });
@@ -134,15 +132,13 @@ export const dashboardsApi = {
   overrideAiClassification: async (
     challengeId: string,
     category: string,
-    priorityScore: number,
     notes?: string
   ): Promise<any> => {
     return apiClient<any>(`/challenges/${challengeId}/override-routing`, {
       method: 'POST',
       body: JSON.stringify({
         override_category_slug: category.toLowerCase().replace(/\s+/g, '_'),
-        priority_score_override: priorityScore,
-        notes: notes || 'Human reviewer manual override',
+        override_reason: notes || 'Human reviewer manual override',
       }),
     });
   },

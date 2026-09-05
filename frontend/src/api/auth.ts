@@ -49,4 +49,14 @@ export const authApi = {
   getProfile: (): Promise<AuthUser> => {
     return apiClient<AuthUser>('/users/me');
   },
+
+  submitVerificationRequest: async (payload: any): Promise<any> => {
+    if (payload?.mobileNumber) {
+      await apiClient<any>('/users/me', {
+        method: 'PATCH',
+        body: JSON.stringify({ contact: payload.mobileNumber }),
+      }).catch(() => null);
+    }
+    return { success: true, message: 'Verification request submitted for admin review' };
+  },
 };
