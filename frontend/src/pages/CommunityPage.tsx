@@ -1,8 +1,14 @@
 import React, { useState } from 'react';
 import WidgetBot from '@widgetbot/react-embed';
 
+const DISCORD_SERVER_ID = import.meta.env.VITE_DISCORD_SERVER_ID || '1546942698760437894';
+const DISCORD_CHANNEL_MAIN = import.meta.env.VITE_DISCORD_CHANNEL_MAIN || '1546942699217879050';
+const DISCORD_CHANNEL_2 = import.meta.env.VITE_DISCORD_CHANNEL_2 || '1547222346279026770';
+const DISCORD_CHANNEL_3 = import.meta.env.VITE_DISCORD_CHANNEL_3 || '1547222485496234055';
+const DISCORD_CHANNEL_RULES = import.meta.env.VITE_DISCORD_CHANNEL_RULES || '1546951489128366132';
+
 export const CommunityPage: React.FC = () => {
-  const [activeChannel, setActiveChannel] = useState(import.meta.env.VITE_DISCORD_CHANNEL_MAIN || '');
+  const [activeChannel, setActiveChannel] = useState(DISCORD_CHANNEL_MAIN);
 
   return (
     <div style={{ maxWidth: '95%', margin: '0 auto', padding: '20px', height: 'calc(100vh - 80px)', boxSizing: 'border-box', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
@@ -16,26 +22,26 @@ export const CommunityPage: React.FC = () => {
         
         <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
           <button 
-            onClick={() => setActiveChannel(import.meta.env.VITE_DISCORD_CHANNEL_MAIN || '')}
-            className={`btn ${activeChannel === import.meta.env.VITE_DISCORD_CHANNEL_MAIN ? 'btn-primary' : 'btn-outline'}`}
+            onClick={() => setActiveChannel(DISCORD_CHANNEL_MAIN)}
+            className={`btn ${activeChannel === DISCORD_CHANNEL_MAIN ? 'btn-primary' : 'btn-outline'}`}
           >
             I'm a citizen
           </button>
           <button 
-            onClick={() => setActiveChannel(import.meta.env.VITE_DISCORD_CHANNEL_2 || '')}
-            className={`btn ${activeChannel === import.meta.env.VITE_DISCORD_CHANNEL_2 ? 'btn-primary' : 'btn-outline'}`}
+            onClick={() => setActiveChannel(DISCORD_CHANNEL_2)}
+            className={`btn ${activeChannel === DISCORD_CHANNEL_2 ? 'btn-primary' : 'btn-outline'}`}
           >
             I'm a student
           </button>
           <button 
-            onClick={() => setActiveChannel(import.meta.env.VITE_DISCORD_CHANNEL_3 || '')}
-            className={`btn ${activeChannel === import.meta.env.VITE_DISCORD_CHANNEL_3 ? 'btn-primary' : 'btn-outline'}`}
+            onClick={() => setActiveChannel(DISCORD_CHANNEL_3)}
+            className={`btn ${activeChannel === DISCORD_CHANNEL_3 ? 'btn-primary' : 'btn-outline'}`}
           >
             connect as an institution
           </button>
           <button 
-            onClick={() => setActiveChannel(import.meta.env.VITE_DISCORD_CHANNEL_RULES || '')}
-            className={`btn ${activeChannel === import.meta.env.VITE_DISCORD_CHANNEL_RULES ? 'btn-primary' : 'btn-outline'}`}
+            onClick={() => setActiveChannel(DISCORD_CHANNEL_RULES)}
+            className={`btn ${activeChannel === DISCORD_CHANNEL_RULES ? 'btn-primary' : 'btn-outline'}`}
           >
             Community Rules
           </button>
@@ -44,7 +50,7 @@ export const CommunityPage: React.FC = () => {
       
       <div style={{ flex: 1, minHeight: 0, borderRadius: '12px', overflow: 'hidden', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)', background: '#fff' }}>
         <WidgetBot
-          server={import.meta.env.VITE_DISCORD_SERVER_ID || ''}
+          server={DISCORD_SERVER_ID}
           channel={activeChannel}
           style={{ width: '100%', height: '100%' }}
         />

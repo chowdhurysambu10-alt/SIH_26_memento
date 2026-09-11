@@ -5,7 +5,7 @@ import { NotificationsModal } from './NotificationsModal';
 import { VerificationRequestModal } from './VerificationRequestModal';
 import { useNotifications } from '../hooks/useNotifications';
 
-export type NavTab = 'feed' | 'top-problems' | 'submit' | 'statistics' | 'community' | 'helpdesk' | 'about' | 'login' | 'admin-dashboard' | 'institution-dashboard' | 'student-dashboard';
+export type NavTab = 'home' | 'feed' | 'top-problems' | 'submit' | 'statistics' | 'community' | 'helpdesk' | 'about' | 'login' | 'admin-dashboard' | 'institution-dashboard' | 'student-dashboard';
 
 interface HeaderProps {
   activeTab: NavTab;
@@ -37,11 +37,17 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, platfor
     <>
       <header className="header">
         <div className="header-content">
-          <div className="logo" onClick={() => setActiveTab('feed')}>
+          <div className="logo" onClick={() => setActiveTab('home')}>
             Memento
           </div>
 
           <nav className="header-nav">
+            <button
+              className={`nav-link ${activeTab === 'home' ? 'active' : ''}`}
+              onClick={() => setActiveTab('home')}
+            >
+              Home
+            </button>
             <button
               className={`nav-link ${activeTab === 'feed' ? 'active' : ''}`}
               onClick={() => setActiveTab('feed')}

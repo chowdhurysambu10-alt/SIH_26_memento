@@ -93,11 +93,12 @@ export class SupabaseService implements OnModuleInit {
     fileName: string,
     mimeType: string,
   ): Promise<{ url: string; path: string }> {
-    const filePath = `challenges/${Date.now()}_${fileName}`;
+    const safeName = (fileName || 'image.jpg').replace(/[^a-zA-Z0-9.-]/g, '_');
+    const filePath = `challenges/${Date.now()}_${safeName}`;
     const { data, error } = await this.supabaseAdmin.storage
       .from(this.storageBucket)
       .upload(filePath, fileBuffer, {
-        contentType: mimeType,
+        contentType: mimeType || 'image/jpeg',
         upsert: true,
       });
 

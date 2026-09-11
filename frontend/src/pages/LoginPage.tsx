@@ -60,7 +60,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
         setError('Full Name is required.');
         return;
       }
-      if (activeRole.id !== 'citizen' && !orgName.trim()) {
+      if (activeRole.id !== 'citizen' && activeRole.id !== 'admin' && !orgName.trim()) {
         setError('Institution / Organization Name is required for this role.');
         return;
       }
@@ -213,34 +213,32 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
               </div>
 
               {/* Toggle */}
-              {activeRole.id !== 'admin' && (
-                <div style={styles.toggleContainer}>
-                  <button
-                    type="button"
-                    onClick={() => { setIsSignUp(false); setError(''); }}
-                    style={{
-                      ...styles.toggleBtn,
-                      background: !isSignUp ? '#fff' : 'transparent',
-                      boxShadow: !isSignUp ? '0 2px 4px rgba(0,0,0,0.08)' : 'none',
-                      color: !isSignUp ? '#0f172a' : '#64748b',
-                    }}
-                  >
-                    Sign In
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setIsSignUp(true); setError(''); }}
-                    style={{
-                      ...styles.toggleBtn,
-                      background: isSignUp ? '#fff' : 'transparent',
-                      boxShadow: isSignUp ? '0 2px 4px rgba(0,0,0,0.08)' : 'none',
-                      color: isSignUp ? '#0f172a' : '#64748b',
-                    }}
-                  >
-                    Register
-                  </button>
-                </div>
-              )}
+              <div style={styles.toggleContainer}>
+                <button
+                  type="button"
+                  onClick={() => { setIsSignUp(false); setError(''); }}
+                  style={{
+                    ...styles.toggleBtn,
+                    background: !isSignUp ? '#fff' : 'transparent',
+                    boxShadow: !isSignUp ? '0 2px 4px rgba(0,0,0,0.08)' : 'none',
+                    color: !isSignUp ? '#0f172a' : '#64748b',
+                  }}
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setIsSignUp(true); setError(''); }}
+                  style={{
+                    ...styles.toggleBtn,
+                    background: isSignUp ? '#fff' : 'transparent',
+                    boxShadow: isSignUp ? '0 2px 4px rgba(0,0,0,0.08)' : 'none',
+                    color: isSignUp ? '#0f172a' : '#64748b',
+                  }}
+                >
+                  Register
+                </button>
+              </div>
 
               <form onSubmit={handleAuth}>
                 {isSignUp && (

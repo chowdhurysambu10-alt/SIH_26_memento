@@ -100,46 +100,134 @@ export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, o
         </span>
       </div>
 
-      <h3>{challenge.title || 'Untitled Challenge'}</h3>
-      <p style={{ whiteSpace: 'pre-wrap', marginBottom: '12px', color: '#475569', fontSize: '14.5px', lineHeight: 1.6 }}>
-        {displayDescription}
-        {isLongDescription && (
-          <button 
-            onClick={() => setIsReadMoreOpen(true)}
-            style={{ 
-              background: 'none', 
-              border: 'none', 
-              color: '#2563eb', 
-              cursor: 'pointer', 
-              fontWeight: 600, 
-              marginLeft: '4px',
-              padding: 0 
-            }}
-          >
-            Read more...
-          </button>
-        )}
-      </p>
+      {(() => {
+        const rawMedia: any = challenge.media_urls;
+        const mediaList: string[] = Array.isArray(rawMedia)
+          ? rawMedia.filter((x): x is string => typeof x === 'string' && x.length > 0)
+          : (typeof rawMedia === 'string' && rawMedia.length > 0
+              ? (rawMedia.startsWith('[') ? JSON.parse(rawMedia) : [rawMedia])
+              : []);
 
-      {challenge.media_urls && challenge.media_urls.length > 0 && (
-        <div className="media-row">
-          {challenge.media_urls.map((url, idx) => {
-            if (!url) return null;
-            const isVideo = url.endsWith('.mp4') || url.endsWith('.mov');
-            return isVideo ? (
-              <video key={idx} src={url} controls className="media-thumb" />
-            ) : (
-              <img
-                key={idx}
-                src={url}
-                alt="Challenge media"
-                className="media-thumb"
-                onClick={() => onOpenLightbox(url)}
-              />
-            );
-          })}
-        </div>
-      )}
+        const hasMedia = mediaList.length > 0;
+
+        return (
+          <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', marginBottom: '8px' }}>
+            {/* Left Side: Title & Description */}
+            <div style={{ flex: '1 1 280px', minWidth: 0 }}>
+              <h3 style={{ margin: '0 0 8px', fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>
+                {challenge.title || 'Untitled Challenge'}
+              </h3>
+              <p style={{ whiteSpace: 'pre-wrap', margin: 0, color: '#475569', fontSize: '14.5px', lineHeight: 1.6 }}>
+                {displayDescription}
+                {isLongDescription && (
+                  <button 
+                    onClick={() => setIsReadMoreOpen(true)}
+                    style={{ 
+                      background: 'none', 
+                      border: 'none', 
+                      color: '#2563eb', 
+                      cursor: 'pointer', 
+                      fontWeight: 600, 
+                      marginLeft: '4px',
+                      padding: 0 
+                    }}
+                  >
+                    Read more...
+                  </button>
+                )}
+              </p>
+            </div>
+
+            {/* Right Side: Smaller Photo */}
+            {hasMedia && (
+              <div style={{ flexShrink: 0, alignSelf: 'flex-start' }}>
+                {mediaList.length === 1 ? (
+                  <div
+                    style={{
+                      position: 'relative',
+                      width: '200px',
+                      height: '135px',
+                      borderRadius: '10px',
+                      overflow: 'hidden',
+                      border: '1px solid #e2e8f0',
+                      background: '#f1f5f9',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 6px rgba(0, 0, 0, 0.06)',
+                    }}
+                    onClick={() => onOpenLightbox(mediaList[0])}
+                    title="Click to view full photo"
+                  >
+                    {mediaList[0].endsWith('.mp4') || mediaList[0].endsWith('.mov') || mediaList[0].endsWith('.webm') ? (
+                      <video
+                        src={mediaList[0]}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    ) : (
+                      <img
+                        src={mediaList[0]}
+                        alt={challenge.title || 'Evidence media'}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          display: 'block',
+                          transition: 'transform 0.25s ease',
+                        }}
+                        onMouseOver={(e) => (e.currentTarget.style.transform = 'scale(1.05)')}
+                        onMouseOut={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                      />
+                    )}
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '6px',
+                      right: '6px',
+                      background: 'rgba(15, 23, 42, 0.75)',
+                      color: '#fff',
+                      fontSize: '10px',
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      backdropFilter: 'blur(4px)',
+                      fontWeight: 500,
+                      pointerEvents: 'none'
+                    }}>
+                      Enlarge
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    {mediaList.slice(0, 2).map((url, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          position: 'relative',
+                          width: '105px',
+                          height: '105px',
+                          borderRadius: '8px',
+                          overflow: 'hidden',
+                          border: '1px solid #e2e8f0',
+                          background: '#f1f5f9',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+                        }}
+                        onClick={() => onOpenLightbox(url)}
+                        title="Click to view full photo"
+                      >
+                        <img
+                          src={url}
+                          alt={`Evidence media ${idx + 1}`}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.2s' }}
+                          onMouseOver={(e) => (e.currentTarget.style.transform = 'scale(1.05)')}
+                          onMouseOut={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       <div className="interaction-row">
         <button

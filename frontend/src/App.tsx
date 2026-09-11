@@ -8,6 +8,7 @@ import { CommunityPage } from './pages/CommunityPage';
 import { LoginPage } from './pages/LoginPage';
 import { TopProblemsDashboard } from './pages/TopProblemsDashboard';
 import { ProblemEntryDashboard } from './pages/ProblemEntryDashboard';
+import { LandingPage } from './pages/LandingPage';
 
 import { AdminDashboard } from './pages/AdminDashboard';
 import { InstitutionDashboard } from './pages/InstitutionDashboard';
@@ -45,16 +46,16 @@ function StudentPortal() {
 }
 
 export function AppContent() {
-  const [activeTab, setActiveTab] = useState<NavTab>('feed');
+  const [activeTab, setActiveTab] = useState<NavTab>('home');
   const { user, isAuthenticated } = useAuth();
   const hasRouted = useRef(false);
   const [platformSettings, setPlatformSettings] = useState<any>(null);
 
   useEffect(() => {
-    fetch('http://localhost:3000/settings')
-      .then(res => res.json())
-      .then(data => setPlatformSettings(data))
-      .catch(console.error);
+    fetch('/api/v1/settings')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => data && setPlatformSettings(data))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -74,7 +75,7 @@ export function AppContent() {
         setActiveTab('student-dashboard');
       }
     } else if (!isAuthenticated && ['admin-dashboard', 'institution-dashboard', 'student-dashboard'].includes(activeTab)) {
-      setActiveTab('feed');
+      setActiveTab('home');
     }
   }, [isAuthenticated, user, activeTab]);
 
@@ -84,9 +85,9 @@ export function AppContent() {
         if (user?.role === 'super_admin') setActiveTab('admin-dashboard');
         else if (user?.role === 'university_admin' || user?.role === 'faculty') setActiveTab('institution-dashboard');
         else if (user?.role === 'student') setActiveTab('student-dashboard');
-        else setActiveTab('feed');
+        else setActiveTab('home');
       }}
-      onBack={() => setActiveTab('feed')}
+      onBack={() => setActiveTab('home')}
     />;
   }
 
@@ -108,6 +109,8 @@ export function AppContent() {
         </div>
       )}
       <Header activeTab={activeTab} setActiveTab={setActiveTab} platformSettings={platformSettings} />
+
+      {activeTab === 'home' && <LandingPage onNavigate={(tab) => setActiveTab(tab)} />}
 
       {activeTab === 'feed' && <HomeFeedPage onNavigateLogin={() => setActiveTab('login')} onNavigateSubmit={() => setActiveTab('submit')} />}
 

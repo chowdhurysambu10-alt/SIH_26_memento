@@ -53,11 +53,12 @@ export const NetworkStatusUI: React.FC = () => {
           left: 0,
           right: 0,
           height: '3px',
-          background: showLoader ? 'linear-gradient(90deg, #2563eb 0%, #60a5fa 50%, #2563eb 100%)' : 'transparent',
+          backgroundImage: showLoader ? 'linear-gradient(90deg, #2563eb 0%, #60a5fa 50%, #2563eb 100%)' : 'none',
+          backgroundColor: 'transparent',
           backgroundSize: '200% 100%',
           animation: showLoader ? 'loading-bar 1.5s infinite linear' : 'none',
           zIndex: 99999,
-          transition: 'background 0.3s ease',
+          transition: 'opacity 0.3s ease',
           pointerEvents: 'none'
         }}
       />

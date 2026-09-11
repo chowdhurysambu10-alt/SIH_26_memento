@@ -33,7 +33,7 @@ export class ChallengesService {
   async createChallenge(
     dto: CreateChallengeDto,
     user: AuthenticatedUser,
-    file?: Express.Multer.File,
+    files?: Express.Multer.File[] | Express.Multer.File,
   ) {
     const admin = this.supabaseService.getAdminClient();
     const mediaUrls = [...(dto.media_urls || [])];
@@ -47,8 +47,9 @@ export class ChallengesService {
       throw new BadRequestException('Geolocation is strictly enforced. Please provide latitude and longitude coordinates.');
     }
 
-    // 1. If file uploaded, check size and store in Supabase Storage
-    if (file) {
+    // 1. Process uploaded file(s)
+    const fileList: Express.Multer.File[] = Array.isArray(files) ? files : (files ? [files] : []);
+    for (const file of fileList) {
       if (file.size > settings.maxAttachmentSizeMB * 1024 * 1024) {
         throw new BadRequestException(`File size exceeds the maximum limit of ${settings.maxAttachmentSizeMB}MB.`);
       }
@@ -58,9 +59,14 @@ export class ChallengesService {
           file.originalname,
           file.mimetype,
         );
-        mediaUrls.push(uploadRes.url);
+        if (uploadRes && uploadRes.url) {
+          mediaUrls.push(uploadRes.url);
+        }
       } catch (err) {
-        this.logger.warn(`File upload failed: ${err.message}`);
+        this.logger.warn(`Supabase Storage upload notice: ${err.message}. Using high-fidelity Data URI fallback...`);
+        // Guaranteed fallback so the uploaded photo is never lost
+        const base64Data = `data:${file.mimetype || 'image/jpeg'};base64,${file.buffer.toString('base64')}`;
+        mediaUrls.push(base64Data);
       }
     }
 
@@ -146,7 +152,7 @@ export class ChallengesService {
           processedAt: new Date().toISOString(),
         },
       })
-      .select('id, title, description, district, category, status, priority_score, submitted_by, user_id, category_id, assigned_institution_id, created_at')
+      .select('id, title, description, district, category, status, priority_score, submitted_by, user_id, category_id, assigned_institution_id, media_urls, created_at')
       .maybeSingle();
 
     if (error) {
