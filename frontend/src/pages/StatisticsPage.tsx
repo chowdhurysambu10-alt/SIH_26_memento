@@ -20,7 +20,7 @@ import {
 import { Line } from 'react-chartjs-2';
 import { Edit, Trash2, Save, XCircle } from 'lucide-react';
 
-const MyPostedProblemItem: React.FC<{ challenge: Challenge }> = ({ challenge }) => {
+const MyPostedProblemItem: React.FC<{ challenge: Challenge; onDeleted?: (id: string) => void }> = ({ challenge, onDeleted }) => {
   const [isDeleted, setIsDeleted] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -37,8 +37,9 @@ const MyPostedProblemItem: React.FC<{ challenge: Challenge }> = ({ challenge }) 
     try {
       await challengesApi.deleteChallenge(challenge.id);
       setIsDeleted(true);
-    } catch (err) {
-      alert('Failed to delete challenge.');
+      if (onDeleted) onDeleted(challenge.id);
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete challenge.');
     }
   };
 
@@ -406,7 +407,11 @@ export const StatisticsPage: React.FC<StatisticsPageProps> = ({ hideMyProblems =
             {myChallenges.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {myChallenges.map((c) => (
-                  <MyPostedProblemItem key={c.id} challenge={c} />
+                  <MyPostedProblemItem
+                    key={c.id}
+                    challenge={c}
+                    onDeleted={(delId) => setChallenges((prev) => prev.filter((item) => item.id !== delId))}
+                  />
                 ))}
               </div>
             ) : (

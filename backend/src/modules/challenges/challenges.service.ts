@@ -485,6 +485,121 @@ export class ChallengesService {
     return data;
   }
 
+  /**
+   * Delete a challenge.
+   * Allowed if user is the author (submitted_by or user_id) or is an admin (SUPER_ADMIN, GOVT_VIEWER).
+   */
+  async deleteChallenge(id: string, user: AuthenticatedUser) {
+    const admin = this.supabaseService.getAdminClient();
+
+    // 1. Fetch existing challenge
+    const { data: challenge, error: findError } = await admin
+      .from('challenges')
+      .select('id, submitted_by, user_id, title')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (findError) {
+      this.logger.error(`Error querying challenge ${id} for deletion: ${findError.message}`);
+      throw new BadRequestException(findError.message);
+    }
+
+    if (!challenge) {
+      throw new NotFoundException(`Challenge with ID ${id} not found.`);
+    }
+
+    // 2. Authorization check
+    const isAuthor =
+      challenge.submitted_by === user.id ||
+      challenge.user_id === user.id;
+    const isAdmin =
+      user.role === UserRole.SUPER_ADMIN ||
+      user.role === UserRole.GOVT_VIEWER ||
+      (user.role as any) === 'admin';
+
+    if (!isAuthor && !isAdmin) {
+      throw new ForbiddenException('You are only authorized to delete your own submitted problems.');
+    }
+
+    // 3. Clean up related records (challenge_supports, project_teams, etc.)
+    try {
+      await admin.from('challenge_supports').delete().eq('challenge_id', id);
+    } catch (e: any) {
+      this.logger.warn(`Notice deleting challenge_supports for ${id}: ${e.message}`);
+    }
+
+    try {
+      await admin.from('project_teams').delete().eq('challenge_id', id);
+    } catch (e: any) {
+      this.logger.warn(`Notice deleting project_teams for ${id}: ${e.message}`);
+    }
+
+    // 4. Delete the challenge
+    const { error: deleteError } = await admin
+      .from('challenges')
+      .delete()
+      .eq('id', id);
+
+    if (deleteError) {
+      this.logger.error(`Failed to delete challenge ${id}: ${deleteError.message}`);
+      throw new BadRequestException(`Failed to delete challenge: ${deleteError.message}`);
+    }
+
+    this.logger.log(`Challenge ${id} ("${challenge.title}") deleted by user ${user.id} (${user.role})`);
+
+    return {
+      success: true,
+      message: `Challenge '${challenge.title || id}' successfully deleted.`,
+    };
+  }
+
+  /**
+   * Update challenge title & description.
+   * Allowed if user is author or admin.
+   */
+  async updateChallenge(id: string, dto: { title?: string; description?: string }, user: AuthenticatedUser) {
+    const admin = this.supabaseService.getAdminClient();
+
+    const { data: challenge, error: findError } = await admin
+      .from('challenges')
+      .select('id, submitted_by, user_id')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (findError || !challenge) {
+      throw new NotFoundException(`Challenge with ID ${id} not found.`);
+    }
+
+    const isAuthor =
+      challenge.submitted_by === user.id ||
+      challenge.user_id === user.id;
+    const isAdmin =
+      user.role === UserRole.SUPER_ADMIN ||
+      user.role === UserRole.GOVT_VIEWER ||
+      (user.role as any) === 'admin';
+
+    if (!isAuthor && !isAdmin) {
+      throw new ForbiddenException('You are only authorized to update your own submitted problems.');
+    }
+
+    const updates: Record<string, any> = { updated_at: new Date().toISOString() };
+    if (dto.title?.trim()) updates.title = dto.title.trim();
+    if (dto.description?.trim()) updates.description = dto.description.trim();
+
+    const { data, error } = await admin
+      .from('challenges')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      throw new BadRequestException(`Failed to update challenge: ${error.message}`);
+    }
+
+    return data;
+  }
+
   private async notifyInstitution(institutionId: string, challenge: any) {
     try {
       const admin = this.supabaseService.getAdminClient();

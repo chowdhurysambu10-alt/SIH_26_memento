@@ -61,6 +61,10 @@ export const HomeFeedPage: React.FC<{ onNavigateLogin: () => void; onNavigateSub
     });
   };
 
+  const handleChallengeDeleted = (id: string) => {
+    setChallenges((prev) => prev.filter((c) => c.id !== id));
+  };
+
   const handleOpenSubmit = () => {
     onNavigateSubmit();
   };
@@ -135,6 +139,7 @@ export const HomeFeedPage: React.FC<{ onNavigateLogin: () => void; onNavigateSub
                 challenge={c}
                 onOpenLightbox={(src) => setLightboxSrc(src)}
                 onSupported={handleChallengeSupported}
+                onDeleted={handleChallengeDeleted}
               />
             ))}
           </div>

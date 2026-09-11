@@ -87,10 +87,15 @@ export const challengesApi = {
   },
 
   updateChallenge: async (id: string, data: { title?: string; description?: string }): Promise<Challenge> => {
-    return { id, ...data } as any;
+    return apiClient<Challenge>(`/challenges/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
   },
 
   deleteChallenge: async (id: string): Promise<{ success: boolean; message: string }> => {
-    return { success: true, message: `Challenge ${id} removed` };
+    return apiClient<{ success: boolean; message: string }>(`/challenges/${id}`, {
+      method: 'DELETE',
+    });
   },
 };

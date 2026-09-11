@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -115,5 +116,24 @@ export class ChallengesController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.challengesService.updateStatus(id, dto, user);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update challenge title and description (Author or Admin)' })
+  async updateChallenge(
+    @Param('id') id: string,
+    @Body() dto: { title?: string; description?: string },
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.challengesService.updateChallenge(id, dto, user);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete a challenge permanently (Author or Admin)' })
+  async deleteChallenge(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.challengesService.deleteChallenge(id, user);
   }
 }

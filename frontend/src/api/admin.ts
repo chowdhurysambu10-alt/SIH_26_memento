@@ -44,8 +44,10 @@ export const adminApi = {
     });
   },
 
-  deleteChallenge: async (_challengeId: string): Promise<any> => {
-    return { success: true, message: 'Challenge removed' };
+  deleteChallenge: async (challengeId: string): Promise<any> => {
+    return apiClient<any>(`/challenges/${challengeId}`, {
+      method: 'DELETE',
+    });
   },
 
   updateChallengeStatus: async (challengeId: string, status: string, remark: string = 'Status updated by Admin'): Promise<any> => {
@@ -55,8 +57,11 @@ export const adminApi = {
     });
   },
 
-  updateChallengeDetails: async (_challengeId: string, _title: string, _description: string): Promise<any> => {
-    return { success: true, message: 'Challenge details updated' };
+  updateChallengeDetails: async (challengeId: string, title: string, description: string): Promise<any> => {
+    return apiClient<any>(`/challenges/${challengeId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ title, description }),
+    });
   },
 
   getSettings: async (): Promise<any> => {

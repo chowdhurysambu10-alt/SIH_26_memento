@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import { Challenge, challengesApi } from '../api/challenges';
 import { useAuth } from '../context/AuthContext';
-import { MapPin, Building2, Tag, X } from 'lucide-react';
+import { MapPin, Building2, Tag, X, Trash2 } from 'lucide-react';
 
 interface FeedItemProps {
   challenge: Challenge;
   onOpenLightbox: (src: string) => void;
   onSupported?: (id: string, newCount: number) => void;
+  onDeleted?: (id: string) => void;
 }
 
-export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, onSupported }) => {
+export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, onSupported, onDeleted }) => {
   const { user, isAuthenticated } = useAuth();
   
   const savedSupports = JSON.parse(localStorage.getItem('supported_challenges') || '{}');
@@ -70,6 +71,35 @@ export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, o
       if (onSupported) onSupported(challenge.id, supportCount);
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+
+  const canDelete =
+    isAuthenticated &&
+    user &&
+    (user.id === challenge.submitted_by ||
+      (challenge as any).user_id === user.id ||
+      user.role === 'super_admin' ||
+      user.role === 'govt_viewer' ||
+      (user.role as any) === 'admin');
+
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!window.confirm(`Are you sure you want to permanently delete "${challenge.title || 'this complaint'}"? This action cannot be undone.`)) {
+      return;
+    }
+    setIsDeleting(true);
+    try {
+      await challengesApi.deleteChallenge(challenge.id);
+      if (onDeleted) {
+        onDeleted(challenge.id);
+      }
+    } catch (err: any) {
+      console.error('Failed to delete complaint:', err);
+      alert(err.message || 'Failed to delete challenge. Please try again.');
+      setIsDeleting(false);
     }
   };
 
@@ -229,7 +259,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, o
         );
       })()}
 
-      <div className="interaction-row">
+      <div className="interaction-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <button
           type="button"
           className={`interaction-btn ${isSupported ? 'support-btn active' : ''}`}
@@ -239,6 +269,34 @@ export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, o
         >
           <span>{isSupported ? 'Supported' : 'Support'} ({supportCount})</span>
         </button>
+
+        {canDelete && (
+          <button
+            type="button"
+            className="interaction-btn"
+            onClick={handleDelete}
+            disabled={isDeleting}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: '#fef2f2',
+              color: '#ef4444',
+              border: '1px solid #fecaca',
+              padding: '6px 14px',
+              borderRadius: '8px',
+              fontSize: '13px',
+              fontWeight: 600,
+              cursor: isDeleting ? 'not-allowed' : 'pointer',
+              opacity: isDeleting ? 0.6 : 1,
+              transition: 'all 0.2s ease',
+            }}
+            title="Delete this complaint"
+          >
+            <Trash2 size={14} />
+            <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
+          </button>
+        )}
       </div>
 
       {isReadMoreOpen && (
