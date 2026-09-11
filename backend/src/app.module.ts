@@ -9,6 +9,7 @@ import { ChallengesModule } from './modules/challenges/challenges.module';
 import { CollaborationModule } from './modules/collaboration/collaboration.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { SettingsModule } from './modules/settings/settings.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
     CollaborationModule,
     NotificationsModule,
     AnalyticsModule,
+    SettingsModule,
   ],
 })
 export class AppModule {}

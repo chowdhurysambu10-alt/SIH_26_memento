@@ -8,6 +8,7 @@ import { CommunityPage } from './pages/CommunityPage';
 import { LoginPage } from './pages/LoginPage';
 import { TopProblemsDashboard } from './pages/TopProblemsDashboard';
 import { ProblemEntryDashboard } from './pages/ProblemEntryDashboard';
+import { LandingPage } from './pages/LandingPage';
 
 import { AdminDashboard } from './pages/AdminDashboard';
 import { InstitutionDashboard } from './pages/InstitutionDashboard';
@@ -45,9 +46,17 @@ function StudentPortal() {
 }
 
 export function AppContent() {
-  const [activeTab, setActiveTab] = useState<NavTab>('feed');
+  const [activeTab, setActiveTab] = useState<NavTab>('home');
   const { user, isAuthenticated } = useAuth();
   const hasRouted = useRef(false);
+  const [platformSettings, setPlatformSettings] = useState<any>(null);
+
+  useEffect(() => {
+    fetch('/api/v1/settings')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => data && setPlatformSettings(data))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const handleNav = (e: any) => setActiveTab(e.detail);
@@ -66,19 +75,19 @@ export function AppContent() {
         setActiveTab('student-dashboard');
       }
     } else if (!isAuthenticated && ['admin-dashboard', 'institution-dashboard', 'student-dashboard'].includes(activeTab)) {
-      setActiveTab('feed');
+      setActiveTab('home');
     }
   }, [isAuthenticated, user, activeTab]);
 
   if (activeTab === 'login') {
-    return <LoginPage 
+    return <LoginPage
       onSuccess={() => {
         if (user?.role === 'super_admin') setActiveTab('admin-dashboard');
         else if (user?.role === 'university_admin' || user?.role === 'faculty') setActiveTab('institution-dashboard');
         else if (user?.role === 'student') setActiveTab('student-dashboard');
-        else setActiveTab('feed');
-      }} 
-      onBack={() => setActiveTab('feed')}
+        else setActiveTab('home');
+      }}
+      onBack={() => setActiveTab('home')}
     />;
   }
 
@@ -94,8 +103,15 @@ export function AppContent() {
 
   return (
     <div>
-      <Header activeTab={activeTab} setActiveTab={setActiveTab} />
-      
+      {platformSettings?.systemBannerText && (
+        <div style={{ background: '#f59e0b', color: '#fff', padding: '12px', textAlign: 'center', fontWeight: 600, fontSize: '14px', position: 'sticky', top: 0, zIndex: 1000 }}>
+          {platformSettings.systemBannerText}
+        </div>
+      )}
+      <Header activeTab={activeTab} setActiveTab={setActiveTab} platformSettings={platformSettings} />
+
+      {activeTab === 'home' && <LandingPage onNavigate={(tab) => setActiveTab(tab)} />}
+
       {activeTab === 'feed' && <HomeFeedPage onNavigateLogin={() => setActiveTab('login')} onNavigateSubmit={() => setActiveTab('submit')} />}
 
       {activeTab === 'top-problems' && <TopProblemsDashboard />}
@@ -105,7 +121,7 @@ export function AppContent() {
       )}
 
 
-      
+
       {activeTab === 'statistics' && <StatisticsPage />}
 
       {activeTab === 'community' && <CommunityPage />}

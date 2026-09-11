@@ -21,6 +21,19 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
   const [editTitle, setEditTitle] = useState('');
   const [editDesc, setEditDesc] = useState('');
 
+  // Settings State
+  const [platformSettings, setPlatformSettings] = useState<any>({
+    maintenanceMode: false,
+    aiAutoTriage: true,
+    allowPublicComments: true,
+    dataRetentionDays: 365,
+    enforceGeolocation: false,
+    maxAttachmentSizeMB: 10,
+    enableCommunityChat: true,
+    systemBannerText: '',
+  });
+  const [savingSettings, setSavingSettings] = useState(false);
+
   const fetchUsers = async () => {
     setLoading(true);
     try {
@@ -58,7 +71,29 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
     if (activeView === 'users' || activeView === 'dashboard') fetchUsers();
     if (activeView === 'posts' || activeView === 'dashboard') fetchPosts();
     if (activeView === 'verification') fetchVerificationRequests();
+    if (activeView === 'settings') fetchSettings();
   }, [activeView]);
+
+  const fetchSettings = async () => {
+    try {
+      const data = await adminApi.getSettings();
+      setPlatformSettings(data);
+    } catch (e) {
+      console.error('Failed to fetch settings:', e);
+    }
+  };
+
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingSettings(true);
+    try {
+      await adminApi.updateSettings(platformSettings);
+      alert('Settings saved successfully!');
+    } catch (e: any) {
+      alert('Failed to save settings: ' + e.message);
+    }
+    setSavingSettings(false);
+  };
 
   const handleDeleteUser = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this user?')) return;
@@ -319,9 +354,127 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
       <div>
         <h2 style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>Platform Settings</h2>
         <p style={{ color: '#64748b' }}>Configure global platform behavior.</p>
-        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '32px', marginTop: '24px' }}>
-          <p style={{ color: '#64748b' }}>Settings interface coming soon.</p>
-        </div>
+        
+        <form onSubmit={handleSaveSettings} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '32px', marginTop: '24px', maxWidth: '600px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#0f172a' }}>Maintenance Mode</h4>
+              <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#64748b' }}>Temporarily disable new submissions across the platform.</p>
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+              <input 
+                type="checkbox" 
+                checked={platformSettings.maintenanceMode}
+                onChange={e => setPlatformSettings({...platformSettings, maintenanceMode: e.target.checked})}
+                style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+              />
+            </label>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#0f172a' }}>AI Auto-Triage</h4>
+              <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#64748b' }}>Use Google AI to automatically classify and escalate critical problems.</p>
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+              <input 
+                type="checkbox" 
+                checked={platformSettings.aiAutoTriage}
+                onChange={e => setPlatformSettings({...platformSettings, aiAutoTriage: e.target.checked})}
+                style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+              />
+            </label>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#0f172a' }}>Allow Public Comments</h4>
+              <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#64748b' }}>Allow citizens to comment on public issues.</p>
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+              <input 
+                type="checkbox" 
+                checked={platformSettings.allowPublicComments}
+                onChange={e => setPlatformSettings({...platformSettings, allowPublicComments: e.target.checked})}
+                style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+              />
+            </label>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#0f172a' }}>Enforce Geolocation (Strict Mode)</h4>
+              <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#64748b' }}>Reject problem submissions missing precise GPS coordinates.</p>
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+              <input 
+                type="checkbox" 
+                checked={platformSettings.enforceGeolocation}
+                onChange={e => setPlatformSettings({...platformSettings, enforceGeolocation: e.target.checked})}
+                style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+              />
+            </label>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#0f172a' }}>Community Chat Enabled</h4>
+              <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#64748b' }}>Show the Discord integration tab to all users.</p>
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+              <input 
+                type="checkbox" 
+                checked={platformSettings.enableCommunityChat}
+                onChange={e => setPlatformSettings({...platformSettings, enableCommunityChat: e.target.checked})}
+                style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+              />
+            </label>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
+            <div style={{ flex: 1 }}>
+              <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#0f172a', marginBottom: '8px' }}>Data Retention (Days)</h4>
+              <input 
+                type="number" 
+                value={platformSettings.dataRetentionDays}
+                onChange={e => setPlatformSettings({...platformSettings, dataRetentionDays: parseInt(e.target.value) || 0})}
+                style={{ padding: '10px 14px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '15px', width: '100%' }}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#0f172a', marginBottom: '8px' }}>Max Attachment (MB)</h4>
+              <input 
+                type="number" 
+                value={platformSettings.maxAttachmentSizeMB}
+                onChange={e => setPlatformSettings({...platformSettings, maxAttachmentSizeMB: parseInt(e.target.value) || 10})}
+                style={{ padding: '10px 14px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '15px', width: '100%' }}
+              />
+            </div>
+          </div>
+
+          <div>
+            <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#0f172a', marginBottom: '8px' }}>Global System Banner</h4>
+            <p style={{ margin: '0 0 12px', fontSize: '14px', color: '#64748b' }}>Text to display as an alert at the top of the entire platform. Leave blank to hide.</p>
+            <input 
+              type="text" 
+              placeholder="e.g. System scheduled for maintenance tonight at 12AM..."
+              value={platformSettings.systemBannerText}
+              onChange={e => setPlatformSettings({...platformSettings, systemBannerText: e.target.value})}
+              style={{ padding: '10px 14px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '15px', width: '100%' }}
+            />
+          </div>
+
+          <hr style={{ border: 'none', borderTop: '1px solid #e2e8f0', margin: '8px 0' }} />
+
+          <button 
+            type="submit" 
+            disabled={savingSettings}
+            style={{ padding: '12px 24px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: 600, cursor: savingSettings ? 'not-allowed' : 'pointer', alignSelf: 'flex-start', opacity: savingSettings ? 0.7 : 1 }}
+          >
+            {savingSettings ? 'Saving...' : 'Save Settings'}
+          </button>
+        </form>
       </div>
     );
   }

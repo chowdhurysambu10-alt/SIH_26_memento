@@ -608,6 +608,7 @@ textarea:focus {
     padding: 12px 16px;
     gap: 12px;
   }
+
   .header-nav {
     gap: 8px;
     flex-wrap: wrap;
@@ -644,7 +645,7 @@ textarea:focus {
   }
 
   /* Sidebar Logo and Top Header */
-  aside > div:first-child {
+  aside>div:first-child {
     display: none !important;
   }
 
@@ -661,14 +662,14 @@ textarea:focus {
     justify-content: center !important;
     padding: 12px !important;
   }
-  
+
   /* Hide labels on mobile sidebar */
   aside nav span {
     display: none !important;
   }
 
   /* Bottom Actions in Sidebar (Logout, Home) */
-  aside > div:last-child {
+  aside>div:last-child {
     display: flex !important;
     flex-direction: row !important;
     padding: 0 !important;
@@ -677,20 +678,21 @@ textarea:focus {
     margin-left: 8px !important;
     padding-left: 8px !important;
   }
-  
-  aside > div:last-child button {
+
+  aside>div:last-child button {
     padding: 12px !important;
     width: auto !important;
   }
-  
-  aside > div:last-child span {
+
+  aside>div:last-child span {
     display: none !important;
   }
 
   /* Main Scrollable Area */
   main[style*="flex: 1"],
   main[style*="flex:1"] {
-    padding-bottom: 70px !important; /* space for bottom nav */
+    padding-bottom: 70px !important;
+    /* space for bottom nav */
   }
 
   /* Problem Entry layout */

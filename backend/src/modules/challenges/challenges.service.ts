@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { ClassificationService } from '../ai/classification.service';
+import { SettingsService } from '../settings/settings.service';
 import { CreateChallengeDto } from './dto/create-challenge.dto';
 import { FilterChallengeDto } from './dto/filter-challenge.dto';
 import { OverrideRoutingDto } from './dto/override-routing.dto';
@@ -23,6 +24,7 @@ export class ChallengesService {
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly classificationService: ClassificationService,
+    private readonly settingsService: SettingsService,
   ) {}
 
   /**
@@ -31,32 +33,64 @@ export class ChallengesService {
   async createChallenge(
     dto: CreateChallengeDto,
     user: AuthenticatedUser,
-    file?: Express.Multer.File,
+    files?: Express.Multer.File[] | Express.Multer.File,
   ) {
     const admin = this.supabaseService.getAdminClient();
     const mediaUrls = [...(dto.media_urls || [])];
+    const settings = this.settingsService.getSettings();
 
-    // 1. If file uploaded, store in Supabase Storage
-    if (file) {
+    if (settings.maintenanceMode) {
+      throw new ForbiddenException('The platform is currently in maintenance mode. New submissions are disabled temporarily.');
+    }
+
+    if (settings.enforceGeolocation && (!dto.latitude || !dto.longitude)) {
+      throw new BadRequestException('Geolocation is strictly enforced. Please provide latitude and longitude coordinates.');
+    }
+
+    // 1. Process uploaded file(s)
+    const fileList: Express.Multer.File[] = Array.isArray(files) ? files : (files ? [files] : []);
+    for (const file of fileList) {
+      if (file.size > settings.maxAttachmentSizeMB * 1024 * 1024) {
+        throw new BadRequestException(`File size exceeds the maximum limit of ${settings.maxAttachmentSizeMB}MB.`);
+      }
       try {
         const uploadRes = await this.supabaseService.uploadFile(
           file.buffer,
           file.originalname,
           file.mimetype,
         );
-        mediaUrls.push(uploadRes.url);
+        if (uploadRes && uploadRes.url) {
+          mediaUrls.push(uploadRes.url);
+        }
       } catch (err) {
-        this.logger.warn(`File upload failed: ${err.message}`);
+        this.logger.warn(`Supabase Storage upload notice: ${err.message}. Using high-fidelity Data URI fallback...`);
+        // Guaranteed fallback so the uploaded photo is never lost
+        const base64Data = `data:${file.mimetype || 'image/jpeg'};base64,${file.buffer.toString('base64')}`;
+        mediaUrls.push(base64Data);
       }
     }
 
-    // 2. Run AI Classification & Duplicate Detection
-    const { classification, matchedInstitutionId, providerUsed } =
-      await this.classificationService.processChallenge(
+    let classification: any = {
+      isDuplicate: false,
+      confidenceScore: 0.5,
+      categorySlug: 'infrastructure',
+      suggestedTags: [],
+      severity: 'Low',
+    };
+    let matchedInstitutionId: string | null = null;
+    let providerUsed = 'none';
+
+    // 2. Run AI Classification & Duplicate Detection if enabled
+    if (settings.aiAutoTriage) {
+      const result = await this.classificationService.processChallenge(
         dto.title,
         dto.description,
         dto.district,
       );
+      classification = result.classification;
+      matchedInstitutionId = result.matchedInstitutionId;
+      providerUsed = result.providerUsed;
+    }
 
     // 3. Resolve Category ID from slug
     let categoryId: string | null = null;
@@ -118,7 +152,7 @@ export class ChallengesService {
           processedAt: new Date().toISOString(),
         },
       })
-      .select('id, title, description, district, category, status, priority_score, submitted_by, user_id, category_id, assigned_institution_id, created_at')
+      .select('id, title, description, district, category, status, priority_score, submitted_by, user_id, category_id, assigned_institution_id, media_urls, created_at')
       .maybeSingle();
 
     if (error) {

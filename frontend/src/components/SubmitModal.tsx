@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { challengesApi } from '../api/challenges';
 import { CameraModal } from './CameraModal';
 import { X, Camera, Image, Sparkles } from 'lucide-react';
+import { ALL_DISTRICTS } from '../constants/districts';
 
 interface SubmitModalProps {
   isOpen: boolean;
@@ -11,7 +12,7 @@ interface SubmitModalProps {
 
 export const SubmitModal: React.FC<SubmitModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const [title, setTitle] = useState('');
-  const [district, setDistrict] = useState('Ranchi');
+  const [district, setDistrict] = useState('Kolkata');
   const [description, setDescription] = useState('');
   const [solution, setSolution] = useState('');
   const [files, setFiles] = useState<File[]>([]);
@@ -53,7 +54,7 @@ export const SubmitModal: React.FC<SubmitModalProps> = ({ isOpen, onClose, onSuc
       formData.append('description', fullDesc);
 
       if (files.length > 0) {
-        formData.append('file', files[0]);
+        files.forEach((f) => formData.append('file', f));
       }
 
       await challengesApi.createChallenge(formData);
@@ -61,7 +62,7 @@ export const SubmitModal: React.FC<SubmitModalProps> = ({ isOpen, onClose, onSuc
       onClose();
       // Reset
       setTitle('');
-      setDistrict('Ranchi');
+      setDistrict('Kolkata');
       setDescription('');
       setSolution('');
       setFiles([]);
@@ -113,11 +114,17 @@ export const SubmitModal: React.FC<SubmitModalProps> = ({ isOpen, onClose, onSuc
                 id="district"
                 type="text"
                 className="input-field"
-                placeholder="e.g. Ranchi, Dumka, Dhanbad, Bokaro..."
+                placeholder="e.g. Kolkata, Howrah, Darjeeling, Ranchi..."
+                list="district-datalist"
                 value={district}
                 onChange={(e) => setDistrict(e.target.value)}
                 required
               />
+              <datalist id="district-datalist">
+                {ALL_DISTRICTS.map((d) => (
+                  <option key={d} value={d} />
+                ))}
+              </datalist>
             </div>
 
             <div className="input-group">

@@ -14,20 +14,9 @@ import {
   Award,
   X,
 } from 'lucide-react';
+import { Lightbox } from '../components/Lightbox';
 
-const DISTRICTS = [
-  'All Districts',
-  'Ranchi',
-  'Dhanbad',
-  'East Singhbhum (Jamshedpur)',
-  'Bokaro',
-  'Hazaribagh',
-  'Deoghar',
-  'Dumka',
-  'Giridih',
-  'Palamu',
-  'Ramgarh',
-];
+import { WEST_BENGAL_DISTRICTS, JHARKHAND_DISTRICTS } from '../constants/districts';
 
 const CATEGORIES = [
   'All Categories',
@@ -55,6 +44,7 @@ export const TopProblemsDashboard: React.FC = () => {
   const [category, setCategory] = useState<string>('All Categories');
   const [status, setStatus] = useState<string>('all');
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'all'>('all');
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   const fetchTopProblems = async () => {
     setLoading(true);
@@ -156,9 +146,17 @@ export const TopProblemsDashboard: React.FC = () => {
             <MapPin size={12} style={{ display: 'inline', marginRight: 4 }} /> District
           </label>
           <select value={district} onChange={(e) => setDistrict(e.target.value)} style={{ padding: '8px 12px', fontSize: '13.5px' }}>
-            {DISTRICTS.map((d) => (
-              <option key={d} value={d}>{d}</option>
-            ))}
+            <option value="All Districts">All Districts</option>
+            <optgroup label="West Bengal">
+              {WEST_BENGAL_DISTRICTS.map((d) => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </optgroup>
+            <optgroup label="Jharkhand">
+              {JHARKHAND_DISTRICTS.map((d) => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </optgroup>
           </select>
         </div>
 
@@ -270,31 +268,84 @@ export const TopProblemsDashboard: React.FC = () => {
                     </span>
                   </div>
 
-                  <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', marginBottom: '6px' }}>
-                    {challenge.title}
-                  </h3>
+                  {/* Side-by-side row: Description on left, smaller photo on right */}
+                  <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', marginBottom: '12px' }}>
+                    <div style={{ flex: '1 1 280px', minWidth: 0 }}>
+                      <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', margin: '0 0 6px' }}>
+                        {challenge.title}
+                      </h3>
+                      <p style={{ color: '#475569', fontSize: '14.5px', lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' }}>
+                        {challenge.description && challenge.description.length > 150 
+                          ? challenge.description.substring(0, 150) + '...'
+                          : challenge.description}
+                        {challenge.description && challenge.description.length > 150 && (
+                          <button 
+                            onClick={() => setReadMoreChallenge(challenge)}
+                            style={{ 
+                              background: 'none', 
+                              border: 'none', 
+                              color: '#2563eb', 
+                              cursor: 'pointer', 
+                              fontWeight: 600, 
+                              marginLeft: '4px',
+                              padding: 0 
+                            }}
+                          >
+                            Read more...
+                          </button>
+                        )}
+                      </p>
+                    </div>
 
-                  <p style={{ color: '#475569', fontSize: '14.5px', lineHeight: 1.6, marginBottom: '12px', whiteSpace: 'pre-wrap' }}>
-                    {challenge.description && challenge.description.length > 150 
-                      ? challenge.description.substring(0, 150) + '...'
-                      : challenge.description}
-                    {challenge.description && challenge.description.length > 150 && (
-                      <button 
-                        onClick={() => setReadMoreChallenge(challenge)}
-                        style={{ 
-                          background: 'none', 
-                          border: 'none', 
-                          color: '#2563eb', 
-                          cursor: 'pointer', 
-                          fontWeight: 600, 
-                          marginLeft: '4px',
-                          padding: 0 
-                        }}
-                      >
-                        Read more...
-                      </button>
+                    {challenge.media_urls && challenge.media_urls.length > 0 && (
+                      <div style={{ flexShrink: 0, alignSelf: 'flex-start' }}>
+                        <div
+                          style={{
+                            position: 'relative',
+                            width: '200px',
+                            height: '135px',
+                            borderRadius: '10px',
+                            overflow: 'hidden',
+                            border: '1px solid #e2e8f0',
+                            background: '#f1f5f9',
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.06)',
+                          }}
+                          onClick={() => setLightboxSrc(challenge.media_urls![0])}
+                          title="Click to view full photo"
+                        >
+                          <img
+                            src={challenge.media_urls[0]}
+                            alt={challenge.title}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover',
+                              display: 'block',
+                              transition: 'transform 0.25s ease',
+                            }}
+                            onMouseOver={(e) => (e.currentTarget.style.transform = 'scale(1.05)')}
+                            onMouseOut={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                          />
+                          <div style={{
+                            position: 'absolute',
+                            bottom: '6px',
+                            right: '6px',
+                            background: 'rgba(15, 23, 42, 0.75)',
+                            color: '#fff',
+                            fontSize: '10px',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            backdropFilter: 'blur(4px)',
+                            fontWeight: 500,
+                            pointerEvents: 'none'
+                          }}>
+                            Enlarge
+                          </div>
+                        </div>
+                      </div>
                     )}
-                  </p>
+                  </div>
 
                   {challenge.ai_summary && (
                     <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', borderLeft: '3px solid #2563eb', fontSize: '13px', color: '#334155', marginBottom: '14px' }}>
@@ -346,6 +397,19 @@ export const TopProblemsDashboard: React.FC = () => {
               {readMoreChallenge.title}
             </h3>
             <div style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: '8px' }}>
+              {readMoreChallenge.media_urls && readMoreChallenge.media_urls.length > 0 && (
+                <div 
+                  style={{ marginBottom: '16px', borderRadius: '10px', overflow: 'hidden', maxHeight: '300px', background: '#f8fafc', border: '1px solid #e2e8f0', cursor: 'pointer' }}
+                  onClick={() => setLightboxSrc(readMoreChallenge.media_urls![0])}
+                  title="Click to view full photo"
+                >
+                  <img
+                    src={readMoreChallenge.media_urls[0]}
+                    alt={readMoreChallenge.title}
+                    style={{ width: '100%', maxHeight: '300px', objectFit: 'cover', display: 'block' }}
+                  />
+                </div>
+              )}
               <p style={{ whiteSpace: 'pre-wrap', color: '#475569', fontSize: '15px', lineHeight: 1.6 }}>
                 {readMoreChallenge.description}
               </p>
@@ -353,6 +417,8 @@ export const TopProblemsDashboard: React.FC = () => {
           </div>
         </div>
       )}
+
+      <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
     </div>
   );
 };

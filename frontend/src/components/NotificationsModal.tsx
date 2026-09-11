@@ -56,17 +56,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({ isOpen, 
     });
   };
 
-  const handleGenerateDemo = () => {
-    const demoTitles = ['System Update', 'New Comment', 'Problem Solved', 'Reminder'];
-    const demoBodies = [
-      'Your recent submission has been reviewed and approved.',
-      'A user commented on your post regarding waste management.',
-      'The issue "Potholes on Main Street" has been marked as completed!',
-      'Don\'t forget to complete your profile for a top contributor badge.'
-    ];
-    const randIndex = Math.floor(Math.random() * demoTitles.length);
-    addNotification(demoTitles[randIndex], demoBodies[randIndex]);
-  };
+
 
   const isAllSelected = notifications.length > 0 && selectedIds.length === notifications.length;
 

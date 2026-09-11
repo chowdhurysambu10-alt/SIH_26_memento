@@ -8,6 +8,7 @@ import {
   Query,
   Req,
   UploadedFile,
+  UploadedFiles,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
@@ -17,7 +18,7 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { AnyFilesInterceptor, FileInterceptor } from '@nestjs/platform-express';
 import { ChallengesService } from './challenges.service';
 import { CreateChallengeDto } from './dto/create-challenge.dto';
 import { FilterChallengeDto } from './dto/filter-challenge.dto';
@@ -38,7 +39,7 @@ export class ChallengesController {
   constructor(private readonly challengesService: ChallengesService) {}
 
   @Post()
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(AnyFilesInterceptor())
   @ApiConsumes('multipart/form-data', 'application/json')
   @ApiOperation({
     summary: 'Submit a new challenge (with optional image/media file upload and AI classification)',
@@ -46,9 +47,9 @@ export class ChallengesController {
   async createChallenge(
     @Body() dto: CreateChallengeDto,
     @CurrentUser() user: AuthenticatedUser,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFiles() files?: Express.Multer.File[],
   ) {
-    return this.challengesService.createChallenge(dto, user, file);
+    return this.challengesService.createChallenge(dto, user, files);
   }
 
   @Get()
