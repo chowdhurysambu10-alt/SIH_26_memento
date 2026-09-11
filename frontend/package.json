@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@widgetbot/react-embed": "^1.11.3",
     "chart.js": "^4.4.7",
     "lucide-react": "^0.473.0",
     "react": "^18.3.1",

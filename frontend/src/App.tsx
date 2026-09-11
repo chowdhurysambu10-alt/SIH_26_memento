@@ -48,6 +48,14 @@ export function AppContent() {
   const [activeTab, setActiveTab] = useState<NavTab>('feed');
   const { user, isAuthenticated } = useAuth();
   const hasRouted = useRef(false);
+  const [platformSettings, setPlatformSettings] = useState<any>(null);
+
+  useEffect(() => {
+    fetch('http://localhost:3000/settings')
+      .then(res => res.json())
+      .then(data => setPlatformSettings(data))
+      .catch(console.error);
+  }, []);
 
   useEffect(() => {
     const handleNav = (e: any) => setActiveTab(e.detail);
@@ -71,13 +79,13 @@ export function AppContent() {
   }, [isAuthenticated, user, activeTab]);
 
   if (activeTab === 'login') {
-    return <LoginPage 
+    return <LoginPage
       onSuccess={() => {
         if (user?.role === 'super_admin') setActiveTab('admin-dashboard');
         else if (user?.role === 'university_admin' || user?.role === 'faculty') setActiveTab('institution-dashboard');
         else if (user?.role === 'student') setActiveTab('student-dashboard');
         else setActiveTab('feed');
-      }} 
+      }}
       onBack={() => setActiveTab('feed')}
     />;
   }
@@ -94,8 +102,13 @@ export function AppContent() {
 
   return (
     <div>
-      <Header activeTab={activeTab} setActiveTab={setActiveTab} />
-      
+      {platformSettings?.systemBannerText && (
+        <div style={{ background: '#f59e0b', color: '#fff', padding: '12px', textAlign: 'center', fontWeight: 600, fontSize: '14px', position: 'sticky', top: 0, zIndex: 1000 }}>
+          {platformSettings.systemBannerText}
+        </div>
+      )}
+      <Header activeTab={activeTab} setActiveTab={setActiveTab} platformSettings={platformSettings} />
+
       {activeTab === 'feed' && <HomeFeedPage onNavigateLogin={() => setActiveTab('login')} onNavigateSubmit={() => setActiveTab('submit')} />}
 
       {activeTab === 'top-problems' && <TopProblemsDashboard />}
@@ -105,7 +118,7 @@ export function AppContent() {
       )}
 
 
-      
+
       {activeTab === 'statistics' && <StatisticsPage />}
 
       {activeTab === 'community' && <CommunityPage />}

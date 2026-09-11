@@ -23,8 +23,11 @@ export const adminApi = {
     }
   },
 
-  broadcastNotification: async (_payload: { role: string; type: string; payload: any }): Promise<any> => {
-    return { success: true, message: 'Broadcast queued for delivery' };
+  broadcastNotification: async (payload: { role: string; type: string; payload: any }): Promise<any> => {
+    return apiClient<any>('/notifications/broadcast', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
   },
 
   deleteUser: async (_userId: string): Promise<any> => {
@@ -54,5 +57,16 @@ export const adminApi = {
 
   updateChallengeDetails: async (_challengeId: string, _title: string, _description: string): Promise<any> => {
     return { success: true, message: 'Challenge details updated' };
+  },
+
+  getSettings: async (): Promise<any> => {
+    return apiClient<any>('/settings');
+  },
+
+  updateSettings: async (updates: any): Promise<any> => {
+    return apiClient<any>('/settings', {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
   },
 };

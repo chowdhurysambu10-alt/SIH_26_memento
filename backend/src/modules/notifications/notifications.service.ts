@@ -88,4 +88,28 @@ export class NotificationsService {
 
     return data;
   }
+
+  async broadcastNotification(role: string, type: string, payload: Record<string, any>) {
+    const admin = this.supabaseService.getAdminClient();
+    
+    let usersQuery = admin.from('users').select('id');
+    if (role && role !== 'all') {
+      usersQuery = usersQuery.eq('role', role);
+    }
+    
+    const { data: users, error: userError } = await usersQuery;
+    if (userError) throw new BadRequestException(userError.message);
+    if (!users || users.length === 0) return { message: 'No users found for this role' };
+
+    const notifications = users.map(u => ({
+      recipient_id: u.id,
+      type,
+      payload
+    }));
+
+    const { error: insertError } = await admin.from('notifications').insert(notifications);
+    if (insertError) throw new BadRequestException(insertError.message);
+
+    return { success: true, count: users.length, message: `Broadcasted to ${users.length} users` };
+  }
 }
