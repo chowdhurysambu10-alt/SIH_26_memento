@@ -9,11 +9,10 @@ import {
   Search,
   Menu,
   Building,
-  ShieldAlert,
-  Home
+  Home,
+  FileText
 } from 'lucide-react';
 import { NotificationsModal } from '../components/NotificationsModal';
-import { VerificationRequestModal } from '../components/VerificationRequestModal';
 import { useNotifications } from '../hooks/useNotifications';
 
 interface InstitutionLayoutProps {
@@ -26,14 +25,13 @@ export const InstitutionLayout: React.FC<InstitutionLayoutProps> = ({ children, 
   const { user, logout } = useAuth();
   const [isSidebarOpen, setSidebarOpen] = useState(true);
   const [isNotificationsOpen, setNotificationsOpen] = useState(false);
-  const [isVerificationModalOpen, setVerificationModalOpen] = useState(false);
   const { notifications } = useNotifications();
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
   const navItems = [
     { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
     { id: 'challenges', label: 'Assigned Challenges', icon: CheckSquare },
-    { id: 'profile', label: 'Organization Profile', icon: Building },
+    { id: 'summary', label: 'Daily Summary', icon: FileText },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
@@ -127,14 +125,7 @@ export const InstitutionLayout: React.FC<InstitutionLayoutProps> = ({ children, 
             <input type="text" placeholder="Search tasks..." style={{ border: 'none', outline: 'none', fontSize: '15px', width: '300px' }} />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-            {user && !user.verified && (
-              <button 
-                onClick={() => setVerificationModalOpen(true)}
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', background: '#fffbeb', color: '#d97706', border: '1px solid #fcd34d', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
-              >
-                <ShieldAlert size={14} /> Request Verification
-              </button>
-            )}
+
             <button onClick={() => setNotificationsOpen(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', position: 'relative' }}>
               <Bell size={20} />
               {unreadCount > 0 && (
@@ -159,9 +150,7 @@ export const InstitutionLayout: React.FC<InstitutionLayoutProps> = ({ children, 
       </main>
 
       <NotificationsModal isOpen={isNotificationsOpen} onClose={() => setNotificationsOpen(false)} />
-      {isVerificationModalOpen && (
-        <VerificationRequestModal onClose={() => setVerificationModalOpen(false)} />
-      )}
+
     </div>
   );
 };

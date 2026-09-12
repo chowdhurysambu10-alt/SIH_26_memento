@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { dashboardsApi, DashboardChallenge, TopProblemsFilter } from '../api/dashboards';
 import { challengesApi } from '../api/challenges';
 import { useAuth } from '../context/AuthContext';
+import { useUI } from '../context/UIContext';
 import {
   Flame,
   Filter,
@@ -34,10 +35,11 @@ const CATEGORIES = [
 
 export const TopProblemsDashboard: React.FC = () => {
   const { isAuthenticated } = useAuth();
+  const { showAlert } = useUI();
   const [challenges, setChallenges] = useState<DashboardChallenge[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [visibleCount, setVisibleCount] = useState<number>(10);
-  const [readMoreChallenge, setReadMoreChallenge] = useState<DashboardChallenge | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   // Filter States
   const [district, setDistrict] = useState<string>('All Districts');
@@ -70,7 +72,7 @@ export const TopProblemsDashboard: React.FC = () => {
 
   const handleSupport = async (id: string) => {
     if (!isAuthenticated) {
-      alert('Please sign in to support this challenge.');
+      showAlert('Please sign in to support this challenge.', 'error');
       return;
     }
 
@@ -275,12 +277,19 @@ export const TopProblemsDashboard: React.FC = () => {
                         {challenge.title}
                       </h3>
                       <p style={{ color: '#475569', fontSize: '14.5px', lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' }}>
-                        {challenge.description && challenge.description.length > 150 
+                        {challenge.description && challenge.description.length > 150 && !expandedIds.has(challenge.id)
                           ? challenge.description.substring(0, 150) + '...'
                           : challenge.description}
                         {challenge.description && challenge.description.length > 150 && (
                           <button 
-                            onClick={() => setReadMoreChallenge(challenge)}
+                            onClick={() => {
+                              setExpandedIds(prev => {
+                                const next = new Set(prev);
+                                if (next.has(challenge.id)) next.delete(challenge.id);
+                                else next.add(challenge.id);
+                                return next;
+                              });
+                            }}
                             style={{ 
                               background: 'none', 
                               border: 'none', 
@@ -291,7 +300,7 @@ export const TopProblemsDashboard: React.FC = () => {
                               padding: 0 
                             }}
                           >
-                            Read more...
+                            {expandedIds.has(challenge.id) ? 'Show less' : 'Read more...'}
                           </button>
                         )}
                       </p>
@@ -387,36 +396,7 @@ export const TopProblemsDashboard: React.FC = () => {
         </div>
       )}
 
-      {readMoreChallenge && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '600px' }}>
-            <button className="modal-close" onClick={() => setReadMoreChallenge(null)}>
-              <X size={20} />
-            </button>
-            <h3 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '16px', color: '#0f172a' }}>
-              {readMoreChallenge.title}
-            </h3>
-            <div style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: '8px' }}>
-              {readMoreChallenge.media_urls && readMoreChallenge.media_urls.length > 0 && (
-                <div 
-                  style={{ marginBottom: '16px', borderRadius: '10px', overflow: 'hidden', maxHeight: '300px', background: '#f8fafc', border: '1px solid #e2e8f0', cursor: 'pointer' }}
-                  onClick={() => setLightboxSrc(readMoreChallenge.media_urls![0])}
-                  title="Click to view full photo"
-                >
-                  <img
-                    src={readMoreChallenge.media_urls[0]}
-                    alt={readMoreChallenge.title}
-                    style={{ width: '100%', maxHeight: '300px', objectFit: 'cover', display: 'block' }}
-                  />
-                </div>
-              )}
-              <p style={{ whiteSpace: 'pre-wrap', color: '#475569', fontSize: '15px', lineHeight: 1.6 }}>
-                {readMoreChallenge.description}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
     </div>

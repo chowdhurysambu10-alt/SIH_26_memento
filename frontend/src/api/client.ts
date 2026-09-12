@@ -13,9 +13,13 @@ export interface ApiResponse<T = any> {
   timestamp?: string;
 }
 
+export interface CustomRequestInit extends RequestInit {
+  suppressGlobalError?: boolean;
+}
+
 export async function apiClient<T = any>(
   endpoint: string,
-  options: RequestInit = {}
+  options: CustomRequestInit = {}
 ): Promise<T> {
   const token = localStorage.getItem('supabase_access_token');
   const headers = new Headers(options.headers || {});
@@ -52,7 +56,7 @@ export async function apiClient<T = any>(
         localStorage.removeItem('supabase_refresh_token');
         localStorage.removeItem('user_data');
         window.location.reload();
-      } else {
+      } else if (!options.suppressGlobalError) {
         dispatchNetworkError(errorMsg);
       }
       throw new Error(errorMsg);
@@ -67,7 +71,9 @@ export async function apiClient<T = any>(
   } catch (error: any) {
     // If it's a TypeError from fetch, it means network failed completely (e.g., offline or server down)
     if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
-      dispatchNetworkError('Network error. Please check your internet connection.');
+      if (!options.suppressGlobalError) {
+        dispatchNetworkError('Network error. Please check your internet connection.');
+      }
     }
     throw error;
   } finally {

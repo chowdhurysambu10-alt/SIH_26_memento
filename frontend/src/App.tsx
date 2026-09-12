@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { UIProvider } from './context/UIContext';
 import { Header, NavTab } from './components/Header';
 import { HomeFeedPage } from './pages/HomeFeedPage';
 import { StatisticsPage } from './pages/StatisticsPage';
@@ -9,6 +10,7 @@ import { LoginPage } from './pages/LoginPage';
 import { TopProblemsDashboard } from './pages/TopProblemsDashboard';
 import { ProblemEntryDashboard } from './pages/ProblemEntryDashboard';
 import { LandingPage } from './pages/LandingPage';
+import { AboutPage } from './pages/AboutPage';
 
 import { AdminDashboard } from './pages/AdminDashboard';
 import { InstitutionDashboard } from './pages/InstitutionDashboard';
@@ -130,14 +132,7 @@ export function AppContent() {
       {activeTab === 'institution-dashboard' && <InstitutionPortal />}
       {activeTab === 'student-dashboard' && <StudentPortal />}
 
-      {activeTab === 'about' && (
-        <div style={{ maxWidth: '800px', margin: '60px auto', textAlign: 'center', padding: '20px' }}>
-          <h2 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '12px' }}>About Memento</h2>
-          <p style={{ color: '#64748b', fontSize: '15px', lineHeight: 1.7 }}>
-            Jharkhand Societal Innovation & Collaboration Platform (SIH 2026 Problem Statement 26043). Powered by Google AI Studio (Gemma 2), PostgreSQL Row-Level Security, and automated multi-stakeholder routing.
-          </p>
-        </div>
-      )}
+      {activeTab === 'about' && <AboutPage />}
 
       {/* Floating Plus Button */}
       {isAuthenticated && ((user?.role === 'citizen' && activeTab !== 'about') || (user?.role !== 'citizen' && activeTab === 'feed')) && (
@@ -179,9 +174,11 @@ export function AppContent() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <NetworkStatusUI />
-      <AppContent />
-    </AuthProvider>
+    <UIProvider>
+      <AuthProvider>
+        <NetworkStatusUI />
+        <AppContent />
+      </AuthProvider>
+    </UIProvider>
   );
 }

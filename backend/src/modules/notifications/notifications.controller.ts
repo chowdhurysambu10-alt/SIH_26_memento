@@ -53,8 +53,8 @@ export class NotificationsController {
   @Roles(UserRole.SUPER_ADMIN, UserRole.GOVT_VIEWER)
   @ApiOperation({ summary: 'Send a broadcast notification (Admin only)' })
   async broadcast(
-    @Body() body: { role: string; type: string; payload: Record<string, any> }
+    @Body() body: { role: string; type: string; method?: string; payload: Record<string, any> }
   ) {
-    return this.notificationsService.broadcastNotification(body.role, body.type, body.payload);
+    return this.notificationsService.broadcastNotification(body.role, body.type, body.payload, body.method);
   }
 }

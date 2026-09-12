@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { dashboardsApi } from '../api/dashboards';
 import { useAuth } from '../context/AuthContext';
+import { useUI } from '../context/UIContext';
+import { CameraModal } from '../components/CameraModal';
 import {
   Send,
   UploadCloud,
@@ -32,6 +34,7 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
   onNavigateLogin,
 }) => {
   const { isAuthenticated } = useAuth();
+  const { showAlert, setGlobalLoading } = useUI();
 
   // Submission Form State
   const [title, setTitle] = useState('');
@@ -41,6 +44,7 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
   const [files, setFiles] = useState<File[]>([]);
   const [filePreviews, setFilePreviews] = useState<{ url: string; file: File; isVideo: boolean }[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [showCameraModal, setShowCameraModal] = useState(false);
 
   useEffect(() => {
     const previews = files.map((file) => ({
@@ -64,17 +68,19 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isAuthenticated) {
-      alert('Please sign in to submit a problem.');
+      showAlert('Please sign in to submit a problem.', 'error');
       onNavigateLogin();
       return;
     }
 
     if (!title.trim() || !description.trim()) {
       setError('Please provide a challenge title and description.');
+      showAlert('Please provide a challenge title and description.', 'error');
       return;
     }
 
     setSubmitting(true);
+    setGlobalLoading(true);
     setError('');
     setSubmitSuccess(null);
 
@@ -96,10 +102,20 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
       setTitle('');
       setDescription('');
       setFiles([]);
+      
+      showAlert('Problem submitted successfully!', 'success');
+
+      // Add a slight delay to allow the user to read the success message
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('navigate', { detail: 'feed' }));
+      }, 1500);
     } catch (err: any) {
+      console.error(err);
       setError(err.message || 'Submission failed.');
+      showAlert(err.message || 'Submission failed.', 'error');
     } finally {
       setSubmitting(false);
+      setGlobalLoading(false);
     }
   };
 
@@ -308,7 +324,7 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
                       type="button"
                       onClick={() => {
                         setShowMediaOptions(false);
-                        fileInputCameraRef.current?.click();
+                        setShowCameraModal(true);
                       }}
                       style={{ padding: '14px 16px', background: 'none', border: 'none', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '15px', color: '#0f172a', fontWeight: 500, cursor: 'pointer', textAlign: 'left' }}
                     >
@@ -381,6 +397,12 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
             </button>
           </form>
       </div>
+
+      <CameraModal
+        isOpen={showCameraModal}
+        onClose={() => setShowCameraModal(false)}
+        onCapture={(file) => setFiles((prev) => [...prev, file])}
+      />
     </div>
   );
 };

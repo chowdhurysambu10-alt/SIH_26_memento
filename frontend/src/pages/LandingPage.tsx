@@ -26,18 +26,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
     let isMounted = true;
     const loadRealDatabaseData = async () => {
       try {
-        const [overviewData, challengeList] = await Promise.all([
+        const [overviewData, topProblem] = await Promise.all([
           analyticsApi.getOverview().catch(() => null),
-          challengesApi.getChallenges({ limit: 5 }).catch(() => [] as Challenge[]),
+          challengesApi.getTopFeaturedProblem().catch(() => null),
         ]);
 
         if (isMounted) {
           if (overviewData) {
             setStats(overviewData);
           }
-          if (challengeList && challengeList.length > 0) {
-            const sorted = [...challengeList].sort((a, b) => (b.support_count || 0) - (a.support_count || 0));
-            setFeaturedChallenge(sorted[0]);
+          if (topProblem) {
+            setFeaturedChallenge(topProblem);
           } else {
             setFeaturedChallenge(null);
           }

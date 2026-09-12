@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { ClassificationService } from '../ai/classification.service';
@@ -18,14 +19,45 @@ import { ChallengeStateMachine } from '../../common/state-machine/challenge-stat
 import { UserRole } from '../../common/constants/roles.enum';
 
 @Injectable()
-export class ChallengesService {
+export class ChallengesService implements OnModuleInit {
   private readonly logger = new Logger(ChallengesService.name);
+  private cachedTopProblem: any = null;
 
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly classificationService: ClassificationService,
     private readonly settingsService: SettingsService,
   ) {}
+
+  async onModuleInit() {
+    // Initial fetch
+    await this.updateTopProblemCache();
+    // Update every minute (60000 ms)
+    setInterval(() => {
+      this.updateTopProblemCache();
+    }, 60000);
+  }
+
+  private async updateTopProblemCache() {
+    try {
+      const client = this.supabaseService.getAdminClient();
+      const { data, error } = await client
+        .from('challenges')
+        .select('*, categories(id, name, slug), institutions(id, name, type, district)')
+        .order('support_count', { ascending: false, nullsFirst: false })
+        .limit(1)
+        .maybeSingle();
+      if (!error && data) {
+        this.cachedTopProblem = data;
+      }
+    } catch (e) {
+      this.logger.error(`Failed to update top problem cache: ${e.message}`);
+    }
+  }
+
+  async getTopFeaturedProblem() {
+    return this.cachedTopProblem;
+  }
 
   /**
    * Create challenge with AI classification & auto-routing.
@@ -182,6 +214,15 @@ export class ChallengesService {
     const limit = filter.limit || 10;
     const offset = (page - 1) * limit;
 
+    let cursorObj: any = null;
+    if (filter.cursor) {
+      try {
+        cursorObj = JSON.parse(Buffer.from(filter.cursor, 'base64').toString('utf8'));
+      } catch (e) {
+        this.logger.warn('Invalid cursor format provided.');
+      }
+    }
+
     let query = client
       .from('challenges')
       .select(
@@ -215,6 +256,9 @@ export class ChallengesService {
         .order('support_count', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false });
     } else if (filter.sort_by === 'recent') {
+      if (cursorObj && cursorObj.created_at) {
+        query = query.lt('created_at', cursorObj.created_at);
+      }
       query = query.order('created_at', { ascending: false });
     } else {
       // Default: Most supported on top, followed by priority and recency
@@ -224,7 +268,13 @@ export class ChallengesService {
         .order('created_at', { ascending: false });
     }
 
-    const result = await query.range(offset, offset + limit - 1);
+    let result;
+    if (cursorObj && filter.sort_by === 'recent') {
+      // Cursor pagination bypasses offset
+      result = await query.limit(limit);
+    } else {
+      result = await query.range(offset, offset + limit - 1);
+    }
 
     let data: any = result.data;
     let count: number = result.count || 0;

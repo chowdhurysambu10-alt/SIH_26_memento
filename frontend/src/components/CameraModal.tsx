@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { Camera, X } from 'lucide-react';
+import { useUI } from '../context/UIContext';
 
 interface CameraModalProps {
   isOpen: boolean;
@@ -11,11 +12,18 @@ export const CameraModal: React.FC<CameraModalProps> = ({ isOpen, onClose, onCap
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const { showAlert } = useUI();
 
   useEffect(() => {
     if (isOpen) {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showAlert('Camera access is not supported or requires a secure HTTPS connection.', 'error');
+        onClose();
+        return;
+      }
+
       navigator.mediaDevices
-        ?.getUserMedia({ video: { facingMode: 'environment' } })
+        .getUserMedia({ video: { facingMode: 'environment' } })
         .then((stream) => {
           streamRef.current = stream;
           if (videoRef.current) {
@@ -23,7 +31,7 @@ export const CameraModal: React.FC<CameraModalProps> = ({ isOpen, onClose, onCap
           }
         })
         .catch((err) => {
-          alert('Could not access camera: ' + err.message);
+          showAlert('Could not access camera: ' + err.message, 'error');
           onClose();
         });
     }

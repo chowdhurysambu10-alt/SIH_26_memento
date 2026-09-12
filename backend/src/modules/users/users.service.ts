@@ -117,4 +117,20 @@ export class UsersService {
 
     return data;
   }
+
+  async deleteUser(userId: string) {
+    const admin = this.supabaseService.getAdminClient();
+    
+    const { error: authError } = await admin.auth.admin.deleteUser(userId);
+    
+    if (authError) {
+      throw new BadRequestException({
+        statusCode: 400,
+        message: authError.message,
+        errorCode: 'USER_DELETE_FAILED',
+      });
+    }
+
+    return { success: true, message: 'User deleted successfully' };
+  }
 }

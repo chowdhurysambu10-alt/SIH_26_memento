@@ -1,7 +1,12 @@
 import React, { useState } from 'react';
 import { Challenge, challengesApi } from '../api/challenges';
 import { useAuth } from '../context/AuthContext';
+<<<<<<< Updated upstream
 import { MapPin, Building2, Tag, X } from 'lucide-react';
+=======
+import { useUI } from '../context/UIContext';
+import { MapPin, Building2, Tag, X, Trash2 } from 'lucide-react';
+>>>>>>> Stashed changes
 
 interface FeedItemProps {
   challenge: Challenge;
@@ -11,6 +16,7 @@ interface FeedItemProps {
 
 export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, onSupported }) => {
   const { user, isAuthenticated } = useAuth();
+  const { showAlert, showConfirm } = useUI();
   
   const savedSupports = JSON.parse(localStorage.getItem('supported_challenges') || '{}');
   const [isSupported, setIsSupported] = useState<boolean>(!!savedSupports[challenge.id]);
@@ -25,14 +31,14 @@ export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, o
 
   const maxDescriptionLength = 150;
   const isLongDescription = challenge.description && challenge.description.length > maxDescriptionLength;
-  const displayDescription = isLongDescription
+  const displayDescription = (isLongDescription && !isReadMoreOpen)
     ? challenge.description.substring(0, maxDescriptionLength) + '...'
     : challenge.description;
 
   const handleSupport = async (e: React.MouseEvent) => {
     e.preventDefault();
     if (!isAuthenticated) {
-      alert('Please sign in to support this challenge.');
+      showAlert('Please sign in to support this challenge.', 'error');
       return;
     }
     if (isSyncing) return;
@@ -73,6 +79,31 @@ export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, o
     }
   };
 
+<<<<<<< Updated upstream
+=======
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+
+  const canDelete = false; // Feature disabled as requested
+
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!(await showConfirm(`Are you sure you want to permanently delete "${challenge.title || 'this complaint'}"? This action cannot be undone.`))) {
+      return;
+    }
+    setIsDeleting(true);
+    try {
+      await challengesApi.deleteChallenge(challenge.id);
+      if (onDeleted) {
+        onDeleted(challenge.id);
+      }
+    } catch (err: any) {
+      console.error('Failed to delete complaint:', err);
+      showAlert(err.message || 'Failed to delete challenge. Please try again.', 'error');
+      setIsDeleting(false);
+    }
+  };
+
+>>>>>>> Stashed changes
   return (
     <div className="feed-item">
       <div className="feed-meta">
@@ -121,7 +152,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, o
                 {displayDescription}
                 {isLongDescription && (
                   <button 
-                    onClick={() => setIsReadMoreOpen(true)}
+                    onClick={() => setIsReadMoreOpen(!isReadMoreOpen)}
                     style={{ 
                       background: 'none', 
                       border: 'none', 
@@ -132,7 +163,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, o
                       padding: 0 
                     }}
                   >
-                    Read more...
+                    {isReadMoreOpen ? 'Show less' : 'Read more...'}
                   </button>
                 )}
               </p>
@@ -241,23 +272,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, o
         </button>
       </div>
 
-      {isReadMoreOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '600px' }}>
-            <button className="modal-close" onClick={() => setIsReadMoreOpen(false)}>
-              <X size={20} />
-            </button>
-            <h3 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '16px', color: '#0f172a' }}>
-              {challenge.title}
-            </h3>
-            <div style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: '8px' }}>
-              <p style={{ whiteSpace: 'pre-wrap', color: '#475569', fontSize: '15px', lineHeight: 1.6 }}>
-                {challenge.description}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 };

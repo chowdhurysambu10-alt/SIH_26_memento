@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Patch,
+  Delete,
   Body,
   Param,
   Query,
@@ -57,5 +58,12 @@ export class UsersController {
     @Query('district') district?: string,
   ) {
     return this.usersService.getAllUsers(role, district);
+  }
+
+  @Delete(':id')
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Delete a user account (Super Admin only)' })
+  async deleteUser(@Param('id') id: string) {
+    return this.usersService.deleteUser(id);
   }
 }

@@ -1,73 +1,128 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Challenge, challengesApi } from '../api/challenges';
 import { SearchBar } from '../components/SearchBar';
 import { FeedItem } from '../components/FeedItem';
-
+import { FeedItemSkeleton } from '../components/FeedItemSkeleton';
+import { useFeedCache } from '../hooks/useFeedCache';
+import { useAutoRefresh } from '../hooks/useAutoRefresh';
 import { Lightbox } from '../components/Lightbox';
 import { useAuth } from '../context/AuthContext';
 import { Plus } from 'lucide-react';
 
 export const HomeFeedPage: React.FC<{ onNavigateLogin: () => void; onNavigateSubmit: () => void }> = ({ onNavigateLogin, onNavigateSubmit }) => {
   const { isAuthenticated } = useAuth();
-  const [challenges, setChallenges] = useState<Challenge[]>([]);
-  const [sortBy, setSortBy] = useState<'support' | 'recent'>('support');
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string>('');
+  const [sortBy, setSortBy] = useState<'support' | 'recent'>('recent');
+  const [page, setPage] = useState<number>(1);
+  const [loadingMore, setLoadingMore] = useState<boolean>(false);
+  const [hasMore, setHasMore] = useState<boolean>(true);
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const observer = useRef<IntersectionObserver | null>(null);
 
-  const fetchChallenges = async (searchQuery?: string, customSort?: 'support' | 'recent') => {
-    setLoading(true);
-    setError('');
-    const activeSort = customSort || sortBy;
+  const cacheKey = `feed_${sortBy}_${searchQuery}`;
+  
+  // SWR-like Caching Hook
+  const { data: challenges, isLoading, isValidating, error, mutate } = useFeedCache(cacheKey, {
+    page: 1, // Only cache the first page inherently, append others
+    limit: 10,
+    search: searchQuery || undefined,
+    sort_by: sortBy,
+  });
+
+  // Auto-refresh: poll every 15 s so support counts and new posts appear without a manual reload
+  useAutoRefresh(async () => {
+    const fresh = await challengesApi.getChallenges({ page: 1, limit: 10, search: searchQuery || undefined, sort_by: sortBy });
+    mutate((prev) => {
+      const freshIds = new Set(fresh.map((c) => c.id));
+      // Keep any extra pages already loaded, but update first-page items
+      const rest = prev.filter((c) => !freshIds.has(c.id));
+      return [...fresh, ...rest];
+    });
+  }, 15000);
+
+  // Load more function directly using the API
+  const fetchMoreChallenges = async (pageNum: number) => {
+    setLoadingMore(true);
     try {
-      const data = await challengesApi.getChallenges({
-        page: 1,
-        limit: 30,
+      const cursor = sortBy === 'recent' && challenges.length > 0
+        ? btoa(JSON.stringify({ created_at: challenges[challenges.length - 1].created_at }))
+        : undefined;
+
+      const newData = await challengesApi.getChallenges({
+        page: cursor ? undefined : pageNum,
+        limit: 10,
         search: searchQuery || undefined,
+        sort_by: sortBy,
+        cursor: cursor,
       });
 
-      // Sort client-side and ensure most supported / recent ordering
-      const sorted = [...data].sort((a, b) => {
-        if (activeSort === 'recent') {
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        }
-        // Default: Most supported first
-        return (Number(b.support_count) || 0) - (Number(a.support_count) || 0);
+      if (newData.length < 10) {
+        setHasMore(false);
+      }
+      
+      mutate((prev) => {
+        const existingIds = new Set(prev.map((c) => c.id));
+        const newUnique = newData.filter((c) => !existingIds.has(c.id));
+        return [...prev, ...newUnique];
       });
-
-      setChallenges(sorted);
     } catch (err: any) {
-      console.error('Fetch feed error:', err);
-      setError(err.message || 'Could not connect to backend server.');
+      console.error('Fetch more error:', err);
     } finally {
-      setLoading(false);
+      setLoadingMore(false);
     }
   };
 
   useEffect(() => {
-    fetchChallenges(undefined, sortBy);
-  }, [sortBy]);
+    setPage(1);
+    setHasMore(true);
+  }, [sortBy, searchQuery]);
+
+  const handleSearch = (q: string) => {
+    setSearchQuery(q);
+  };
+
+  const lastElementRef = useCallback((node: HTMLDivElement | null) => {
+    if (isLoading || loadingMore || !hasMore) return;
+    if (observer.current) observer.current.disconnect();
+
+    observer.current = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && hasMore && !loadingMore) {
+        setPage((prevPage) => {
+          const nextPage = prevPage + 1;
+          fetchMoreChallenges(nextPage);
+          return nextPage;
+        });
+      }
+    });
+
+    if (node) observer.current.observe(node);
+  }, [isLoading, loadingMore, hasMore, sortBy, searchQuery]);
 
   const handleChallengeSupported = (id: string, newCount: number) => {
-    setChallenges((prev) => {
+    mutate((prev) => {
       const updated = prev.map((c) => (c.id === id ? { ...c, support_count: newCount } : c));
       if (sortBy === 'support') {
-        return updated.sort((a, b) => {
-          return (Number(b.support_count) || 0) - (Number(a.support_count) || 0);
-        });
+        return updated.sort((a, b) => (Number(b.support_count) || 0) - (Number(a.support_count) || 0));
       }
       return updated;
     });
   };
 
+<<<<<<< Updated upstream
+=======
+  const handleChallengeDeleted = (id: string) => {
+    mutate((prev) => prev.filter((c) => c.id !== id));
+  };
+
+>>>>>>> Stashed changes
   const handleOpenSubmit = () => {
     onNavigateSubmit();
   };
 
   return (
     <>
-      <SearchBar onSearch={(q) => fetchChallenges(q)} />
+      <SearchBar onSearch={handleSearch} />
 
       <main className="main-layout">
         <div className="feed-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
@@ -75,24 +130,6 @@ export const HomeFeedPage: React.FC<{ onNavigateLogin: () => void; onNavigateSub
 
           {/* Sorting Tabs */}
           <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '4px', borderRadius: '10px' }}>
-            <button
-              className="btn"
-              onClick={() => setSortBy('support')}
-              style={{
-                padding: '6px 14px',
-                fontSize: '13px',
-                borderRadius: '8px',
-                background: sortBy === 'support' ? '#ffffff' : 'transparent',
-                color: sortBy === 'support' ? '#2563eb' : '#64748b',
-                fontWeight: sortBy === 'support' ? 700 : 500,
-                boxShadow: sortBy === 'support' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                border: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              Most Supported
-            </button>
-
             <button
               className="btn"
               onClick={() => setSortBy('recent')}
@@ -110,25 +147,49 @@ export const HomeFeedPage: React.FC<{ onNavigateLogin: () => void; onNavigateSub
             >
               Most Recent
             </button>
+            <button
+              className="btn"
+              onClick={() => setSortBy('support')}
+              style={{
+                padding: '6px 14px',
+                fontSize: '13px',
+                borderRadius: '8px',
+                background: sortBy === 'support' ? '#ffffff' : 'transparent',
+                color: sortBy === 'support' ? '#2563eb' : '#64748b',
+                fontWeight: sortBy === 'support' ? 700 : 500,
+                boxShadow: sortBy === 'support' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              Most Supported
+            </button>
           </div>
         </div>
 
-        {loading && <p style={{ color: '#64748b', textAlign: 'center', padding: '40px' }}>Loading challenges...</p>}
+        {isLoading && challenges.length === 0 && (
+          <div className="challenge-list">
+            <FeedItemSkeleton />
+            <FeedItemSkeleton />
+            <FeedItemSkeleton />
+          </div>
+        )}
 
-        {error && (
+        {error && !isLoading && (
           <div className="feed-item" style={{ borderColor: '#fca5a5', background: '#fef2f2' }}>
             <p style={{ color: '#b91c1c' }}>{error}</p>
           </div>
         )}
 
-        {!loading && !error && challenges.length === 0 && (
+        {!isLoading && !error && challenges.length === 0 && (
           <p style={{ color: '#64748b', textAlign: 'center', padding: '40px' }}>
             No challenges found. Be the first to report a societal issue!
           </p>
         )}
 
-        {!loading && challenges.length > 0 && (
+        {challenges.length > 0 && (
           <div className="challenge-list">
+<<<<<<< Updated upstream
             {challenges.map((c) => (
               <FeedItem
                 key={c.id}
@@ -136,7 +197,37 @@ export const HomeFeedPage: React.FC<{ onNavigateLogin: () => void; onNavigateSub
                 onOpenLightbox={(src) => setLightboxSrc(src)}
                 onSupported={handleChallengeSupported}
               />
+=======
+            {challenges.map((c, i) => (
+              <div 
+                key={`${c.id}-${i}`}
+                style={{ 
+                  contentVisibility: 'auto', 
+                  containIntrinsicSize: '0 300px' // Native browser DOM virtualization!
+                }}
+              >
+                <FeedItem
+                  challenge={c}
+                  onOpenLightbox={(src) => setLightboxSrc(src)}
+                  onSupported={handleChallengeSupported}
+                  onDeleted={handleChallengeDeleted}
+                />
+              </div>
+>>>>>>> Stashed changes
             ))}
+            <div style={{ textAlign: 'center', marginTop: '20px' }} ref={lastElementRef}>
+              {loadingMore && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <FeedItemSkeleton />
+                  <FeedItemSkeleton />
+                </div>
+              )}
+              {!hasMore && challenges.length > 0 && (
+                <div style={{ padding: '20px', color: '#94a3b8', fontSize: '14px', fontStyle: 'italic' }}>
+                  You've reached the end of the feed.
+                </div>
+              )}
+            </div>
           </div>
         )}
       </main>

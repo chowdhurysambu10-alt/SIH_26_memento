@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
+import { authApi } from '../api/auth';
 import { useAuth } from '../context/AuthContext';
+import { useUI } from '../context/UIContext';
 import {
   Globe,
   GraduationCap,
@@ -28,19 +30,69 @@ const ROLES = [
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
   const { user, login, signup, logout } = useAuth();
+  const { showAlert } = useUI();
 
   const [activeRole, setActiveRole] = useState<typeof ROLES[0] | null>(null);
   const [isSignUp, setIsSignUp] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   
   const [name, setName] = useState('');
   const [orgName, setOrgName] = useState('');
+  const [district, setDistrict] = useState('');
   const [email, setEmail] = useState('');
+  const [contact, setContact] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      setError('Please enter your Registered Email Address first.');
+      return;
+    }
+    setLoading(true);
+    try {
+      await authApi.requestOtp(email.trim());
+      showAlert(`A password reset OTP has been sent to your email`, 'success');
+      setError('');
+      setOtpSent(true);
+    } catch (err: any) {
+      setError(err.message || 'Failed to request OTP');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otp.trim()) {
+      setError('Please enter the OTP');
+      return;
+    }
+    if (!newPassword || newPassword.length < 6) {
+      setError('Please enter a new password (min 6 characters)');
+      return;
+    }
+    setLoading(true);
+    try {
+      await authApi.resetPassword(email.trim(), otp, newPassword);
+      showAlert(`Your password has been reset successfully!`, 'success');
+      setIsForgotPassword(false);
+      setOtpSent(false);
+      setOtp('');
+      setNewPassword('');
+      setError('');
+    } catch (err: any) {
+      setError(err.message || 'Invalid OTP');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const passRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
   const showPasswordError = isSignUp && password.length > 0 && !passRegex.test(password);
@@ -81,12 +133,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
         await signup({
           email: email.trim(),
           password,
-          name: name.trim(),
+          name: activeRole.id === 'institution' && orgName.trim() ? orgName.trim() : name.trim(),
           role: activeRole.backendRole,
-          district: 'Ranchi',
+          district: district || 'Ranchi',
+          contact: contact.trim() || undefined,
         });
       } else {
-        await login(email.trim(), password);
+        await login(email.trim(), password, activeRole.backendRole);
       }
       onSuccess();
     } catch (err: any) {
@@ -189,13 +242,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
               </div>
             </div>
           ) : (
-            // LOGIN / SIGNUP STEP
+            // LOGIN / SIGNUP / FORGOT PASSWORD STEP
             <div>
               <button 
-                onClick={() => { setActiveRole(null); setError(''); setIsSignUp(false); }} 
+                onClick={() => { 
+                  if (isForgotPassword) {
+                    setIsForgotPassword(false);
+                  } else {
+                    setActiveRole(null); 
+                    setError(''); 
+                    setIsSignUp(false); 
+                  }
+                }} 
                 style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: 24, color: '#64748b', background: 'none', border: 'none', fontSize: '14px', fontWeight: 500, cursor: 'pointer' }}
               >
-                <ChevronLeft size={16} /> Back to Portals
+                <ChevronLeft size={16} /> {isForgotPassword ? 'Back to Login' : 'Back to Portals'}
               </button>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
@@ -207,40 +268,111 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
                     {activeRole.label}
                   </h2>
                   <p style={{ color: '#64748b', fontSize: 14, margin: 0 }}>
-                    {isSignUp ? 'Create your new account' : 'Sign in to continue'}
+                    {isForgotPassword ? 'Reset your password' : isSignUp ? 'Create your new account' : 'Sign in to continue'}
                   </p>
                 </div>
               </div>
 
               {/* Toggle */}
-              <div style={styles.toggleContainer}>
-                <button
-                  type="button"
-                  onClick={() => { setIsSignUp(false); setError(''); }}
-                  style={{
-                    ...styles.toggleBtn,
-                    background: !isSignUp ? '#fff' : 'transparent',
-                    boxShadow: !isSignUp ? '0 2px 4px rgba(0,0,0,0.08)' : 'none',
-                    color: !isSignUp ? '#0f172a' : '#64748b',
-                  }}
-                >
-                  Sign In
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setIsSignUp(true); setError(''); }}
-                  style={{
-                    ...styles.toggleBtn,
-                    background: isSignUp ? '#fff' : 'transparent',
-                    boxShadow: isSignUp ? '0 2px 4px rgba(0,0,0,0.08)' : 'none',
-                    color: isSignUp ? '#0f172a' : '#64748b',
-                  }}
-                >
-                  Register
-                </button>
-              </div>
+              {!isForgotPassword && (
+                <div style={styles.toggleContainer}>
+                  <button
+                    type="button"
+                    onClick={() => { setIsSignUp(false); setError(''); }}
+                    style={{
+                      ...styles.toggleBtn,
+                      background: !isSignUp ? '#fff' : 'transparent',
+                      boxShadow: !isSignUp ? '0 2px 4px rgba(0,0,0,0.08)' : 'none',
+                      color: !isSignUp ? '#0f172a' : '#64748b',
+                    }}
+                  >
+                    Sign In
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setIsSignUp(true); setError(''); }}
+                    style={{
+                      ...styles.toggleBtn,
+                      background: isSignUp ? '#fff' : 'transparent',
+                      boxShadow: isSignUp ? '0 2px 4px rgba(0,0,0,0.08)' : 'none',
+                      color: isSignUp ? '#0f172a' : '#64748b',
+                    }}
+                  >
+                    Register
+                  </button>
+                </div>
+              )}
 
-              <form onSubmit={handleAuth}>
+              {isForgotPassword ? (
+                <div>
+                  {!otpSent ? (
+                    <>
+                      <div style={{ marginBottom: 14 }}>
+                        <label style={styles.label}>Registered Email Address (Required)</label>
+                        <input
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="name@domain.com"
+                          style={styles.input}
+                          required
+                        />
+                      </div>
+                      {error && (
+                        <div style={{ ...styles.errorBanner, display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <AlertCircle size={16} /> {error}
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={handleForgotPassword}
+                        disabled={loading}
+                        style={{ ...styles.submitBtn, background: activeRole.color, padding: '14px', fontSize: 16, opacity: loading ? 0.7 : 1 }}
+                      >
+                        {loading ? 'Sending...' : 'Send Reset OTP'}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ marginBottom: 20 }}>
+                        <label style={styles.label}>Enter 6-Digit OTP</label>
+                        <input
+                          type="text"
+                          value={otp}
+                          onChange={(e) => setOtp(e.target.value)}
+                          placeholder="000000"
+                          style={{ ...styles.input, letterSpacing: '4px', textAlign: 'center', fontSize: '20px' }}
+                          maxLength={6}
+                        />
+                      </div>
+                      <div style={{ marginBottom: 20 }}>
+                        <label style={styles.label}>New Password</label>
+                        <input
+                          type="password"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="••••••••"
+                          style={styles.input}
+                        />
+                      </div>
+                      {error && (
+                        <div style={{ ...styles.errorBanner, display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <AlertCircle size={16} /> {error}
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={handleVerifyOtp}
+                        disabled={loading}
+                        style={{ ...styles.submitBtn, background: activeRole.color, padding: '14px', fontSize: 16, opacity: loading ? 0.7 : 1 }}
+                      >
+                        {loading ? 'Verifying...' : 'Verify OTP'}
+                      </button>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <form onSubmit={handleAuth}>
                 {isSignUp && (
                   <div style={{ marginBottom: 14 }}>
                     <label style={styles.label}>Full Name</label>
@@ -269,6 +401,23 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
                   </div>
                 )}
 
+                {isSignUp && (
+                  <div style={{ marginBottom: 14 }}>
+                    <label style={styles.label}>District / Location</label>
+                    <select
+                      value={district}
+                      onChange={(e) => setDistrict(e.target.value)}
+                      style={styles.input}
+                      required
+                    >
+                      <option value="" disabled>Select your district</option>
+                      {['Ranchi', 'East Singhbhum', 'Dhanbad', 'Bokaro', 'Hazaribagh', 'Palamu', 'Deoghar', 'Giridih', 'Ramgarh', 'West Singhbhum', 'Dumka'].map(d => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 <div style={{ marginBottom: 14 }}>
                   <label style={styles.label}>Email / User ID</label>
                   <input
@@ -280,6 +429,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
                     required
                   />
                 </div>
+
+                {isSignUp && (
+                  <div style={{ marginBottom: 14 }}>
+                    <label style={styles.label}>Phone Number (Optional)</label>
+                    <input
+                      type="tel"
+                      value={contact}
+                      onChange={(e) => setContact(e.target.value)}
+                      placeholder="+91 9876543210"
+                      style={styles.input}
+                    />
+                  </div>
+                )}
 
                 <div style={{ marginBottom: isSignUp ? 14 : 20 }}>
                   <label style={styles.label}>Password</label>
@@ -300,6 +462,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
                       {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
+                  
+                  {!isSignUp && activeRole.id !== 'admin' && (
+                    <div style={{ marginTop: '8px', textAlign: 'right' }}>
+                      <button 
+                        type="button" 
+                        onClick={() => setIsForgotPassword(true)}
+                        style={{ background: 'none', border: 'none', color: activeRole.color, fontSize: '13px', fontWeight: 600, cursor: 'pointer', outline: 'none' }}
+                      >
+                        Forgot Password?
+                      </button>
+                    </div>
+                  )}
+
                   {showPasswordError && (
                     <div style={{ color: '#b91c1c', fontSize: 12, marginTop: 6, display: 'flex', gap: 4, alignItems: 'center' }}>
                       <AlertCircle size={14} /> Must be 8+ chars, 1 uppercase, 1 lowercase, 1 number, 1 special char.
@@ -335,6 +510,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
                   {loading ? 'Processing...' : isSignUp ? `Register as ${activeRole.label.split(' ')[0]}` : `Sign in`}
                 </button>
               </form>
+            )}
             </div>
           )}
         </div>

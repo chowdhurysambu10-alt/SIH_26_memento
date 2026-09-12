@@ -11,6 +11,11 @@ export class FilterChallengeDto {
   @Min(1)
   page?: number = 1;
 
+  @ApiPropertyOptional({ description: 'Cursor for cursor-based pagination (encoded JSON)' })
+  @IsOptional()
+  @IsString()
+  cursor?: string;
+
   @ApiPropertyOptional({ default: 10, minimum: 1, maximum: 100 })
   @IsOptional()
   @Type(() => Number)

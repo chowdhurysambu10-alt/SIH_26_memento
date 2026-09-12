@@ -1,11 +1,21 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
+import * as nodemailer from 'nodemailer';
 
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
+  private transporter: nodemailer.Transporter;
 
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(private readonly supabaseService: SupabaseService) {
+    this.transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
+  }
 
   async getMyNotifications(userId: string, unreadOnly = false) {
     const admin = this.supabaseService.getAdminClient();
@@ -89,10 +99,10 @@ export class NotificationsService {
     return data;
   }
 
-  async broadcastNotification(role: string, type: string, payload: Record<string, any>) {
+  async broadcastNotification(role: string, type: string, payload: Record<string, any>, method: string = 'in-site') {
     const admin = this.supabaseService.getAdminClient();
     
-    let usersQuery = admin.from('users').select('id');
+    let usersQuery = admin.from('users').select('id, email');
     if (role && role !== 'all') {
       usersQuery = usersQuery.eq('role', role);
     }
@@ -101,15 +111,40 @@ export class NotificationsService {
     if (userError) throw new BadRequestException(userError.message);
     if (!users || users.length === 0) return { message: 'No users found for this role' };
 
-    const notifications = users.map(u => ({
-      recipient_id: u.id,
-      type,
-      payload
-    }));
+    if (method === 'email') {
+      const emailPromises = users.map(u => 
+        this.transporter.sendMail({
+          from: `"Memento Portal" <${process.env.SMTP_USER}>`,
+          to: u.email,
+          subject: payload.title,
+          html: `<div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+            <h2 style="color: #2563eb;">Official Notice</h2>
+            <p>${payload.message}</p>
+            <hr style="border: none; border-top: 1px solid #eaeaea; margin: 20px 0;" />
+            <p style="font-size: 12px; color: #666;">This is an automated administrative broadcast from the Memento portal.</p>
+          </div>`
+        })
+      );
+      
+      try {
+        await Promise.all(emailPromises);
+      } catch (err) {
+        this.logger.error(`Failed to broadcast email: ${err.message}`);
+        throw new BadRequestException('Failed to send emails to some users.');
+      }
+      
+      return { success: true, count: users.length, message: `Emailed ${users.length} users successfully.` };
+    } else {
+      const notifications = users.map(u => ({
+        recipient_id: u.id,
+        type,
+        payload
+      }));
 
-    const { error: insertError } = await admin.from('notifications').insert(notifications);
-    if (insertError) throw new BadRequestException(insertError.message);
+      const { error: insertError } = await admin.from('notifications').insert(notifications);
+      if (insertError) throw new BadRequestException(insertError.message);
 
-    return { success: true, count: users.length, message: `Broadcasted to ${users.length} users` };
+      return { success: true, count: users.length, message: `Broadcasted to ${users.length} users` };
+    }
   }
 }

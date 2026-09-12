@@ -2,7 +2,7 @@ import { apiClient } from './client';
 
 export const notificationsApi = {
   getMyNotifications: async (unreadOnly?: boolean): Promise<any[]> => {
-    return apiClient<any[]>(`/notifications${unreadOnly ? '?unreadOnly=true' : ''}`);
+    return apiClient<any[]>(`/notifications${unreadOnly ? '?unreadOnly=true' : ''}`, { suppressGlobalError: true });
   },
 
   markAsRead: async (id: string): Promise<any> => {

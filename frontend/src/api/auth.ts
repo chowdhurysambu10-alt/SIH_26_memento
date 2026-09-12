@@ -32,10 +32,10 @@ export interface SignupPayload {
 }
 
 export const authApi = {
-  login: (email: string, password: string): Promise<AuthResponse> => {
+  login: async (email: string, password: string, expectedRole?: string): Promise<AuthResponse> => {
     return apiClient<AuthResponse>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, expectedRole }),
     });
   },
 
@@ -58,5 +58,19 @@ export const authApi = {
       }).catch(() => null);
     }
     return { success: true, message: 'Verification request submitted for admin review' };
+  },
+
+  requestOtp: (email: string, contact?: string): Promise<{ success: boolean; message: string }> => {
+    return apiClient('/auth/request-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email, contact }),
+    });
+  },
+
+  resetPassword: (email: string, otp: string, newPassword?: string): Promise<{ success: boolean; message: string }> => {
+    return apiClient('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp, newPassword }),
+    });
   },
 };

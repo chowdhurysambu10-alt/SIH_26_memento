@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { AuthUser, authApi, SignupPayload } from '../api/auth';
+import { useUI } from './UIContext';
 
 interface AuthContextType {
   user: AuthUser | null;
   token: string | null;
   loading: boolean;
-  login: (email: string, pass: string) => Promise<void>;
+  login: (email: string, pass: string, expectedRole?: string) => Promise<void>;
   signup: (payload: SignupPayload) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
@@ -17,6 +18,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const { showConfirm } = useUI();
 
   useEffect(() => {
     const savedToken = localStorage.getItem('supabase_access_token');
@@ -35,8 +37,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(false);
   }, []);
 
-  const login = async (email: string, pass: string) => {
-    const res = await authApi.login(email, pass);
+  const login = async (email: string, pass: string, expectedRole?: string) => {
+    const res = await authApi.login(email, pass, expectedRole);
     if (res?.session?.access_token) {
       localStorage.setItem('supabase_access_token', res.session.access_token);
       if (res.session.refresh_token) {
@@ -65,8 +67,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const logout = () => {
-    if (!window.confirm('Are you sure you want to sign out?')) return;
+  const logout = async () => {
+    if (!(await showConfirm('Are you sure you want to sign out?'))) return;
     localStorage.removeItem('supabase_access_token');
     localStorage.removeItem('supabase_refresh_token');
     localStorage.removeItem('user_data');

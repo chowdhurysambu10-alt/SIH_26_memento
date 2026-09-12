@@ -1,11 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { adminApi } from '../api/admin';
 import { dashboardsApi, DashboardChallenge } from '../api/dashboards';
 import { AiAnalysisDashboard } from './AiAnalysisDashboard';
 import { StatisticsPage } from './StatisticsPage';
+<<<<<<< Updated upstream
 import { Users, FileText, Trash2, Edit2, ShieldAlert, X, ShieldCheck, Megaphone, Clock, ChevronRight, Activity, Bell } from 'lucide-react';
+=======
+import { useUI } from '../context/UIContext';
+import { useAutoRefresh } from '../hooks/useAutoRefresh';
+import { Users, FileText, Trash2, Edit2, ShieldAlert, X, ShieldCheck, Megaphone, Clock, ChevronRight, Activity, Bell, CheckCircle, Building2, Mail } from 'lucide-react';
+>>>>>>> Stashed changes
 
 export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (view: string) => void, searchQuery?: string }> = ({ activeView, setActiveView, searchQuery = '' }) => {
+  const { showAlert, showConfirm, setGlobalLoading } = useUI();
   const [users, setUsers] = useState<any[]>([]);
   const [posts, setPosts] = useState<DashboardChallenge[]>([]);
   const [verificationRequests, setVerificationRequests] = useState<any[]>([]);
@@ -15,6 +22,7 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
   
   // Broadcast State
   const [broadcastRole, setBroadcastRole] = useState('all');
+  const [broadcastMethod, setBroadcastMethod] = useState<'in-site' | 'email'>('in-site');
   const [broadcastTitle, setBroadcastTitle] = useState('');
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [broadcasting, setBroadcasting] = useState(false);
@@ -34,37 +42,51 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
   });
   const [savingSettings, setSavingSettings] = useState(false);
 
-  const fetchUsers = async () => {
-    setLoading(true);
+  const fetchUsers = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const data = await adminApi.getAllUsers();
       setUsers(data);
     } catch (e) {
       console.error(e);
     }
-    setLoading(false);
+    if (!silent) setLoading(false);
   };
 
+<<<<<<< Updated upstream
   const fetchPosts = async () => {
     setLoading(true);
+=======
+  const fetchInstitutions = async () => {
+    try {
+      const data = await adminApi.getInstitutions();
+      setInstitutions(data);
+    } catch (e) {
+      console.error('Failed to fetch institutions:', e);
+    }
+  };
+
+  const fetchPosts = async (silent = false) => {
+    if (!silent) setLoading(true);
+>>>>>>> Stashed changes
     try {
       const data = await adminApi.getAllChallenges();
       setPosts(data);
     } catch (e) {
       console.error(e);
     }
-    setLoading(false);
+    if (!silent) setLoading(false);
   };
 
-  const fetchVerificationRequests = async () => {
-    setLoading(true);
+  const fetchVerificationRequests = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const data = await adminApi.getVerificationRequests();
       setVerificationRequests(data);
     } catch (e) {
       console.error(e);
     }
-    setLoading(false);
+    if (!silent) setLoading(false);
   };
 
   useEffect(() => {
@@ -73,6 +95,15 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
     if (activeView === 'verification') fetchVerificationRequests();
     if (activeView === 'settings') fetchSettings();
   }, [activeView]);
+
+  // Auto-refresh: re-fetch the relevant data every 15 s — silent so no loading blink
+  const refreshCurrentView = useCallback(async () => {
+    if (activeView === 'users' || activeView === 'dashboard') fetchUsers(true);
+    if (activeView === 'posts' || activeView === 'dashboard') { fetchPosts(true); fetchInstitutions(); }
+    if (activeView === 'verification') fetchVerificationRequests(true);
+  }, [activeView]);
+
+  useAutoRefresh(refreshCurrentView, 15000);
 
   const fetchSettings = async () => {
     try {
@@ -86,46 +117,58 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingSettings(true);
+    setGlobalLoading(true);
     try {
       await adminApi.updateSettings(platformSettings);
-      alert('Settings saved successfully!');
+      showAlert('Settings saved successfully!', 'success');
     } catch (e: any) {
-      alert('Failed to save settings: ' + e.message);
+      showAlert('Failed to save settings: ' + e.message, 'error');
     }
     setSavingSettings(false);
+    setGlobalLoading(false);
   };
 
   const handleDeleteUser = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this user?')) return;
+    if (!(await showConfirm('Are you sure you want to delete this user?'))) return;
+    setGlobalLoading(true);
     try {
       await adminApi.deleteUser(id);
       fetchUsers();
     } catch (e) {
-      alert('Failed to delete user');
+      showAlert('Failed to delete user', 'error');
+    } finally {
+      setGlobalLoading(false);
     }
   };
 
   const handleUpdateRole = async (id: string, newRole: string) => {
     try {
+      setGlobalLoading(true);
       await adminApi.updateUserRole(id, newRole);
       fetchUsers();
     } catch (e) {
-      alert('Failed to update role');
+      showAlert('Failed to update role', 'error');
+    } finally {
+      setGlobalLoading(false);
     }
   };
 
   const handleDeletePost = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this post?')) return;
+    if (!(await showConfirm('Are you sure you want to delete this post?'))) return;
     try {
+      setGlobalLoading(true);
       await adminApi.deleteChallenge(id);
       fetchPosts();
     } catch (e) {
-      alert('Failed to delete post');
+      showAlert('Failed to delete post', 'error');
+    } finally {
+      setGlobalLoading(false);
     }
   };
 
   const handleVerifyUser = async (id: string, isFromRequestsView = false) => {
     try {
+      setGlobalLoading(true);
       await adminApi.verifyUser(id);
       if (isFromRequestsView) {
         fetchVerificationRequests();
@@ -133,40 +176,86 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
         fetchUsers();
       }
     } catch (e) {
-      alert('Failed to verify user');
+      showAlert('Failed to verify user', 'error');
+    } finally {
+      setGlobalLoading(false);
     }
   };
 
   const handleBroadcast = async (e: React.FormEvent) => {
     e.preventDefault();
     setBroadcasting(true);
+    setGlobalLoading(true);
     try {
       await adminApi.broadcastNotification({
         role: broadcastRole,
         type: 'ADMIN_NOTICE',
+        method: broadcastMethod,
         payload: {
           title: broadcastTitle,
           message: broadcastMessage
         }
       });
-      alert('Broadcast sent successfully!');
+      showAlert('Broadcast sent successfully!', 'success');
       setBroadcastTitle('');
       setBroadcastMessage('');
     } catch (err: any) {
-      alert('Failed to send broadcast: ' + err.message);
+      showAlert('Failed to send broadcast: ' + err.message, 'error');
     }
     setBroadcasting(false);
+    setGlobalLoading(false);
   };
 
   const handleUpdatePostStatus = async (id: string, status: string) => {
     try {
+      setGlobalLoading(true);
       await adminApi.updateChallengeStatus(id, status);
       fetchPosts();
     } catch (e) {
-      alert('Failed to update status');
+      showAlert('Failed to update status', 'error');
+    } finally {
+      setGlobalLoading(false);
     }
   };
 
+<<<<<<< Updated upstream
+=======
+  const handleAllocateInstitution = async (challengeId: string, institutionId: string | null) => {
+    try {
+      setGlobalLoading(true);
+      await adminApi.allocateInstitution(challengeId, institutionId);
+      await fetchPosts();
+      if (institutionId) {
+        const inst = institutions.find(i => i.id === institutionId);
+        showAlert(`Problem allocated to ${inst?.name || 'Institution'} successfully!`, 'success');
+      } else {
+        showAlert('Institution allocation cleared.', 'info');
+      }
+    } catch (e: any) {
+      showAlert('Failed to allocate institution: ' + (e.message || e), 'error');
+    } finally {
+      setGlobalLoading(false);
+    }
+  };
+
+  const handleVerifyAndAssign = async (challengeId: string, institutionId?: string | null) => {
+    try {
+      setGlobalLoading(true);
+      await adminApi.updateChallengeStatus(challengeId, 'in_progress', 'Claim verified and officially assigned by Admin');
+      if (institutionId) {
+        await adminApi.allocateInstitution(challengeId, institutionId);
+      }
+      await fetchPosts();
+      const inst = institutions.find(i => i.id === institutionId);
+      showAlert(`Claim verified! Problem officially assigned to ${inst?.name || 'the institution'} and moved to In Progress.`, 'success');
+    } catch (e: any) {
+      showAlert('Failed to verify claim: ' + (e.message || e), 'error');
+    } finally {
+      setGlobalLoading(false);
+    }
+  };
+
+>>>>>>> Stashed changes
   const handleEditPost = (post: DashboardChallenge) => {
     setEditingPost(post);
     setEditTitle(post.title);
@@ -176,11 +265,23 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
   const handleSavePostEdit = async () => {
     if (!editingPost) return;
     try {
+<<<<<<< Updated upstream
       await adminApi.updateChallengeDetails(editingPost.id, editTitle, editDesc);
+=======
+      setGlobalLoading(true);
+      await adminApi.updateChallengeDetails(
+        editingPost.id, 
+        editTitle, 
+        editDesc, 
+        editAssignedInstitutionId || null
+      );
+>>>>>>> Stashed changes
       setEditingPost(null);
       fetchPosts();
     } catch (e) {
-      alert('Failed to save edit');
+      showAlert('Failed to save edit', 'error');
+    } finally {
+      setGlobalLoading(false);
     }
   };
 
@@ -553,7 +654,7 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
                   </button>
                   <button 
                     style={{ padding: '8px 24px', background: '#fff', color: '#ef4444', border: '1px solid #fca5a5', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}
-                    onClick={() => alert('Rejection flow coming soon')}
+                    onClick={() => showAlert('Rejection flow coming soon', 'info')}
                   >
                     Reject
                   </button>
@@ -598,6 +699,18 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
               <p style={{ margin: '6px 0 0', fontSize: '13px', color: '#64748b' }}>
                 The notice will instantly appear in the notification bell for the selected group.
               </p>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#334155', marginBottom: '8px' }}>Broadcast Method</label>
+              <select 
+                value={broadcastMethod}
+                onChange={e => setBroadcastMethod(e.target.value as 'in-site' | 'email')}
+                style={{ width: '100%', padding: '12px 16px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '15px', outline: 'none', background: '#f8fafc' }}
+              >
+                <option value="in-site">In-Site Notification (Appears on bell icon)</option>
+                <option value="email">Email Broadcast (Sends an email)</option>
+              </select>
             </div>
 
             <div>
@@ -682,12 +795,22 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
                     </td>
 
                     <td style={{ padding: '16px' }}>
-                      <button 
-                        onClick={() => handleDeleteUser(u.id)}
-                        style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer' }}
-                      >
-                        <Trash2 size={18} />
-                      </button>
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                        <a 
+                          href={`mailto:${u.email}`}
+                          style={{ color: '#3b82f6', textDecoration: 'none', display: 'flex', alignItems: 'center' }}
+                          title="Send Email"
+                        >
+                          <Mail size={18} />
+                        </a>
+                        <button 
+                          onClick={() => handleDeleteUser(u.id)}
+                          style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                          title="Delete User"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -43,6 +43,8 @@ export interface ChallengeFilterParams {
   category_id?: string;
   category_slug?: string;
   search?: string;
+  sort_by?: 'support' | 'priority' | 'recent';
+  cursor?: string;
 }
 
 export const challengesApi = {
@@ -55,11 +57,17 @@ export const challengesApi = {
     if (params.category_id) query.set('category_id', params.category_id);
     if (params.category_slug) query.set('category_slug', params.category_slug);
     if (params.search) query.set('search', params.search);
+    if (params.sort_by) query.set('sort_by', params.sort_by);
+    if (params.cursor) query.set('cursor', params.cursor);
 
     const qs = query.toString();
     const endpoint = `/challenges${qs ? `?${qs}` : ''}`;
-    const result = await apiClient<any>(endpoint);
+    const result = await apiClient<any>(endpoint, { suppressGlobalError: true });
     return Array.isArray(result) ? result : (Array.isArray(result?.data) ? result.data : []);
+  },
+
+  getTopFeaturedProblem: (): Promise<Challenge> => {
+    return apiClient<Challenge>('/challenges/top-featured', { suppressGlobalError: true });
   },
 
   getChallengeById: (id: string): Promise<Challenge> => {

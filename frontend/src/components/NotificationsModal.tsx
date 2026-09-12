@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNotifications } from '../hooks/useNotifications';
+import { useUI } from '../context/UIContext';
 import { X, Trash2, Copy, Trash, BellRing, CheckSquare, Square } from 'lucide-react';
 
 interface NotificationsModalProps {
@@ -9,6 +10,7 @@ interface NotificationsModalProps {
 
 export const NotificationsModal: React.FC<NotificationsModalProps> = ({ isOpen, onClose }) => {
   const { notifications, deleteNotifications, clearAll, addNotification, markAsRead } = useNotifications();
+  const { showAlert, showConfirm } = useUI();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   if (!isOpen) return null;
@@ -35,8 +37,8 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({ isOpen, 
     setSelectedIds([]);
   };
 
-  const handleClearAll = () => {
-    if (window.confirm('Are you sure you want to delete all notifications?')) {
+  const handleClearAll = async () => {
+    if (await showConfirm('Are you sure you want to delete all notifications?')) {
       clearAll();
       setSelectedIds([]);
     }
@@ -50,7 +52,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({ isOpen, 
       .join('\n\n');
       
     navigator.clipboard.writeText(textToCopy).then(() => {
-      alert('Selected notifications copied to clipboard!');
+      showAlert('Selected notifications copied to clipboard!', 'success');
       // Mark as read after copying
       markAsRead(selectedIds);
     });

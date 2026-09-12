@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { dashboardsApi, DashboardChallenge } from '../api/dashboards';
 import { useAuth } from '../context/AuthContext';
+import { useUI } from '../context/UIContext';
 import {
   Cpu,
   Edit3,
@@ -28,6 +29,7 @@ const CATEGORIES_LIST = [
 
 export const AiAnalysisDashboard: React.FC = () => {
   const { isAuthenticated } = useAuth();
+  const { showAlert } = useUI();
   const [challenges, setChallenges] = useState<DashboardChallenge[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [search, setSearch] = useState<string>('');
@@ -68,7 +70,7 @@ export const AiAnalysisDashboard: React.FC = () => {
     if (!selectedChallenge) return;
 
     if (!isAuthenticated) {
-      alert('Please sign in as an Admin/Reviewer to apply manual classification overrides.');
+      showAlert('Please sign in as an Admin/Reviewer to apply manual classification overrides.', 'error');
       return;
     }
 
@@ -96,9 +98,9 @@ export const AiAnalysisDashboard: React.FC = () => {
       );
 
       setSelectedChallenge(null);
-      alert('Override saved successfully! Logged in AI Audit Trail.');
+      showAlert('Override saved successfully! Logged in AI Audit Trail.', 'success');
     } catch (err: any) {
-      alert('Failed to save override: ' + err.message);
+      showAlert('Failed to save override: ' + err.message, 'error');
     } finally {
       setSavingOverride(false);
     }

@@ -65,6 +65,15 @@ export class ChallengesController {
     return this.challengesService.getChallenges(filter, user, req.token);
   }
 
+  @Get('top-featured')
+  @Public()
+  @ApiOperation({
+    summary: 'Get the top featured problem (cached in-memory for instant loading)',
+  })
+  async getTopFeaturedProblem() {
+    return this.challengesService.getTopFeaturedProblem();
+  }
+
   @Get(':id')
   @Public()
   @ApiOperation({ summary: 'Get details of a single challenge by ID' })

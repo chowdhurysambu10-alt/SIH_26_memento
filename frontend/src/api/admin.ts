@@ -23,15 +23,17 @@ export const adminApi = {
     }
   },
 
-  broadcastNotification: async (payload: { role: string; type: string; payload: any }): Promise<any> => {
+  broadcastNotification: async (payload: { role: string; type: string; method?: string; payload: any }): Promise<any> => {
     return apiClient<any>('/notifications/broadcast', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
   },
 
-  deleteUser: async (_userId: string): Promise<any> => {
-    return { success: true, message: 'User record processed' };
+  deleteUser: async (userId: string): Promise<any> => {
+    return apiClient<any>(`/users/${userId}`, {
+      method: 'DELETE',
+    });
   },
 
   updateUserRole: async (_userId: string, _role: string): Promise<any> => {

@@ -7,6 +7,7 @@ import {
 } from '../api/analytics';
 import { Challenge, challengesApi } from '../api/challenges';
 import { useAuth } from '../context/AuthContext';
+import { useUI } from '../context/UIContext';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -20,7 +21,12 @@ import {
 import { Line } from 'react-chartjs-2';
 import { Edit, Trash2, Save, XCircle } from 'lucide-react';
 
+<<<<<<< Updated upstream
 const MyPostedProblemItem: React.FC<{ challenge: Challenge }> = ({ challenge }) => {
+=======
+const MyPostedProblemItem: React.FC<{ challenge: Challenge; onDeleted?: (id: string) => void }> = ({ challenge, onDeleted }) => {
+  const { showAlert, showConfirm, setGlobalLoading } = useUI();
+>>>>>>> Stashed changes
   const [isDeleted, setIsDeleted] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -33,30 +39,43 @@ const MyPostedProblemItem: React.FC<{ challenge: Challenge }> = ({ challenge }) 
   const [editDescription, setEditDescription] = useState(currentDescription);
 
   const handleDelete = async () => {
-    if (!window.confirm('Are you sure you want to delete this challenge? This action cannot be undone.')) return;
+    if (!(await showConfirm('Are you sure you want to delete this challenge? This action cannot be undone.'))) return;
+    setGlobalLoading(true);
     try {
       await challengesApi.deleteChallenge(challenge.id);
       setIsDeleted(true);
+<<<<<<< Updated upstream
     } catch (err) {
       alert('Failed to delete challenge.');
+=======
+      if (onDeleted) onDeleted(challenge.id);
+      showAlert('Challenge deleted successfully', 'success');
+    } catch (err: any) {
+      showAlert(err.message || 'Failed to delete challenge.', 'error');
+    } finally {
+      setGlobalLoading(false);
+>>>>>>> Stashed changes
     }
   };
 
   const handleSaveEdit = async () => {
     if (!editTitle.trim() || !editDescription.trim()) {
-      alert('Title and description cannot be empty.');
+      showAlert('Title and description cannot be empty.', 'error');
       return;
     }
     setIsSaving(true);
+    setGlobalLoading(true);
     try {
       await challengesApi.updateChallenge(challenge.id, { title: editTitle, description: editDescription });
       setCurrentTitle(editTitle);
       setCurrentDescription(editDescription);
       setIsEditing(false);
+      showAlert('Challenge updated successfully', 'success');
     } catch (err) {
-      alert('Failed to update challenge.');
+      showAlert('Failed to update challenge.', 'error');
     } finally {
       setIsSaving(false);
+      setGlobalLoading(false);
     }
   };
 

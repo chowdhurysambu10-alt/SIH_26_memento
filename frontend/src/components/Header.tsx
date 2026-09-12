@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { ChevronDown, LogOut, User as UserIcon, Bell, ShieldAlert } from 'lucide-react';
+import { ChevronDown, LogOut, User as UserIcon, Bell, ShieldAlert, Headset } from 'lucide-react';
 import { NotificationsModal } from './NotificationsModal';
 import { VerificationRequestModal } from './VerificationRequestModal';
 import { useNotifications } from '../hooks/useNotifications';
@@ -121,12 +121,16 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, platfor
                     alignItems: 'center',
                     gap: '8px',
                     fontSize: '14px',
+                    position: 'relative'
                   }}
                   onClick={() => setDropdownOpen(!dropdownOpen)}
                 >
                   <UserIcon size={16} />
                   <span>{user.name || 'User'}</span>
                   <ChevronDown size={14} />
+                  {unreadCount > 0 && (
+                    <div style={{ position: 'absolute', top: '-4px', right: '-4px', width: '10px', height: '10px', background: '#ef4444', borderRadius: '50%', border: '2px solid #fff' }}></div>
+                  )}
                 </button>
 
                 {dropdownOpen && (
@@ -156,6 +160,16 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, platfor
                         {(user.role || 'Citizen').replace('_', ' ')}
                       </span>
                     </div>
+
+                    <a
+                      href="https://mail.google.com/mail/?view=cm&fs=1&to=mementoserviceco@gmail.com&su=Helpdesk%20Request"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn btn-outline w-100"
+                      style={{ marginBottom: '8px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', textDecoration: 'none', color: '#475569' }}
+                    >
+                      <Headset size={14} /> Helpdesk
+                    </a>
 
                     {user && !user.verified && (user.role === 'student' || user.role === 'university_admin') && (
                       <button
