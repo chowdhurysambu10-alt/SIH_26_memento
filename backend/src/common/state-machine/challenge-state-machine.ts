@@ -14,6 +14,7 @@ export class ChallengeStateMachine {
     [ChallengeStatus.SUBMITTED]: [
       ChallengeStatus.UNDER_REVIEW,
       ChallengeStatus.ROUTED, // AI auto-routing or fast-track
+      ChallengeStatus.IN_PROGRESS, // Direct admin approval into action
     ],
     [ChallengeStatus.UNDER_REVIEW]: [
       ChallengeStatus.ROUTED,

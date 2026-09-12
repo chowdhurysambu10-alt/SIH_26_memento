@@ -8,7 +8,7 @@ export interface DashboardChallenge {
   category?: string;
 
   support_count?: number;
-  status: 'submitted' | 'under_action' | 'resolved' | 'under_review' | 'claimed' | 'in_progress' | 'completed';
+  status: 'submitted' | 'under_action' | 'resolved' | 'under_review' | 'routed' | 'team_formed' | 'claimed' | 'in_progress' | 'completed' | 'validated' | 'rejected';
   user_id?: string;
   created_at: string;
   ai_summary?: string;

@@ -209,8 +209,25 @@ export const StatisticsPage: React.FC<StatisticsPageProps> = ({ hideMyProblems =
   }, []);
 
   const totalChallenges = overview?.totals?.challenges ?? challenges.length;
-  const resolvedChallenges = (overview?.statusBreakdown?.completed || 0) + (overview?.statusBreakdown?.validated || 0);
-  const pendingChallenges = Math.max(0, totalChallenges - resolvedChallenges);
+  const resolvedChallenges = overview?.statusBreakdown
+    ? (overview.statusBreakdown.completed || 0) + (overview.statusBreakdown.validated || 0)
+    : challenges.filter((c) => c.status === 'completed' || c.status === 'validated').length;
+
+  // Under Action: ONLY count problems actively allowed/approved by admin and being worked on
+  const underActionChallenges = overview?.statusBreakdown
+    ? (overview.statusBreakdown.under_review || 0) +
+      (overview.statusBreakdown.routed || 0) +
+      (overview.statusBreakdown.team_formed || 0) +
+      (overview.statusBreakdown.in_progress || 0) +
+      (overview.statusBreakdown.under_action || 0)
+    : challenges.filter((c) =>
+        ['under_review', 'routed', 'team_formed', 'in_progress', 'under_action'].includes(c.status)
+      ).length;
+
+  // Newly submitted challenges awaiting admin approval/action
+  const submittedChallenges = overview?.statusBreakdown
+    ? (overview.statusBreakdown.submitted || 0)
+    : challenges.filter((c) => c.status === 'submitted' || !c.status).length;
   const myChallenges = user ? challenges.filter((c) => c.submitted_by === user.id) : [];
 
   // Trending problems sorted by support count (greater than 0)
@@ -309,12 +326,16 @@ export const StatisticsPage: React.FC<StatisticsPageProps> = ({ hideMyProblems =
               <p>{totalChallenges}</p>
             </div>
             <div className="stat-box">
-              <h4>Resolved</h4>
-              <p style={{ color: '#16a34a' }}>{resolvedChallenges}</p>
+              <h4>Submitted (Awaiting Action)</h4>
+              <p style={{ color: '#6366f1' }}>{submittedChallenges}</p>
             </div>
             <div className="stat-box">
               <h4>Under Action</h4>
-              <p style={{ color: '#eab308' }}>{pendingChallenges}</p>
+              <p style={{ color: '#eab308' }}>{underActionChallenges}</p>
+            </div>
+            <div className="stat-box">
+              <h4>Resolved</h4>
+              <p style={{ color: '#16a34a' }}>{resolvedChallenges}</p>
             </div>
             {user && !hideMyProblems && (
               <div className="stat-box" style={{ background: '#eff6ff', borderColor: '#bfdbfe' }}>

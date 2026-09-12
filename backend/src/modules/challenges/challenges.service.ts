@@ -190,7 +190,22 @@ export class ChallengesService {
       );
 
     if (filter.status) {
-      query = query.eq('status', filter.status);
+      const statusValue = String(filter.status);
+      if (statusValue === 'under_action') {
+        query = query.in('status', [
+          ChallengeStatus.UNDER_REVIEW,
+          ChallengeStatus.ROUTED,
+          ChallengeStatus.TEAM_FORMED,
+          ChallengeStatus.IN_PROGRESS,
+        ]);
+      } else if (statusValue === 'resolved') {
+        query = query.in('status', [
+          ChallengeStatus.COMPLETED,
+          ChallengeStatus.VALIDATED,
+        ]);
+      } else {
+        query = query.eq('status', statusValue);
+      }
     }
     if (filter.district) {
       query = query.eq('district', filter.district);
