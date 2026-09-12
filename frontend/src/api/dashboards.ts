@@ -15,6 +15,8 @@ export interface DashboardChallenge {
   ai_confidence?: number;
   model_used?: string;
   media_urls?: string[];
+  assigned_institution_id?: string;
+  institutions?: any;
   // Joined assignments
   challenge_assignments?: {
     id: string;

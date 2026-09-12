@@ -1,10 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { dashboardsApi, DashboardChallenge } from '../api/dashboards';
-<<<<<<< Updated upstream
-import { Building2, CheckCircle, Clock } from 'lucide-react';
-
-export const InstitutionDashboard: React.FC<{ activeView: string }> = ({ activeView }) => {
-=======
 import { adminApi } from '../api/admin';
 import { useAuth } from '../context/AuthContext';
 import { useUI } from '../context/UIContext';
@@ -19,11 +14,8 @@ interface InstitutionDashboardProps {
 export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ activeView, setActiveView }) => {
   const { user } = useAuth();
   const { showAlert } = useUI();
->>>>>>> Stashed changes
   const [challenges, setChallenges] = useState<DashboardChallenge[]>([]);
   const [loading, setLoading] = useState(false);
-<<<<<<< Updated upstream
-=======
   const [filterTab, setFilterTab] = useState<'all' | 'verified' | 'pending' | 'available'>('all');
   const [selectedCategories, setSelectedCategories] = useState<string[]>(
     JSON.parse(localStorage.getItem('inst_categories') || '["Education", "Agriculture", "Healthcare"]')
@@ -31,6 +23,8 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
   const [summaryEnabled, setSummaryEnabled] = useState(localStorage.getItem('inst_summary') === 'true');
   const [emailNotifications, setEmailNotifications] = useState(localStorage.getItem('inst_email') !== 'false');
   const [inPlatformAlerts, setInPlatformAlerts] = useState(localStorage.getItem('inst_alerts') !== 'false');
+  const [institutions, setInstitutions] = useState<any[]>([]);
+  const [selectedOrgId, setSelectedOrgId] = useState<string>('');
 
   useEffect(() => {
     localStorage.setItem('inst_categories', JSON.stringify(selectedCategories));
@@ -52,7 +46,6 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
       console.error('Failed to fetch institutions:', e);
     }
   };
->>>>>>> Stashed changes
 
   const fetchChallenges = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -66,27 +59,15 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
   };
 
   useEffect(() => {
-<<<<<<< Updated upstream
-    if (activeView === 'challenges' || activeView === 'dashboard') {
-=======
     fetchInstitutions();
   }, []);
 
   useEffect(() => {
     if (activeView === 'challenges' || activeView === 'dashboard' || activeView === 'summary') {
->>>>>>> Stashed changes
       fetchChallenges();
     }
   }, [activeView]);
 
-<<<<<<< Updated upstream
-  const handleClaim = async (id: string) => {
-    try {
-      await dashboardsApi.claimChallenge(id);
-      fetchChallenges();
-    } catch (e) {
-      alert('Failed to claim challenge');
-=======
   // Auto-refresh: keep challenges up-to-date every 15 s — silent so no loading blink
   const refreshChallenges = useCallback(() => {
     fetchChallenges(true);
@@ -172,20 +153,11 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
       showAlert(`Claim request submitted for ${currentInstitution?.name || user?.name || 'your institution'}! Waiting for Admin verification.`, 'success');
     } catch (e: any) {
       showAlert('Failed to claim challenge: ' + (e.message || 'Error occurred'), 'error');
->>>>>>> Stashed changes
     }
   };
 
   if (activeView === 'dashboard') {
     return (
-<<<<<<< Updated upstream
-      <div>
-        <h2 style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>Overview</h2>
-        <p style={{ color: '#64748b', marginBottom: '32px' }}>Welcome to the Institution portal.</p>
-        <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-          <h3 style={{ margin: '0 0 8px' }}>Quick Stats</h3>
-          <p style={{ margin: 0, color: '#64748b' }}>Total Assigned Challenges: {challenges.length}</p>
-=======
       <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
         {/* Header with Institution Selector */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
@@ -398,21 +370,11 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
               ))}
             </div>
           )}
->>>>>>> Stashed changes
         </div>
       </div>
     );
   }
 
-<<<<<<< Updated upstream
-  if (activeView === 'profile' || activeView === 'settings') {
-    return (
-      <div>
-        <h2 style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>{activeView === 'profile' ? 'Organization Profile' : 'Settings'}</h2>
-        <p style={{ color: '#64748b' }}>Configure your organizational details.</p>
-        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '32px', marginTop: '24px' }}>
-          <p style={{ color: '#64748b' }}>Interface coming soon.</p>
-=======
   // 2. SETTINGS
   if (activeView === 'settings') {
     return (
@@ -561,14 +523,11 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
             </div>
           </div>
 
->>>>>>> Stashed changes
         </div>
       </div>
     );
   }
 
-<<<<<<< Updated upstream
-=======
   // 3. SUMMARY VIEW
   if (activeView === 'summary') {
     return (
@@ -658,7 +617,6 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
   }
 
   // 4. CHALLENGES VIEW (Assigned & Claimable Challenges)
->>>>>>> Stashed changes
   return (
     <div>
       <div style={{ marginBottom: '24px' }}>
@@ -675,23 +633,6 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
               No challenges currently assigned to your institution.
             </div>
           )}
-<<<<<<< Updated upstream
-          {challenges.map(c => (
-            <div key={c.id} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', margin: '0 0 8px' }}>{c.title}</h3>
-                <p style={{ fontSize: '15px', color: '#475569', margin: '0 0 12px', maxWidth: '700px' }}>{c.description}</p>
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  <span style={{ fontSize: '12px', background: '#f1f5f9', padding: '4px 8px', borderRadius: '4px', color: '#475569', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <Clock size={12} /> {new Date(c.created_at).toLocaleDateString()}
-                  </span>
-                  <span style={{ fontSize: '12px', background: '#eff6ff', color: '#2563eb', padding: '4px 8px', borderRadius: '4px' }}>
-                    {c.district}
-                  </span>
-                  <span style={{ fontSize: '12px', background: '#fffbeb', color: '#d97706', padding: '4px 8px', borderRadius: '4px', border: '1px solid #fde68a' }}>
-                    {c.status.replace('_', ' ').toUpperCase()}
-                  </span>
-=======
 
           {displayedChallenges.map(c => {
             const isMineChallenge = isMine(c);
@@ -868,21 +809,10 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
                       <Building2 size={16} /> Claim Problem
                     </button>
                   )}
->>>>>>> Stashed changes
                 </div>
               </div>
-              <button 
-                onClick={() => handleClaim(c.id)}
-                disabled={c.status === 'under_action'}
-                style={{
-                  background: c.status === 'under_action' ? '#94a3b8' : '#2563eb',
-                  color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: c.status === 'under_action' ? 'not-allowed' : 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px'
-                }}
-              >
-                {c.status === 'under_action' ? <><CheckCircle size={18} /> Claimed</> : 'Claim Action'}
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

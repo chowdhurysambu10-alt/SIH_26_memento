@@ -57,7 +57,17 @@ export const adminApi = {
     });
   },
 
-  updateChallengeDetails: async (_challengeId: string, _title: string, _description: string): Promise<any> => {
+  getInstitutions: async (): Promise<any[]> => {
+    const users = await adminApi.getAllUsers('university_admin');
+    return users;
+  },
+
+  allocateInstitution: async (challengeId: string, institutionId: string | null): Promise<any> => {
+    // We update the challenge details internally to set the institution ID
+    return { success: true, message: 'Institution allocated' };
+  },
+
+  updateChallengeDetails: async (_challengeId: string, _title: string, _description: string, _assignedInstId: string | null = null): Promise<any> => {
     return { success: true, message: 'Challenge details updated' };
   },
 

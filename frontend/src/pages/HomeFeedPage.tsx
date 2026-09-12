@@ -109,13 +109,10 @@ export const HomeFeedPage: React.FC<{ onNavigateLogin: () => void; onNavigateSub
     });
   };
 
-<<<<<<< Updated upstream
-=======
   const handleChallengeDeleted = (id: string) => {
     mutate((prev) => prev.filter((c) => c.id !== id));
   };
 
->>>>>>> Stashed changes
   const handleOpenSubmit = () => {
     onNavigateSubmit();
   };
@@ -189,15 +186,6 @@ export const HomeFeedPage: React.FC<{ onNavigateLogin: () => void; onNavigateSub
 
         {challenges.length > 0 && (
           <div className="challenge-list">
-<<<<<<< Updated upstream
-            {challenges.map((c) => (
-              <FeedItem
-                key={c.id}
-                challenge={c}
-                onOpenLightbox={(src) => setLightboxSrc(src)}
-                onSupported={handleChallengeSupported}
-              />
-=======
             {challenges.map((c, i) => (
               <div 
                 key={`${c.id}-${i}`}
@@ -213,7 +201,6 @@ export const HomeFeedPage: React.FC<{ onNavigateLogin: () => void; onNavigateSub
                   onDeleted={handleChallengeDeleted}
                 />
               </div>
->>>>>>> Stashed changes
             ))}
             <div style={{ textAlign: 'center', marginTop: '20px' }} ref={lastElementRef}>
               {loadingMore && (

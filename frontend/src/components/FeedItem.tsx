@@ -1,20 +1,17 @@
 import React, { useState } from 'react';
 import { Challenge, challengesApi } from '../api/challenges';
 import { useAuth } from '../context/AuthContext';
-<<<<<<< Updated upstream
-import { MapPin, Building2, Tag, X } from 'lucide-react';
-=======
 import { useUI } from '../context/UIContext';
 import { MapPin, Building2, Tag, X, Trash2 } from 'lucide-react';
->>>>>>> Stashed changes
 
 interface FeedItemProps {
   challenge: Challenge;
   onOpenLightbox: (src: string) => void;
   onSupported?: (id: string, newCount: number) => void;
+  onDeleted?: (id: string) => void;
 }
 
-export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, onSupported }) => {
+export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, onSupported, onDeleted }) => {
   const { user, isAuthenticated } = useAuth();
   const { showAlert, showConfirm } = useUI();
   
@@ -79,8 +76,6 @@ export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, o
     }
   };
 
-<<<<<<< Updated upstream
-=======
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
   const canDelete = false; // Feature disabled as requested
@@ -103,7 +98,6 @@ export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, o
     }
   };
 
->>>>>>> Stashed changes
   return (
     <div className="feed-item">
       <div className="feed-meta">

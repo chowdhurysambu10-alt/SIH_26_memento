@@ -3,13 +3,9 @@ import { adminApi } from '../api/admin';
 import { dashboardsApi, DashboardChallenge } from '../api/dashboards';
 import { AiAnalysisDashboard } from './AiAnalysisDashboard';
 import { StatisticsPage } from './StatisticsPage';
-<<<<<<< Updated upstream
-import { Users, FileText, Trash2, Edit2, ShieldAlert, X, ShieldCheck, Megaphone, Clock, ChevronRight, Activity, Bell } from 'lucide-react';
-=======
 import { useUI } from '../context/UIContext';
 import { useAutoRefresh } from '../hooks/useAutoRefresh';
 import { Users, FileText, Trash2, Edit2, ShieldAlert, X, ShieldCheck, Megaphone, Clock, ChevronRight, Activity, Bell, CheckCircle, Building2, Mail } from 'lucide-react';
->>>>>>> Stashed changes
 
 export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (view: string) => void, searchQuery?: string }> = ({ activeView, setActiveView, searchQuery = '' }) => {
   const { showAlert, showConfirm, setGlobalLoading } = useUI();
@@ -28,6 +24,8 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
   const [broadcasting, setBroadcasting] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editDesc, setEditDesc] = useState('');
+  const [institutions, setInstitutions] = useState<any[]>([]);
+  const [editAssignedInstitutionId, setEditAssignedInstitutionId] = useState<string>('');
 
   // Settings State
   const [platformSettings, setPlatformSettings] = useState<any>({
@@ -53,10 +51,6 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
     if (!silent) setLoading(false);
   };
 
-<<<<<<< Updated upstream
-  const fetchPosts = async () => {
-    setLoading(true);
-=======
   const fetchInstitutions = async () => {
     try {
       const data = await adminApi.getInstitutions();
@@ -68,7 +62,6 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
 
   const fetchPosts = async (silent = false) => {
     if (!silent) setLoading(true);
->>>>>>> Stashed changes
     try {
       const data = await adminApi.getAllChallenges();
       setPosts(data);
@@ -218,8 +211,6 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
     }
   };
 
-<<<<<<< Updated upstream
-=======
   const handleAllocateInstitution = async (challengeId: string, institutionId: string | null) => {
     try {
       setGlobalLoading(true);
@@ -255,7 +246,6 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
     }
   };
 
->>>>>>> Stashed changes
   const handleEditPost = (post: DashboardChallenge) => {
     setEditingPost(post);
     setEditTitle(post.title);
@@ -265,9 +255,6 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
   const handleSavePostEdit = async () => {
     if (!editingPost) return;
     try {
-<<<<<<< Updated upstream
-      await adminApi.updateChallengeDetails(editingPost.id, editTitle, editDesc);
-=======
       setGlobalLoading(true);
       await adminApi.updateChallengeDetails(
         editingPost.id, 
@@ -275,7 +262,6 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
         editDesc, 
         editAssignedInstitutionId || null
       );
->>>>>>> Stashed changes
       setEditingPost(null);
       fetchPosts();
     } catch (e) {

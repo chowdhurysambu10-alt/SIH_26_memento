@@ -21,12 +21,8 @@ import {
 import { Line } from 'react-chartjs-2';
 import { Edit, Trash2, Save, XCircle } from 'lucide-react';
 
-<<<<<<< Updated upstream
-const MyPostedProblemItem: React.FC<{ challenge: Challenge }> = ({ challenge }) => {
-=======
 const MyPostedProblemItem: React.FC<{ challenge: Challenge; onDeleted?: (id: string) => void }> = ({ challenge, onDeleted }) => {
   const { showAlert, showConfirm, setGlobalLoading } = useUI();
->>>>>>> Stashed changes
   const [isDeleted, setIsDeleted] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -44,17 +40,12 @@ const MyPostedProblemItem: React.FC<{ challenge: Challenge; onDeleted?: (id: str
     try {
       await challengesApi.deleteChallenge(challenge.id);
       setIsDeleted(true);
-<<<<<<< Updated upstream
-    } catch (err) {
-      alert('Failed to delete challenge.');
-=======
       if (onDeleted) onDeleted(challenge.id);
       showAlert('Challenge deleted successfully', 'success');
     } catch (err: any) {
       showAlert(err.message || 'Failed to delete challenge.', 'error');
     } finally {
       setGlobalLoading(false);
->>>>>>> Stashed changes
     }
   };
 
