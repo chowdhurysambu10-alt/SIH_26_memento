@@ -31,6 +31,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { UserRole } from '../../common/constants/roles.enum';
+import { ChallengeStatus } from '../../common/constants/challenge-status.enum';
 
 @ApiTags('Challenges')
 @ApiBearerAuth()
@@ -119,10 +120,10 @@ export class ChallengesController {
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Update challenge title and description (Author or Admin)' })
+  @ApiOperation({ summary: 'Update challenge title, description, or allocated institution (Author or Admin)' })
   async updateChallenge(
     @Param('id') id: string,
-    @Body() dto: { title?: string; description?: string },
+    @Body() dto: { title?: string; description?: string; assigned_institution_id?: string | null; category_id?: string; status?: ChallengeStatus },
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.challengesService.updateChallenge(id, dto, user);

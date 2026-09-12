@@ -19,8 +19,8 @@ export class OverrideRoutingDto {
   @Max(100)
   priority_score?: number;
 
-  @ApiProperty({ example: 'Re-routed to BIT Sindri due to specialized water filtration research lab.' })
+  @ApiPropertyOptional({ example: 'Re-routed to BIT Sindri due to specialized water filtration research lab.' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  override_reason: string;
+  override_reason?: string;
 }

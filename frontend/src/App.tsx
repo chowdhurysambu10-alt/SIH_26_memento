@@ -31,7 +31,7 @@ function InstitutionPortal() {
   const [activeView, setActiveView] = useState('dashboard');
   return (
     <InstitutionLayout activeView={activeView} setActiveView={setActiveView}>
-      <InstitutionDashboard activeView={activeView} />
+      <InstitutionDashboard activeView={activeView} setActiveView={setActiveView} />
     </InstitutionLayout>
   );
 }

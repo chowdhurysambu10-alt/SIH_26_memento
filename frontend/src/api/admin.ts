@@ -57,10 +57,36 @@ export const adminApi = {
     });
   },
 
-  updateChallengeDetails: async (challengeId: string, title: string, description: string): Promise<any> => {
+  getInstitutions: async (): Promise<any[]> => {
+    try {
+      const res = await apiClient<any>('/analytics/institutions');
+      return Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : []);
+    } catch (e) {
+      console.error('Failed to load registered institutions from database:', e);
+      return [];
+    }
+  },
+
+  allocateInstitution: async (challengeId: string, institutionId: string | null): Promise<any> => {
     return apiClient<any>(`/challenges/${challengeId}`, {
       method: 'PATCH',
-      body: JSON.stringify({ title, description }),
+      body: JSON.stringify({ assigned_institution_id: institutionId }),
+    });
+  },
+
+  updateChallengeDetails: async (
+    challengeId: string, 
+    title: string, 
+    description: string, 
+    assigned_institution_id?: string | null
+  ): Promise<any> => {
+    const payload: Record<string, any> = { title, description };
+    if (assigned_institution_id !== undefined) {
+      payload.assigned_institution_id = assigned_institution_id;
+    }
+    return apiClient<any>(`/challenges/${challengeId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
     });
   },
 

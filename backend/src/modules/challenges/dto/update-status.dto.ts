@@ -12,4 +12,9 @@ export class UpdateStatusDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiPropertyOptional({ example: 'a1000000-0000-0000-0000-000000000001' })
+  @IsOptional()
+  @IsString()
+  assigned_institution_id?: string;
 }

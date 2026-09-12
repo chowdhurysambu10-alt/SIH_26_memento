@@ -15,6 +15,13 @@ export interface DashboardChallenge {
   ai_confidence?: number;
   model_used?: string;
   media_urls?: string[];
+  assigned_institution_id?: string | null;
+  institutions?: {
+    id: string;
+    name: string;
+    type?: string;
+    district?: string;
+  } | null;
   // Joined assignments
   challenge_assignments?: {
     id: string;
@@ -107,17 +114,28 @@ export const dashboardsApi = {
 
   // 3. Claim Challenge for Organizations
   getClaimableChallenges: async (): Promise<DashboardChallenge[]> => {
-    const result = await apiClient<any>('/challenges?limit=50');
+    const result = await apiClient<any>('/challenges?limit=100');
     const items = Array.isArray(result) ? result : (Array.isArray(result?.data) ? result.data : []);
-    return items.filter((c: any) => c.status === 'submitted' || c.status === 'under_review');
+    return items.filter((c: any) => 
+      Boolean(c.assigned_institution_id) ||
+      c.status === 'submitted' || 
+      c.status === 'under_review' || 
+      c.status === 'routed' || 
+      c.status === 'team_formed' || 
+      c.status === 'in_progress' ||
+      c.status === 'under_action' ||
+      c.status === 'completed' ||
+      c.status === 'resolved'
+    );
   },
 
   claimChallenge: async (challengeId: string, orgId?: string, notes?: string): Promise<any> => {
     return apiClient<any>(`/challenges/${challengeId}/status`, {
       method: 'PATCH',
       body: JSON.stringify({
-        status: 'team_formed',
-        notes: notes || 'Claimed by institutional research team',
+        status: 'under_review',
+        assigned_institution_id: orgId,
+        notes: notes || 'Claim requested by institution. Awaiting Admin verification.',
       }),
     });
   },

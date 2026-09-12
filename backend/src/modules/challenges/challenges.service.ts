@@ -248,7 +248,7 @@ export class ChallengesService {
       this.logger.warn(`Primary query notice: ${result.error.message}. Executing direct column select...`);
       let fallback = client
         .from('challenges')
-        .select('id, title, description, district, category, status, priority_score, support_count, media_urls, created_at, submitted_by, category_id, assigned_institution_id');
+        .select('id, title, description, district, category, status, priority_score, support_count, media_urls, created_at, submitted_by, category_id, assigned_institution_id, categories(id, name, slug), institutions(id, name, type, district)');
       
       if (filter.sort_by === 'priority') {
         fallback = fallback
@@ -413,7 +413,13 @@ export class ChallengesService {
     dto: OverrideRoutingDto,
     user: AuthenticatedUser,
   ) {
-    if (user.role !== UserRole.SUPER_ADMIN && user.role !== UserRole.GOVT_VIEWER) {
+    const isAdmin =
+      user.role === UserRole.SUPER_ADMIN ||
+      user.role === UserRole.GOVT_VIEWER ||
+      (user.role as any) === 'admin' ||
+      (user.role as any) === 'super_admin';
+
+    if (!isAdmin) {
       throw new ForbiddenException({
         statusCode: 403,
         message: 'Only Super Admins or Government Viewers can override routing',
@@ -431,25 +437,27 @@ export class ChallengesService {
         ...existing.ai_classification,
         adminOverride: {
           overriddenBy: user.id,
-          reason: dto.override_reason,
+          reason: dto.override_reason || 'Manual Admin allocation',
           at: new Date().toISOString(),
         },
       },
     };
 
     if (dto.category_id) updatePayload.category_id = dto.category_id;
-    if (dto.assigned_institution_id) updatePayload.assigned_institution_id = dto.assigned_institution_id;
+    if (dto.assigned_institution_id !== undefined) {
+      updatePayload.assigned_institution_id = dto.assigned_institution_id || null;
+    }
     if (dto.priority_score) updatePayload.priority_score = dto.priority_score;
 
-    if (dto.assigned_institution_id && existing.status === ChallengeStatus.SUBMITTED) {
-      updatePayload.status = ChallengeStatus.ROUTED;
+    if (dto.assigned_institution_id && (existing.status === ChallengeStatus.SUBMITTED || existing.status === ChallengeStatus.UNDER_REVIEW)) {
+      updatePayload.status = ChallengeStatus.IN_PROGRESS;
     }
 
     const { data, error } = await admin
       .from('challenges')
       .update(updatePayload)
       .eq('id', id)
-      .select('*, categories(name), institutions(name)')
+      .select('*, categories(name), institutions(id, name, type, district)')
       .single();
 
     if (error) {
@@ -477,16 +485,63 @@ export class ChallengesService {
     const currentStatus = existing.status as ChallengeStatus;
     const targetStatus = dto.status;
 
-    // Validate transition via state machine
-    ChallengeStateMachine.assertValidTransition(currentStatus, targetStatus, user.role);
+    // Validate transition via state machine if changing status
+    if (currentStatus !== targetStatus) {
+      ChallengeStateMachine.assertValidTransition(currentStatus, targetStatus, user.role);
+    }
+
+    const updatePayload: Record<string, any> = {
+      status: targetStatus,
+    };
+
+    // If assigned_institution_id is explicitly passed, save it
+    let institutionIdToAssign = dto.assigned_institution_id || user.org_id;
+
+    if (!institutionIdToAssign && (
+      user.role === UserRole.UNIVERSITY_ADMIN ||
+      user.role === UserRole.FACULTY ||
+      (user.role as any) === 'institution'
+    )) {
+      try {
+        const { data: insts } = await admin.from('institutions').select('id, name');
+        if (insts && insts.length > 0) {
+          const matched = insts.find(i => 
+            (user.name && i.name && (
+              i.name.toLowerCase().includes(user.name.toLowerCase()) || 
+              user.name.toLowerCase().includes(i.name.toLowerCase())
+            ))
+          );
+          if (matched) {
+            institutionIdToAssign = matched.id;
+          } else {
+            const instName = user.name || 'Brainware University';
+            const { data: newInst } = await admin.from('institutions').insert({
+              name: instName,
+              type: 'university',
+              district: user.district || 'Kolkata',
+              domain_expertise: ['technology', 'engineering', 'urban_infrastructure']
+            }).select('id').maybeSingle();
+            if (newInst) {
+              institutionIdToAssign = newInst.id;
+            } else {
+              institutionIdToAssign = insts[0]?.id;
+            }
+          }
+        }
+      } catch (e) {
+        // fallback
+      }
+    }
+
+    if (institutionIdToAssign) {
+      updatePayload.assigned_institution_id = institutionIdToAssign;
+    }
 
     const { data, error } = await admin
       .from('challenges')
-      .update({
-        status: targetStatus,
-      })
+      .update(updatePayload)
       .eq('id', id)
-      .select()
+      .select('*, categories(name), institutions(id, name, type, district)')
       .single();
 
     if (error) {
@@ -572,12 +627,22 @@ export class ChallengesService {
    * Update challenge title & description.
    * Allowed if user is author or admin.
    */
-  async updateChallenge(id: string, dto: { title?: string; description?: string }, user: AuthenticatedUser) {
+  async updateChallenge(
+    id: string,
+    dto: {
+      title?: string;
+      description?: string;
+      assigned_institution_id?: string | null;
+      category_id?: string;
+      status?: ChallengeStatus;
+    },
+    user: AuthenticatedUser,
+  ) {
     const admin = this.supabaseService.getAdminClient();
 
     const { data: challenge, error: findError } = await admin
       .from('challenges')
-      .select('id, submitted_by, user_id')
+      .select('id, submitted_by, user_id, status')
       .eq('id', id)
       .maybeSingle();
 
@@ -591,21 +656,33 @@ export class ChallengesService {
     const isAdmin =
       user.role === UserRole.SUPER_ADMIN ||
       user.role === UserRole.GOVT_VIEWER ||
-      (user.role as any) === 'admin';
+      (user.role as any) === 'admin' ||
+      (user.role as any) === 'super_admin';
 
     if (!isAuthor && !isAdmin) {
       throw new ForbiddenException('You are only authorized to update your own submitted problems.');
     }
 
     const updates: Record<string, any> = { updated_at: new Date().toISOString() };
-    if (dto.title?.trim()) updates.title = dto.title.trim();
-    if (dto.description?.trim()) updates.description = dto.description.trim();
+    if (dto.title !== undefined && dto.title.trim()) updates.title = dto.title.trim();
+    if (dto.description !== undefined && dto.description.trim()) updates.description = dto.description.trim();
+
+    if (isAdmin) {
+      if (dto.assigned_institution_id !== undefined) {
+        updates.assigned_institution_id = dto.assigned_institution_id || null;
+        if (dto.assigned_institution_id && (challenge.status === ChallengeStatus.SUBMITTED || challenge.status === ChallengeStatus.UNDER_REVIEW)) {
+          updates.status = ChallengeStatus.IN_PROGRESS;
+        }
+      }
+      if (dto.category_id) updates.category_id = dto.category_id;
+      if (dto.status) updates.status = dto.status;
+    }
 
     const { data, error } = await admin
       .from('challenges')
       .update(updates)
       .eq('id', id)
-      .select()
+      .select('*, categories(id, name, slug), institutions(id, name, type, district)')
       .single();
 
     if (error) {
