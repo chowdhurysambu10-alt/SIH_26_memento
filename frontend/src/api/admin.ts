@@ -40,9 +40,10 @@ export const adminApi = {
     return { success: true, message: 'User role updated' };
   },
 
-  verifyUser: async (userId: string): Promise<any> => {
+  verifyUser: async (userId: string, status: boolean = true): Promise<any> => {
     return apiClient<any>(`/users/${userId}/verify`, {
       method: 'PATCH',
+      body: JSON.stringify({ status }),
     });
   },
 

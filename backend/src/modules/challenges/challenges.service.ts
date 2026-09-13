@@ -44,7 +44,7 @@ export class ChallengesService implements OnModuleInit {
       const { data, error } = await client
         .from('challenges')
         .select('*, categories(id, name, slug), institutions(id, name, type, district)')
-        .order('support_count', { ascending: false, nullsFirst: false })
+        .order('priority_score', { ascending: false, nullsFirst: false })
         .limit(1)
         .maybeSingle();
       if (!error && data) {
@@ -120,7 +120,7 @@ export class ChallengesService implements OnModuleInit {
         dto.district,
       );
       classification = result.classification;
-      matchedInstitutionId = result.matchedInstitutionId;
+      // matchedInstitutionId = result.matchedInstitutionId; // Disabled per user request (no auto-routing without admin/institution applying)
       providerUsed = result.providerUsed;
     }
 
@@ -168,9 +168,11 @@ export class ChallengesService implements OnModuleInit {
         media_urls: mediaUrls,
         category_id: categoryId,
         category: classification.categoryName || 'Water & Sanitation',
-        priority_score: classification.priorityScore,
-        ai_summary: classification.rationale || `${dto.title} in ${dto.district}`,
-        ai_confidence: 0.88,
+        // importance = hierarchicalBase + AI severity adjustment + support boost (starts at 0)
+        priority_score: this.calculateImportance(classification.categorySlug, classification.priorityScore, 0),
+        ai_summary: '', // Summarization disabled
+        // ai_confidence stores raw AI severity (0–1) so we can recompute importance when support changes
+        ai_confidence: classification.priorityScore / 100,
         model_used: providerUsed || 'gemma-2',
         duplicate_of:
           classification.duplicateSimilarityScore >= 0.70
@@ -184,7 +186,7 @@ export class ChallengesService implements OnModuleInit {
           processedAt: new Date().toISOString(),
         },
       })
-      .select('id, title, description, district, category, status, priority_score, submitted_by, user_id, category_id, assigned_institution_id, media_urls, created_at')
+      .select('id, title, description, district, location_text, category, status, priority_score, submitted_by, user_id, category_id, assigned_institution_id, media_urls, created_at')
       .maybeSingle();
 
     if (error) {
@@ -196,13 +198,45 @@ export class ChallengesService implements OnModuleInit {
       });
     }
 
-    // 6. Notify assigned institution admins if routed
+    // 6. Write AI analysis result to ai_analysis_log (one-time, never re-calculated)
+    if (challenge && settings.aiAutoTriage && providerUsed !== 'none') {
+      try {
+        const hierarchicalScore = ChallengesService.getHierarchicalScore(classification.categorySlug);
+        const importance = this.calculateImportance(classification.categorySlug, classification.priorityScore, 0);
+        await admin.from('ai_analysis_log').insert({
+          challenge_id: challenge.id,
+          model_used: providerUsed || 'gemma-3.5-flash-lite',
+          ai_category: classification.categoryName,
+          ai_priority_score: importance,          // computed importance score
+          ai_confidence: classification.priorityScore / 100, // raw AI severity (0-1)
+          ai_summary: JSON.stringify({
+            categorySlug: classification.categorySlug,
+            rawSeverityScore: classification.priorityScore,
+            hierarchicalScore,
+            importance,
+            keywords: classification.recommendedKeywords,
+            rationale: classification.rationale,
+            isDuplicate: classification.duplicateSimilarityScore >= 0.70,
+            duplicateCandidateId: classification.duplicateCandidateId || null,
+            duplicateSimilarityScore: classification.duplicateSimilarityScore,
+          }),
+          raw_response: classification,
+        });
+        this.logger.log(`AI analysis log saved for challenge ${challenge.id}`);
+      } catch (logErr) {
+        // Non-fatal: log warning but don't fail the challenge creation
+        this.logger.warn(`Could not write to ai_analysis_log: ${logErr.message}`);
+      }
+    }
+
+    // 7. Notify assigned institution admins if routed
     if (matchedInstitutionId) {
       await this.notifyInstitution(matchedInstitutionId, challenge);
     }
 
     return challenge;
   }
+
 
   /**
    * Fetch challenges with filters, search, and pagination.
@@ -226,7 +260,7 @@ export class ChallengesService implements OnModuleInit {
     let query = client
       .from('challenges')
       .select(
-        'id, title, description, district, category, status, priority_score, support_count, media_urls, created_at, submitted_by, category_id, assigned_institution_id, categories(id, name, slug), institutions(id, name, type, district)',
+        'id, title, description, district, location_text, category, status, priority_score, support_count, media_urls, created_at, submitted_by, user_id, category_id, assigned_institution_id, ai_summary, ai_confidence, model_used, ai_classification, categories(id, name, slug), institutions(id, name, type, district)',
         { count: 'exact' },
       );
 
@@ -253,7 +287,7 @@ export class ChallengesService implements OnModuleInit {
     if (filter.sort_by === 'priority') {
       query = query
         .order('priority_score', { ascending: false, nullsFirst: false })
-        .order('support_count', { ascending: false, nullsFirst: false })
+        .order('priority_score', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false });
     } else if (filter.sort_by === 'recent') {
       if (cursorObj && cursorObj.created_at) {
@@ -263,7 +297,7 @@ export class ChallengesService implements OnModuleInit {
     } else {
       // Default: Most supported on top, followed by priority and recency
       query = query
-        .order('support_count', { ascending: false, nullsFirst: false })
+        .order('priority_score', { ascending: false, nullsFirst: false })
         .order('priority_score', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false });
     }
@@ -283,17 +317,17 @@ export class ChallengesService implements OnModuleInit {
       this.logger.warn(`Primary query notice: ${result.error.message}. Executing direct column select...`);
       let fallback = client
         .from('challenges')
-        .select('id, title, description, district, category, status, priority_score, support_count, media_urls, created_at, submitted_by, category_id, assigned_institution_id');
+        .select('id, title, description, district, location_text, category, status, priority_score, support_count, media_urls, created_at, submitted_by, category_id, assigned_institution_id');
       
       if (filter.sort_by === 'priority') {
         fallback = fallback
           .order('priority_score', { ascending: false, nullsFirst: false })
-          .order('support_count', { ascending: false, nullsFirst: false });
+          .order('priority_score', { ascending: false, nullsFirst: false });
       } else if (filter.sort_by === 'recent') {
         fallback = fallback.order('created_at', { ascending: false });
       } else {
         fallback = fallback
-          .order('support_count', { ascending: false, nullsFirst: false })
+          .order('priority_score', { ascending: false, nullsFirst: false })
           .order('priority_score', { ascending: false, nullsFirst: false });
       }
 
@@ -343,7 +377,7 @@ export class ChallengesService implements OnModuleInit {
     // 1. Fetch current challenge
     const { data: challenge, error } = await admin
       .from('challenges')
-      .select('id, support_count')
+      .select('id, support_count, ai_classification, category')
       .eq('id', id)
       .maybeSingle();
 
@@ -400,10 +434,15 @@ export class ChallengesService implements OnModuleInit {
       isSupported = true;
     }
 
-    // 3. Persist new support count in challenges table
+    // 3. Recompute importance using updated support count
+    const categorySlug = challenge.ai_classification?.categorySlug || challenge.category?.toLowerCase().replace(/\s+/g, '_') || 'public_administration';
+    // ai_confidence stores the AI raw severity (0-1 scale)
+    const aiRawSeverity = Number(challenge.ai_classification?.priorityScore || 50);
+    const newImportance = this.calculateImportance(categorySlug, aiRawSeverity, newCount);
+
     const { data: updated } = await admin
       .from('challenges')
-      .update({ support_count: newCount })
+      .update({ support_count: newCount, priority_score: newImportance })
       .eq('id', id)
       .select('id, support_count')
       .single();
@@ -473,6 +512,10 @@ export class ChallengesService implements OnModuleInit {
     };
 
     if (dto.category_id) updatePayload.category_id = dto.category_id;
+    if (dto.override_category_slug) {
+      const { data: cat } = await admin.from('categories').select('id').eq('slug', dto.override_category_slug).maybeSingle();
+      if (cat) updatePayload.category_id = cat.id;
+    }
     if (dto.assigned_institution_id) updatePayload.assigned_institution_id = dto.assigned_institution_id;
     if (dto.priority_score) updatePayload.priority_score = dto.priority_score;
 
@@ -561,5 +604,193 @@ export class ChallengesService implements OnModuleInit {
     } catch (err) {
       this.logger.warn(`Could not dispatch notification: ${err.message}`);
     }
+  }
+
+  // --- TENDER / PROPOSAL SYSTEM ---
+
+  async submitProposal(id: string, dto: any, user: AuthenticatedUser) {
+    const admin = this.supabaseService.getAdminClient();
+    
+    // Resolve org_id from DB if not present in token (token might be stale)
+    let orgId = user.org_id;
+    let dbUser = null;
+    if (!orgId) {
+      const result = await admin.from('users').select('org_id').eq('id', user.id).maybeSingle();
+      dbUser = result.data;
+      orgId = dbUser?.org_id || null;
+    }
+
+    // Auto-create a mock institution for Super Admin testing if they don't have one
+    if (!orgId && user.role === UserRole.SUPER_ADMIN) {
+      const { data: newInst } = await admin.from('institutions').insert({
+        id: user.id,
+        name: 'Super Admin Test Institution',
+        type: 'govt',
+        location: 'Admin HQ',
+        district: 'Admin District',
+      }).select('id').single();
+      
+      if (newInst?.id) {
+        await admin.from('users').update({ org_id: newInst.id }).eq('id', user.id);
+        orgId = newInst.id;
+      }
+    }
+
+    if (!orgId) {
+      throw new BadRequestException('User does not belong to an institution. Please ensure your institution account is set up correctly.');
+    }
+
+    // Check challenge status
+    const existing = await this.getChallengeById(id, user);
+    if (existing.status !== ChallengeStatus.SUBMITTED && existing.status !== ChallengeStatus.ROUTED) {
+      throw new BadRequestException('Challenge is not open for proposals.');
+    }
+
+    if (!dto.proposal_text || !dto.budget_estimate || !dto.timeline_estimate || !(dto.contact_phone || user.contact)) {
+      throw new BadRequestException('All proposal fields (solution, budget, timeline, and contact phone) are mandatory.');
+    }
+
+    // Insert proposal
+    const { data, error } = await admin
+      .from('proposals')
+      .insert({
+        challenge_id: id,
+        institution_id: orgId,
+        budget_estimate: dto.budget_estimate,
+        timeline_estimate: dto.timeline_estimate,
+        proposal_text: dto.proposal_text,
+        contact_email: user.email,
+        contact_phone: dto.contact_phone || user.contact,
+        is_verified: true // Institutions able to use the platform are verified
+      })
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === '23505') { // Unique violation
+        throw new BadRequestException('Your institution has already submitted a proposal for this challenge.');
+      }
+      throw new BadRequestException(`Failed to submit proposal: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  async getMyProposals(user: AuthenticatedUser) {
+    const admin = this.supabaseService.getAdminClient();
+    // Resolve org_id fresh from DB if stale in token
+    let orgId = user.org_id;
+    if (!orgId) {
+      const { data: dbUser } = await admin.from('users').select('org_id').eq('id', user.id).maybeSingle();
+      orgId = dbUser?.org_id || null;
+    }
+    if (!orgId) return [];
+    
+    const { data, error } = await admin
+      .from('proposals')
+      .select('*, challenges(title, district, category, status)')
+      .eq('institution_id', orgId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw new BadRequestException(error.message);
+    return data || [];
+  }
+
+  async getChallengeProposals(id: string, user: AuthenticatedUser) {
+    const admin = this.supabaseService.getAdminClient();
+    
+    const { data, error } = await admin
+      .from('proposals')
+      .select('*, institutions(name, district, type)')
+      .eq('challenge_id', id)
+      .order('created_at', { ascending: false });
+
+    if (error) throw new BadRequestException(error.message);
+    return data || [];
+  }
+
+  async approveProposal(id: string, proposalId: string, user: AuthenticatedUser) {
+    const admin = this.supabaseService.getAdminClient();
+    
+    // 1. Fetch proposal
+    const { data: proposal, error: propErr } = await admin
+      .from('proposals')
+      .select('*')
+      .eq('id', proposalId)
+      .eq('challenge_id', id)
+      .single();
+      
+    if (propErr || !proposal) {
+      throw new NotFoundException('Proposal not found');
+    }
+    
+    // 2. Reject all other proposals for this challenge
+    await admin
+      .from('proposals')
+      .update({ status: 'rejected' })
+      .eq('challenge_id', id)
+      .neq('id', proposalId);
+      
+    // 3. Approve the winning proposal
+    const { data: updatedProp, error: updateErr } = await admin
+      .from('proposals')
+      .update({ status: 'approved' })
+      .eq('id', proposalId)
+      .select()
+      .single();
+      
+    if (updateErr) throw new BadRequestException('Failed to approve proposal');
+    
+    // 4. Update the challenge to assign to the winning institution and set status to IN_PROGRESS
+    await admin
+      .from('challenges')
+      .update({
+        assigned_institution_id: proposal.institution_id,
+        status: ChallengeStatus.IN_PROGRESS
+      })
+      .eq('id', id);
+      
+    return updatedProp;
+  }
+
+  /**
+   * HIERARCHICAL SCORE — purely code-determined, based on category.
+   * This does NOT change with AI or support. It reflects our policy priority.
+   * Water > Healthcare > Energy > Urban > Environment > Agriculture > Rural > Education > Accessibility > Admin
+   */
+  static getHierarchicalScore(categorySlug: string): number {
+    const hierarchy: Record<string, number> = {
+      water: 95,
+      healthcare: 92,
+      energy: 80,
+      urban_development: 77,
+      environment: 74,
+      agriculture: 68,
+      rural_livelihoods: 65,
+      education: 58,
+      accessibility: 54,
+      public_administration: 50,
+    };
+    // Normalise slug variants
+    const slug = categorySlug?.toLowerCase().replace(/[\s&]+/g, '_') || 'public_administration';
+    return hierarchy[slug] ?? 50;
+  }
+
+  /**
+   * IMPORTANCE — combines hierarchical base + AI problem-specific severity + support popularity.
+   * Formula:
+   *   hierarchicalBase (60% weight) + aiSeverity (30% weight) + supportBoost (10% weight, capped)
+   *   supportBoost = min(10, log2(1 + supportCount) * 3)   → 1 support≈2pts, 10≈10pts, 100≈10pts cap
+   */
+  private calculateImportance(
+    categorySlug: string,
+    aiRawSeverity: number,   // 1–100 from AI
+    supportCount: number,
+  ): number {
+    const hierarchicalBase = ChallengesService.getHierarchicalScore(categorySlug);
+    const aiContribution = Math.round(aiRawSeverity * 0.3);
+    const supportBoost = Math.min(10, Math.round(Math.log2(1 + supportCount) * 3));
+    const score = Math.round(hierarchicalBase * 0.6) + aiContribution + supportBoost;
+    return Math.min(100, Math.max(1, score));
   }
 }

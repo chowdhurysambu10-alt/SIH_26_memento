@@ -12,6 +12,7 @@ import {
   X,
   Camera,
   Image as ImageIcon,
+  MapPin,
 } from 'lucide-react';
 
 import { WEST_BENGAL_DISTRICTS, JHARKHAND_DISTRICTS } from '../constants/districts';
@@ -45,6 +46,8 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
   const [filePreviews, setFilePreviews] = useState<{ url: string; file: File; isVideo: boolean }[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [showCameraModal, setShowCameraModal] = useState(false);
+  const [locationText, setLocationText] = useState('');
+  const [locationLoading, setLocationLoading] = useState(false);
 
   useEffect(() => {
     const previews = files.map((file) => ({
@@ -92,6 +95,9 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
       if (category !== 'Let AI Automatically Classify') {
         formData.append('category', category);
       }
+      if (locationText.trim()) {
+        formData.append('location_text', locationText.trim());
+      }
       if (files.length > 0) {
         files.forEach((f) => formData.append('file', f));
       }
@@ -101,6 +107,7 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
       // Reset form
       setTitle('');
       setDescription('');
+      setLocationText('');
       setFiles([]);
       
       showAlert('Problem submitted successfully!', 'success');
@@ -117,6 +124,27 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
       setSubmitting(false);
       setGlobalLoading(false);
     }
+  };
+
+  const handleGetCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      showAlert('Geolocation is not supported by your browser.', 'error');
+      return;
+    }
+    setLocationLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        setLocationText(`https://www.google.com/maps?q=${lat},${lng}`);
+        setLocationLoading(false);
+        showAlert('Location captured successfully!', 'success');
+      },
+      (error) => {
+        setLocationLoading(false);
+        showAlert('Failed to get location. Please allow location permissions or enter manually.', 'error');
+      }
+    );
   };
 
   return (
@@ -202,6 +230,42 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
                 onChange={(e) => setDescription(e.target.value)}
                 required
               />
+            </div>
+
+            <div className="input-group" style={{ marginBottom: '24px' }}>
+              <label htmlFor="p-location">Exact Location (Optional)</label>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <input
+                  id="p-location"
+                  type="text"
+                  className="input-field"
+                  placeholder="e.g. Google Maps link or Village Name"
+                  value={locationText}
+                  onChange={(e) => setLocationText(e.target.value)}
+                  style={{ flex: 1 }}
+                />
+                <button
+                  type="button"
+                  onClick={handleGetCurrentLocation}
+                  disabled={locationLoading}
+                  style={{
+                    padding: '0 16px',
+                    background: '#f8fafc',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '8px',
+                    color: '#0f172a',
+                    fontWeight: 600,
+                    cursor: locationLoading ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  <MapPin size={18} color="#2563eb" />
+                  {locationLoading ? 'Locating...' : 'Use Current Location'}
+                </button>
+              </div>
             </div>
 
             <div className="form-group" style={{ marginBottom: '24px' }}>

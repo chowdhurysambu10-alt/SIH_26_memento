@@ -47,8 +47,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setToken(res.session.access_token);
     }
     if (res?.user) {
-      localStorage.setItem('user_data', JSON.stringify(res.user));
-      setUser(res.user);
+      // Start with login response, then enrich with fresh DB profile (gets org_id, verified, etc.)
+      let finalUser = res.user;
+      try {
+        const freshProfile = await authApi.getProfile();
+        if (freshProfile) {
+          finalUser = { ...res.user, ...freshProfile };
+        }
+      } catch {
+        // If profile fetch fails, fall back to login response data
+      }
+      localStorage.setItem('user_data', JSON.stringify(finalUser));
+      setUser(finalUser);
     }
   };
 

@@ -4,7 +4,7 @@ import { adminApi } from '../api/admin';
 import { useAuth } from '../context/AuthContext';
 import { useUI } from '../context/UIContext';
 import { useAutoRefresh } from '../hooks/useAutoRefresh';
-import { Building2, CheckCircle, Clock, FileText, ArrowRight, ShieldCheck, AlertCircle, Bell, Lock, Mail, Users, Save, Download } from 'lucide-react';
+import { Building2, CheckCircle, Clock, FileText, ArrowRight, ShieldCheck, AlertCircle, Bell, Lock, Mail, Users, Save, Download, MapPin } from 'lucide-react';
 
 interface InstitutionDashboardProps {
   activeView: string;
@@ -16,7 +16,7 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
   const { showAlert } = useUI();
   const [challenges, setChallenges] = useState<DashboardChallenge[]>([]);
   const [loading, setLoading] = useState(false);
-  const [filterTab, setFilterTab] = useState<'all' | 'verified' | 'pending' | 'available'>('all');
+  const [filterTab, setFilterTab] = useState<'all' | 'verified' | 'pending' | 'available' | 'proposals'>('all');
   const [selectedCategories, setSelectedCategories] = useState<string[]>(
     JSON.parse(localStorage.getItem('inst_categories') || '["Education", "Agriculture", "Healthcare"]')
   );
@@ -25,6 +25,17 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
   const [inPlatformAlerts, setInPlatformAlerts] = useState(localStorage.getItem('inst_alerts') !== 'false');
   const [institutions, setInstitutions] = useState<any[]>([]);
   const [selectedOrgId, setSelectedOrgId] = useState<string>('');
+  
+  // Proposals state
+  const [proposalModalOpen, setProposalModalOpen] = useState(false);
+  const [selectedChallengeForProposal, setSelectedChallengeForProposal] = useState<DashboardChallenge | null>(null);
+  const [proposalForm, setProposalForm] = useState({
+    proposal_text: '',
+    budget_estimate: '',
+    timeline_estimate: '',
+    contact_phone: user?.contact || ''
+  });
+  const [myProposals, setMyProposals] = useState<any[]>([]);
 
   useEffect(() => {
     localStorage.setItem('inst_categories', JSON.stringify(selectedCategories));
@@ -50,8 +61,12 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
   const fetchChallenges = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const data = await dashboardsApi.getClaimableChallenges();
+      const data = await adminApi.getAllChallenges();
       setChallenges(data);
+      if (user?.org_id) {
+        const proposals = await dashboardsApi.getMyProposals();
+        setMyProposals(proposals);
+      }
     } catch (e) {
       console.error(e);
     }
@@ -156,6 +171,30 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
     }
   };
 
+  const handleSubmitProposal = async () => {
+    if (!selectedChallengeForProposal) return;
+    if (!proposalForm.proposal_text.trim() || !proposalForm.budget_estimate.trim() || !proposalForm.timeline_estimate.trim() || !(proposalForm.contact_phone || user?.contact)) {
+      showAlert('Please fill in all mandatory fields.', 'error');
+      return;
+    }
+    setLoading(true);
+    try {
+      await dashboardsApi.submitProposal(selectedChallengeForProposal.id, {
+        ...proposalForm,
+        contact_phone: proposalForm.contact_phone || user?.contact || ''
+      });
+      showAlert('Proposal submitted successfully! The admin will review your bid.', 'success');
+      setProposalModalOpen(false);
+      setSelectedChallengeForProposal(null);
+      setProposalForm({ proposal_text: '', budget_estimate: '', timeline_estimate: '', contact_phone: user?.contact || '' });
+      await fetchChallenges();
+    } catch (e: any) {
+      showAlert(e.message || 'Failed to submit proposal', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (activeView === 'dashboard') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
@@ -234,18 +273,18 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
             </div>
           </div>
 
-          {/* 2. Pending Verification */}
+          {/* 2. Pending Verification (Bids) */}
           <div 
-            onClick={() => { setFilterTab('pending'); setActiveView?.('challenges'); }}
+            onClick={() => { setFilterTab('proposals'); setActiveView?.('challenges'); }}
             style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '14px', padding: '20px', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <span style={{ fontSize: '13px', fontWeight: 700, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Pending Claims</span>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Submitted Bids</span>
               <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Clock size={20} color="#d97706" />
               </div>
             </div>
-            <div style={{ fontSize: '32px', fontWeight: 800, color: '#b45309' }}>{myPendingClaims.length}</div>
+            <div style={{ fontSize: '32px', fontWeight: 800, color: '#b45309' }}>{myProposals.filter(p => p.status === 'submitted').length}</div>
             <div style={{ fontSize: '13px', color: '#92400e', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
               <span>Awaiting Admin Verification</span>
               <ArrowRight size={14} />
@@ -351,6 +390,17 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
                           {c.district}
                         </span>
                       )}
+                      {c.location_text && (
+                        <a 
+                          href={c.location_text.startsWith('http') ? c.location_text : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.location_text)}`} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          style={{ fontSize: '12px', display: 'inline-flex', alignItems: 'center', background: '#eff6ff', color: '#2563eb', padding: '2px 8px', borderRadius: '4px', fontWeight: 600, border: '1px solid #bfdbfe', textDecoration: 'none' }}
+                        >
+                          <MapPin size={12} style={{ marginRight: 4 }} />
+                          Location Link
+                        </a>
+                      )}
                       {c.category && (
                         <span style={{ fontSize: '12px', background: '#fff', color: '#475569', padding: '2px 8px', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
                           {c.category}
@@ -413,6 +463,10 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
               <div>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>Primary Contact Email</label>
                 <input type="email" defaultValue={user?.email || ''} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>Phone Number</label>
+                <input type="tel" defaultValue={user?.contact || currentInstitution?.contact || ''} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }} />
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>District Location</label>
@@ -592,6 +646,16 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                     <span style={{ fontSize: '12px', fontWeight: 700, padding: '4px 10px', borderRadius: '6px', background: '#ede9fe', color: '#6d28d9' }}>{c.category || 'General'}</span>
                     {c.district && <span style={{ fontSize: '12px', color: '#64748b' }}>{c.district}</span>}
+                    {c.location_text && (
+                      <a 
+                        href={c.location_text.startsWith('http') ? c.location_text : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.location_text)}`} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        style={{ fontSize: '12px', color: '#2563eb', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '2px' }}
+                      >
+                        <MapPin size={12} /> Map Link
+                      </a>
+                    )}
                   </div>
                   <h4 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', margin: 0 }}>{c.title}</h4>
                 </div>
@@ -634,14 +698,58 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
             </div>
           )}
 
-          {displayedChallenges.map(c => {
+          {challenges.length === 0 && filterTab !== 'proposals' && (
+            <div style={{ textAlign: 'center', padding: '40px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', color: '#64748b' }}>
+              No challenges currently assigned to your institution.
+            </div>
+          )}
+
+          {filterTab === 'proposals' && (
+            myProposals.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1', color: '#64748b' }}>
+                <FileText size={40} color="#94a3b8" style={{ margin: '0 auto 12px' }} />
+                <h4 style={{ margin: '0 0 6px', color: '#334155', fontSize: '16px' }}>No Bids Submitted</h4>
+                <p style={{ margin: 0, color: '#64748b', fontSize: '14px' }}>You haven't submitted any proposals yet.</p>
+              </div>
+            ) : (
+              myProposals.map(p => (
+                <div key={p.id} style={{ background: p.status === 'approved' ? '#f0fdf4' : p.status === 'rejected' ? '#fef2f2' : '#fff', border: `1px solid ${p.status === 'approved' ? '#bbf7d0' : p.status === 'rejected' ? '#fecaca' : '#e2e8f0'}`, borderRadius: '12px', padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '20px' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '12px', background: p.status === 'approved' ? '#dcfce7' : p.status === 'rejected' ? '#fee2e2' : '#fef3c7', color: p.status === 'approved' ? '#166534' : p.status === 'rejected' ? '#991b1b' : '#92400e', padding: '4px 10px', borderRadius: '6px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                        {p.status === 'approved' ? <CheckCircle size={13} /> : p.status === 'rejected' ? <AlertCircle size={13} /> : <Clock size={13} />} 
+                        {p.status.toUpperCase()}
+                      </span>
+                      <span style={{ fontSize: '12px', color: '#64748b' }}>Submitted: {new Date(p.created_at).toLocaleDateString()}</span>
+                    </div>
+                    <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', margin: '0 0 8px' }}>{p.challenges?.title || 'Unknown Challenge'}</h3>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '12px 24px', background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0', marginTop: '16px' }}>
+                      <div style={{ color: '#64748b', fontSize: '13px', fontWeight: 600 }}>Budget:</div>
+                      <div style={{ color: '#0f172a', fontSize: '14px', fontWeight: 500 }}>{p.budget_estimate}</div>
+                      
+                      <div style={{ color: '#64748b', fontSize: '13px', fontWeight: 600 }}>Timeline:</div>
+                      <div style={{ color: '#0f172a', fontSize: '14px', fontWeight: 500 }}>{p.timeline_estimate}</div>
+                      
+                      <div style={{ color: '#64748b', fontSize: '13px', fontWeight: 600 }}>Solution:</div>
+                      <div style={{ color: '#334155', fontSize: '14px', whiteSpace: 'pre-wrap' }}>{p.proposal_text}</div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )
+          )}
+
+          {filterTab !== 'proposals' && displayedChallenges.map(c => {
             const isMineChallenge = isMine(c);
             const isPendingClaimByMe = isMineChallenge && c.status === 'under_review';
             const isVerifiedAndOccupiedByMe = isMineChallenge && ['in_progress', 'team_formed', 'under_action', 'completed', 'resolved'].includes(c.status);
-            const isOccupiedByOther = Boolean(c.assigned_institution_id && !isMineChallenge);
+            const isOccupiedByOther = Boolean(c.assigned_institution_id && !isMineChallenge && ['in_progress', 'team_formed', 'under_action', 'completed', 'resolved'].includes(c.status));
             const isUnderAction = ['under_action', 'in_progress', 'team_formed'].includes(c.status);
 
-            const occupiedInstName = c.institutions?.name || (institutions.find(i => i.id === c.assigned_institution_id)?.name);
+            const occupiedInstName = (isVerifiedAndOccupiedByMe || isOccupiedByOther) 
+              ? (c.institutions?.name || (institutions.find(i => i.id === c.assigned_institution_id)?.name)) 
+              : null;
 
             return (
               <div 
@@ -668,9 +776,20 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
                     </span>
 
                     {c.district && (
-                      <span style={{ fontSize: '12px', background: '#eff6ff', color: '#2563eb', padding: '4px 8px', borderRadius: '4px', fontWeight: 500 }}>
+                      <span style={{ fontSize: '11px', background: '#f1f5f9', color: '#475569', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
                         {c.district}
                       </span>
+                    )}
+                    {c.location_text && (
+                      <a 
+                        href={c.location_text.startsWith('http') ? c.location_text : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.location_text)}`} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        style={{ fontSize: '11px', display: 'inline-flex', alignItems: 'center', background: '#eff6ff', color: '#2563eb', padding: '2px 6px', borderRadius: '4px', fontWeight: 600, textDecoration: 'none' }}
+                      >
+                        <MapPin size={10} style={{ marginRight: 2 }} />
+                        Map Link
+                      </a>
                     )}
 
                     {c.category && (
@@ -789,9 +908,30 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
                     >
                       <Building2 size={16} /> {c.status === 'under_review' ? 'Claim Pending Other Inst' : 'Occupied by Other'}
                     </button>
+                  ) : myProposals.some(p => p.challenge_id === c.id) ? (
+                    <button 
+                      disabled
+                      style={{
+                        background: '#f8fafc',
+                        color: '#334155',
+                        border: '1px solid #cbd5e1',
+                        padding: '10px 18px',
+                        borderRadius: '8px',
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        cursor: 'default'
+                      }}
+                    >
+                      <FileText size={16} /> Proposal Submitted
+                    </button>
                   ) : (
                     <button 
-                      onClick={() => handleClaim(c.id)}
+                      onClick={() => {
+                        setSelectedChallengeForProposal(c);
+                        setProposalModalOpen(true);
+                      }}
                       style={{
                         background: '#2563eb',
                         color: '#fff',
@@ -806,13 +946,106 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
                         boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)'
                       }}
                     >
-                      <Building2 size={16} /> Claim Problem
+                      <Building2 size={16} /> Submit Proposal
                     </button>
                   )}
                 </div>
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* PROPOSAL SUBMISSION MODAL */}
+      {proposalModalOpen && selectedChallengeForProposal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+          background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px'
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '600px',
+            maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+          }}>
+            <div style={{ padding: '24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <h3 style={{ margin: '0 0 8px', fontSize: '20px', fontWeight: 700, color: '#0f172a' }}>Submit Tender Proposal</h3>
+                <p style={{ margin: 0, fontSize: '14px', color: '#64748b' }}>For: <strong style={{ color: '#0f172a' }}>{selectedChallengeForProposal.title}</strong></p>
+              </div>
+              <button 
+                onClick={() => setProposalModalOpen(false)}
+                style={{ background: 'none', border: 'none', fontSize: '24px', color: '#94a3b8', cursor: 'pointer', lineHeight: 1 }}
+              >&times;</button>
+            </div>
+            
+            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#334155', marginBottom: '8px' }}>
+                  Proposed Solution & Strategy <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <textarea 
+                  value={proposalForm.proposal_text}
+                  onChange={e => setProposalForm({ ...proposalForm, proposal_text: e.target.value })}
+                  placeholder="Describe how your institution plans to solve this civic problem..."
+                  style={{ width: '100%', minHeight: '120px', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '14px', resize: 'vertical' }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#334155', marginBottom: '8px' }}>
+                    Estimated Budget <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <input 
+                    type="text" 
+                    value={proposalForm.budget_estimate}
+                    onChange={e => setProposalForm({ ...proposalForm, budget_estimate: e.target.value })}
+                    placeholder="e.g. ₹50,000 or Nil"
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '14px' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#334155', marginBottom: '8px' }}>
+                    Estimated Timeline <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <input 
+                    type="text" 
+                    value={proposalForm.timeline_estimate}
+                    onChange={e => setProposalForm({ ...proposalForm, timeline_estimate: e.target.value })}
+                    placeholder="e.g. 3 Months"
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '14px' }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#334155', marginBottom: '8px' }}>
+                  Contact Phone <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input 
+                  type="tel" 
+                  value={proposalForm.contact_phone}
+                  onChange={e => setProposalForm({ ...proposalForm, contact_phone: e.target.value })}
+                  placeholder="Your verified mobile number"
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '14px' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ padding: '20px 24px', background: '#f8fafc', borderTop: '1px solid #e2e8f0', borderRadius: '0 0 16px 16px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button 
+                onClick={() => setProposalModalOpen(false)}
+                style={{ padding: '10px 20px', background: '#fff', border: '1px solid #cbd5e1', color: '#475569', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}
+              >Cancel</button>
+              <button 
+                onClick={handleSubmitProposal}
+                disabled={loading || !proposalForm.proposal_text.trim() || !proposalForm.budget_estimate.trim() || !proposalForm.timeline_estimate.trim() || !(proposalForm.contact_phone || user?.contact)}
+                style={{ padding: '10px 24px', background: '#2563eb', border: 'none', color: '#fff', borderRadius: '8px', fontWeight: 600, cursor: loading || !proposalForm.proposal_text.trim() || !proposalForm.budget_estimate.trim() || !proposalForm.timeline_estimate.trim() || !(proposalForm.contact_phone || user?.contact) ? 'not-allowed' : 'pointer', opacity: loading || !proposalForm.proposal_text.trim() || !proposalForm.budget_estimate.trim() || !proposalForm.timeline_estimate.trim() || !(proposalForm.contact_phone || user?.contact) ? 0.7 : 1 }}
+              >
+                {loading ? 'Submitting...' : 'Submit Proposal'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

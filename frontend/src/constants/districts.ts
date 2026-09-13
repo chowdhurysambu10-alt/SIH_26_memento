@@ -34,7 +34,7 @@ export const JHARKHAND_DISTRICTS: string[] = [
   'Deoghar',
   'Dhanbad',
   'Dumka',
-  'East Singhbhum (Jamshedpur)',
+  'East Singhbhum',
   'Garhwa',
   'Giridih',
   'Godda',
@@ -50,7 +50,7 @@ export const JHARKHAND_DISTRICTS: string[] = [
   'Ramgarh',
   'Ranchi',
   'Sahibganj',
-  'Seraikela Kharsawan',
+  'Saraikela Kharsawan',
   'Simdega',
   'West Singhbhum',
 ];

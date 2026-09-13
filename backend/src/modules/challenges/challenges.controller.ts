@@ -125,4 +125,55 @@ export class ChallengesController {
   ) {
     return this.challengesService.updateStatus(id, dto, user);
   }
+
+  // --- TENDER / PROPOSAL SYSTEM ENDPOINTS ---
+
+  @Post(':id/proposals')
+  @Roles(UserRole.UNIVERSITY_ADMIN, UserRole.FACULTY)
+  @ApiOperation({
+    summary: 'Submit a proposal (bid) for a challenge',
+  })
+  async submitProposal(
+    @Param('id') id: string,
+    @Body() dto: any, // CreateProposalDto
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.challengesService.submitProposal(id, dto, user);
+  }
+
+  @Get('proposals/my-bids')
+  @Roles(UserRole.UNIVERSITY_ADMIN, UserRole.FACULTY)
+  @ApiOperation({
+    summary: 'Get all proposals submitted by the current institution',
+  })
+  async getMyProposals(
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.challengesService.getMyProposals(user);
+  }
+
+  @Get(':id/proposals')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.GOVT_VIEWER)
+  @ApiOperation({
+    summary: 'List all proposals (bids) for a specific challenge',
+  })
+  async getChallengeProposals(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.challengesService.getChallengeProposals(id, user);
+  }
+
+  @Patch(':id/proposals/:proposalId/approve')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.GOVT_VIEWER)
+  @ApiOperation({
+    summary: 'Approve a proposal (bid) for a challenge, rejecting others and assigning the institution',
+  })
+  async approveProposal(
+    @Param('id') id: string,
+    @Param('proposalId') proposalId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.challengesService.approveProposal(id, proposalId, user);
+  }
 }

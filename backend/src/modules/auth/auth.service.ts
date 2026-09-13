@@ -16,8 +16,11 @@ import { LoginDto } from './dto/login.dto';
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
 
-  // In-memory OTP store (target -> { otp, expiresAt })
-  private otpStore = new Map<string, { otp: string; expiresAt: number }>();
+  // In-memory OTP store (target -> { otp, expiresAt, contact, verified })
+  private otpStore = new Map<string, { otp: string; expiresAt: number; contact?: string; verified?: boolean }>();
+  
+  // Rate limiting for OTP requests per day
+  private dailyOtpRequests = new Map<string, { count: number; date: string }>();
   
   private transporter: nodemailer.Transporter;
 
@@ -83,14 +86,35 @@ export class AuthService {
 
     const userId = authData.user.id;
 
-    // 2. Insert into public.users table
+    // 2. Manage Organization and Insert into public.users table
     try {
+      let finalOrgId = dto.org_id || null;
+
+      // Auto-create an institution for university_admin if not provided
+      if (dto.role === 'university_admin' && !finalOrgId) {
+        const { data: newInst, error: instError } = await admin.from('institutions').insert({
+          id: userId, // Use user id as institution id for 1-to-1 mapping
+          name: dto.name,
+          type: 'university',
+          location: dto.district || 'Unknown Location',
+          district: dto.district || 'Unknown District',
+          contact_email: dto.email,
+          contact_phone: dto.contact,
+        }).select('id').single();
+
+        if (newInst?.id && !instError) {
+          finalOrgId = newInst.id;
+        } else {
+          this.logger.warn(`Failed to auto-create institution: ${instError?.message}`);
+        }
+      }
+
       const { error: profileError } = await admin.from('users').insert({
         id: userId,
         name: dto.name,
         email: dto.email,
         role: dto.role,
-        org_id: dto.org_id || null,
+        org_id: finalOrgId,
         district: dto.district || null,
         contact: dto.contact || null,
         verified: dto.role === 'citizen',
@@ -215,10 +239,20 @@ export class AuthService {
   async requestOtp(email: string, contact?: string) {
     const admin = this.supabaseService.getAdminClient();
     
+    const today = new Date().toISOString().slice(0, 10);
+    const requestStats = this.dailyOtpRequests.get(email.trim()) || { count: 0, date: today };
+    if (requestStats.date !== today) {
+      requestStats.count = 0;
+      requestStats.date = today;
+    }
+    if (requestStats.count >= 5) {
+      throw new BadRequestException('You have exceeded the maximum limit of 5 OTP requests per day.');
+    }
+    
     // Check if user exists
     const { data: user, error: userError } = await admin
       .from('users')
-      .select('id, email')
+      .select('id, email, contact')
       .eq('email', email.trim())
       .single();
       
@@ -226,11 +260,11 @@ export class AuthService {
       throw new BadRequestException('No account found with this email address.');
     }
     
-    // If contact is provided for mobile verification, apply rate limit
+    // If contact is provided for mobile verification, apply rate limit and verify
     if (contact) {
-      // SECURITY WARNING: We are not verifying if this mobile number belongs to the email!
-      // This allows anyone to reset any account's password if they have a mobile number.
-      // (Implemented as requested by user since mobile numbers aren't stored)
+      if (user.contact && user.contact !== contact) {
+        throw new BadRequestException('Mobile number does not match the registered account. Please check the number or use email verification.');
+      }
       await this.checkMobileRateLimit();
     }
 
@@ -241,7 +275,12 @@ export class AuthService {
     this.otpStore.set(email.trim(), {
       otp,
       expiresAt: Date.now() + 10 * 60 * 1000,
+      contact: contact || undefined,
+      verified: false,
     });
+    
+    requestStats.count++;
+    this.dailyOtpRequests.set(email.trim(), requestStats);
 
     if (!contact && process.env.SMTP_USER) {
       // Send email via Nodemailer if no contact is provided (email flow)
@@ -265,7 +304,7 @@ export class AuthService {
     return { success: true, message: `OTP generated for ${contact || email}` };
   }
 
-  async resetPassword(email: string, otp: string, newPassword?: string) {
+  async verifyOtp(email: string, otp: string) {
     const record = this.otpStore.get(email.trim());
     
     if (!record) {
@@ -281,6 +320,17 @@ export class AuthService {
       throw new BadRequestException('Invalid OTP.');
     }
     
+    record.verified = true;
+    return { success: true, message: 'OTP verified successfully.' };
+  }
+
+  async resetPassword(email: string, newPassword?: string) {
+    const record = this.otpStore.get(email.trim());
+    
+    if (!record || !record.verified) {
+      throw new BadRequestException('OTP not verified or request expired.');
+    }
+    
     if (!newPassword || newPassword.length < 6) {
       throw new BadRequestException('New password must be at least 6 characters.');
     }
@@ -290,7 +340,7 @@ export class AuthService {
     // Find the user ID from the users table first
     const { data: user, error: userError } = await admin
       .from('users')
-      .select('id')
+      .select('id, contact')
       .eq('email', email.trim())
       .single();
 
@@ -306,6 +356,11 @@ export class AuthService {
     if (updateError) {
       this.logger.error(`Failed to update password for ${email}: ${updateError.message}`);
       throw new BadRequestException('Failed to update password. Please try again.');
+    }
+    
+    // If the reset was done via mobile and it's a new number, store it
+    if (record.contact && !user.contact) {
+      await admin.from('users').update({ contact: record.contact }).eq('id', user.id);
     }
     
     // Valid OTP and successful update - clean it up

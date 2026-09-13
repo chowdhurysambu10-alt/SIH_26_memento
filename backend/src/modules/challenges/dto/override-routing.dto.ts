@@ -19,6 +19,11 @@ export class OverrideRoutingDto {
   @Max(100)
   priority_score?: number;
 
+  @ApiPropertyOptional({ example: 'water_sanitation' })
+  @IsOptional()
+  @IsString()
+  override_category_slug?: string;
+
   @ApiProperty({ example: 'Re-routed to BIT Sindri due to specialized water filtration research lab.' })
   @IsString()
   @IsNotEmpty()

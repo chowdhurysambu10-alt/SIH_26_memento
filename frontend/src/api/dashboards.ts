@@ -5,9 +5,11 @@ export interface DashboardChallenge {
   title: string;
   description: string;
   district: string;
+  location_text?: string;
   category?: string;
 
   support_count?: number;
+  priority_score?: number;
   status: 'submitted' | 'under_action' | 'resolved' | 'under_review' | 'claimed' | 'in_progress' | 'completed';
   user_id?: string;
   created_at: string;
@@ -93,9 +95,9 @@ export const dashboardsApi = {
       });
     }
 
-    // Sort: support_count DESC
+    // Sort: priority_score DESC
     return items.sort((a: any, b: any) => {
-      return (Number(b.support_count) || 0) - (Number(a.support_count) || 0);
+      return (Number(b.priority_score) || 0) - (Number(a.priority_score) || 0);
     });
   },
 
@@ -134,14 +136,39 @@ export const dashboardsApi = {
   overrideAiClassification: async (
     challengeId: string,
     category: string,
-    notes?: string
+    notes?: string,
+    priority_score?: number
   ): Promise<any> => {
     return apiClient<any>(`/challenges/${challengeId}/override-routing`, {
       method: 'POST',
       body: JSON.stringify({
         override_category_slug: category.toLowerCase().replace(/\s+/g, '_'),
         override_reason: notes || 'Human reviewer manual override',
+        priority_score: priority_score,
       }),
+    });
+  },
+
+  // --- TENDER / PROPOSAL SYSTEM ---
+
+  submitProposal: async (challengeId: string, payload: { proposal_text: string, budget_estimate?: string, timeline_estimate?: string, contact_phone?: string }): Promise<any> => {
+    return apiClient<any>(`/challenges/${challengeId}/proposals`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  getMyProposals: async (): Promise<any[]> => {
+    return apiClient<any[]>('/challenges/proposals/my-bids');
+  },
+
+  getChallengeProposals: async (challengeId: string): Promise<any[]> => {
+    return apiClient<any[]>(`/challenges/${challengeId}/proposals`);
+  },
+
+  approveProposal: async (challengeId: string, proposalId: string): Promise<any> => {
+    return apiClient<any>(`/challenges/${challengeId}/proposals/${proposalId}/approve`, {
+      method: 'PATCH',
     });
   },
 };

@@ -7,6 +7,7 @@ export interface AuthUser {
   role: string;
   org_id?: string | null;
   district?: string | null;
+  contact?: string | null;
   verified?: boolean;
 }
 
@@ -50,6 +51,13 @@ export const authApi = {
     return apiClient<AuthUser>('/users/me');
   },
 
+  updateProfile: (updates: { name?: string; email?: string }): Promise<AuthUser> => {
+    return apiClient<AuthUser>('/users/me', {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
+  },
+
   submitVerificationRequest: async (payload: any): Promise<any> => {
     if (payload?.mobileNumber) {
       await apiClient<any>('/users/me', {
@@ -67,10 +75,17 @@ export const authApi = {
     });
   },
 
-  resetPassword: (email: string, otp: string, newPassword?: string): Promise<{ success: boolean; message: string }> => {
+  verifyOtp: (email: string, otp: string): Promise<{ success: boolean; message: string }> => {
+    return apiClient('/auth/verify-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp }),
+    });
+  },
+
+  resetPassword: (email: string, newPassword?: string): Promise<{ success: boolean; message: string }> => {
     return apiClient('/auth/reset-password', {
       method: 'POST',
-      body: JSON.stringify({ email, otp, newPassword }),
+      body: JSON.stringify({ email, newPassword }),
     });
   },
 };

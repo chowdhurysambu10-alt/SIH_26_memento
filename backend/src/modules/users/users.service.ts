@@ -47,8 +47,30 @@ export class UsersService {
     });
   }
 
-  async updateProfile(userId: string, updates: Partial<{ name: string; contact: string; district: string }>) {
+  async updateProfile(userId: string, updates: Partial<{ name: string; contact: string; district: string; email: string }>) {
     const admin = this.supabaseService.getAdminClient();
+    
+    // If email or name is being updated, sync with auth.users
+    if (updates.email || updates.name) {
+      const authUpdates: any = {};
+      if (updates.email) {
+        authUpdates.email = updates.email;
+        authUpdates.email_confirm = true; // Auto-confirm email change
+      }
+      if (updates.name) {
+        authUpdates.user_metadata = { name: updates.name };
+      }
+      
+      const { error: authError } = await admin.auth.admin.updateUserById(userId, authUpdates);
+      if (authError) {
+        throw new BadRequestException({
+          statusCode: 400,
+          message: authError.message || 'Failed to update authentication credentials',
+          errorCode: 'AUTH_UPDATE_FAILED',
+        });
+      }
+    }
+
     const { data, error } = await admin
       .from('users')
       .update(updates)
@@ -67,7 +89,7 @@ export class UsersService {
     return data;
   }
 
-  async verifyUser(targetUserId: string, callerRole: UserRole) {
+  async verifyUser(targetUserId: string, callerRole: UserRole, status: boolean = true) {
     if (callerRole !== UserRole.SUPER_ADMIN && callerRole !== UserRole.GOVT_VIEWER) {
       throw new ForbiddenException({
         statusCode: 403,
@@ -79,7 +101,7 @@ export class UsersService {
     const admin = this.supabaseService.getAdminClient();
     const { data, error } = await admin
       .from('users')
-      .update({ verified: true })
+      .update({ verified: status })
       .eq('id', targetUserId)
       .select()
       .single();

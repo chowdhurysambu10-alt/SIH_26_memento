@@ -3,6 +3,7 @@ import { adminApi } from '../api/admin';
 import { dashboardsApi, DashboardChallenge } from '../api/dashboards';
 import { AiAnalysisDashboard } from './AiAnalysisDashboard';
 import { StatisticsPage } from './StatisticsPage';
+import { TenderReviewDashboard } from './TenderReviewDashboard';
 import { useUI } from '../context/UIContext';
 import { useAutoRefresh } from '../hooks/useAutoRefresh';
 import { Users, FileText, Trash2, Edit2, ShieldAlert, X, ShieldCheck, Megaphone, Clock, ChevronRight, Activity, Bell, CheckCircle, Building2, Mail } from 'lucide-react';
@@ -159,17 +160,17 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
     }
   };
 
-  const handleVerifyUser = async (id: string, isFromRequestsView = false) => {
+  const handleVerifyUser = async (id: string, isFromRequestsView = false, status: boolean = true) => {
     try {
       setGlobalLoading(true);
-      await adminApi.verifyUser(id);
+      await adminApi.verifyUser(id, status);
       if (isFromRequestsView) {
         fetchVerificationRequests();
       } else {
         fetchUsers();
       }
     } catch (e) {
-      showAlert('Failed to verify user', 'error');
+      showAlert(`Failed to ${status ? 'verify' : 'unverify'} user`, 'error');
     } finally {
       setGlobalLoading(false);
     }
@@ -395,6 +396,13 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
                   </div>
                   <ChevronRight size={16} color="#94a3b8" />
                 </button>
+                <button onClick={() => setActiveView && setActiveView('tenders')} style={{ width: '100%', padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', transition: 'all 0.2s', color: '#0f172a', fontWeight: 600 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#fff', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Building2 size={16} color="#2563eb" /></div>
+                    Review Tenders (Bids)
+                  </div>
+                  <ChevronRight size={16} color="#94a3b8" />
+                </button>
               </div>
             </div>
           </div>
@@ -582,6 +590,14 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
     );
   }
 
+  if (activeView === 'tenders') {
+    return (
+      <div style={{ marginTop: '-40px' }}>
+        <TenderReviewDashboard />
+      </div>
+    );
+  }
+
   if (activeView === 'verification') {
     return (
       <div>
@@ -765,7 +781,12 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
               <tbody>
                 {filteredUsers.map((u, i) => (
                   <tr key={u.id} style={{ borderBottom: i < filteredUsers.length - 1 ? '1px solid #e2e8f0' : 'none' }}>
-                    <td style={{ padding: '16px', color: '#0f172a', fontWeight: 500 }}>{u.name || 'Unknown'}</td>
+                    <td style={{ padding: '16px', color: '#0f172a', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {u.name || 'Unknown'}
+                      {u.verified && (
+                        <span title="Verified" style={{ display: 'flex' }}><ShieldCheck size={14} color="#10b981" /></span>
+                      )}
+                    </td>
                     <td style={{ padding: '16px', color: '#64748b' }}>{u.email}</td>
                     <td style={{ padding: '16px' }}>
                       <select 
@@ -789,6 +810,23 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
                         >
                           <Mail size={18} />
                         </a>
+                        {(u.role === 'university_admin' || u.role === 'student') && (
+                          <button 
+                            onClick={() => {
+                              if (u.verified) {
+                                if (window.confirm(`Are you sure you want to REVOKE verification for ${u.name || 'this user'}?`)) {
+                                  handleVerifyUser(u.id, false, false);
+                                }
+                              } else {
+                                handleVerifyUser(u.id, false, true);
+                              }
+                            }}
+                            style={{ background: 'transparent', border: 'none', color: u.verified ? '#ef4444' : '#10b981', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                            title={u.verified ? 'Revoke Verification' : 'Verify User'}
+                          >
+                            {u.verified ? <ShieldAlert size={18} /> : <ShieldCheck size={18} />}
+                          </button>
+                        )}
                         <button 
                           onClick={() => handleDeleteUser(u.id)}
                           style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}

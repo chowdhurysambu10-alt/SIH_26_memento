@@ -9,6 +9,7 @@ export interface AuthenticatedUser {
   district?: string;
   name?: string;
   verified?: boolean;
+  contact?: string;
 }
 
 export const CurrentUser = createParamDecorator(

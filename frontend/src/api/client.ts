@@ -50,8 +50,16 @@ export async function apiClient<T = any>(
         errorMsg = Array.isArray(resData.message) ? resData.message.join(', ') : resData.message;
       }
       
-      if (res.status === 401 && errorMsg.toLowerCase().includes('token')) {
-        // Auto-logout if token is invalid/expired
+      // Only auto-logout on true token expiry — NOT on every 401.
+      // Check specific error codes to avoid logging admin out during backend restarts.
+      const isTokenExpired =
+        res.status === 401 &&
+        (resData?.errorCode === 'INVALID_TOKEN' ||
+          resData?.errorCode === 'TOKEN_EXPIRED' ||
+          errorMsg.toLowerCase().includes('expired'));
+
+      if (isTokenExpired) {
+        // Auto-logout only if the token is genuinely expired, not just any 401
         localStorage.removeItem('supabase_access_token');
         localStorage.removeItem('supabase_refresh_token');
         localStorage.removeItem('user_data');

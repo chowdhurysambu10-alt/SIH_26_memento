@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { ChevronDown, LogOut, User as UserIcon, Bell, ShieldAlert, Headset } from 'lucide-react';
 import { NotificationsModal } from './NotificationsModal';
 import { VerificationRequestModal } from './VerificationRequestModal';
+import { ProfileModal } from './ProfileModal';
 import { useNotifications } from '../hooks/useNotifications';
 
 export type NavTab = 'home' | 'feed' | 'top-problems' | 'submit' | 'statistics' | 'community' | 'helpdesk' | 'about' | 'login' | 'admin-dashboard' | 'institution-dashboard' | 'student-dashboard';
@@ -18,6 +19,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, platfor
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const { notifications } = useNotifications();
@@ -60,7 +62,6 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, platfor
             >
               Top Problems
             </button>
-
 
             <button
               className={`nav-link ${activeTab === 'statistics' ? 'active' : ''}`}
@@ -171,6 +172,19 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, platfor
                       <Headset size={14} /> Helpdesk
                     </a>
 
+                    {user && user.role !== 'super_admin' && (
+                      <button
+                        className="btn btn-outline w-100"
+                        style={{ marginBottom: '8px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', color: '#475569' }}
+                        onClick={() => {
+                          setIsProfileModalOpen(true);
+                          setDropdownOpen(false);
+                        }}
+                      >
+                        <UserIcon size={14} /> Profile
+                      </button>
+                    )}
+
                     {user && !user.verified && (user.role === 'student' || user.role === 'university_admin') && (
                       <button
                         className="btn btn-outline w-100"
@@ -231,6 +245,18 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, platfor
         isOpen={isNotificationsOpen}
         onClose={() => setIsNotificationsOpen(false)}
       />
+      {user && (
+        <ProfileModal
+          user={user}
+          isOpen={isProfileModalOpen}
+          onClose={() => setIsProfileModalOpen(false)}
+          onProfileUpdate={(updatedUser) => {
+            // Need to reload window or update context.
+            // A simple reload to reflect changes across app (or implement context update in useAuth)
+            window.location.reload();
+          }}
+        />
+      )}
       {isVerificationModalOpen && (
         <VerificationRequestModal onClose={() => setIsVerificationModalOpen(false)} />
       )}

@@ -144,11 +144,11 @@ const MyPostedProblemItem: React.FC<{ challenge: Challenge; onDeleted?: (id: str
                   <strong>AI Analysis: </strong> {challenge.ai_summary}
                 </div>
               )}
-              {challenge.institutions?.name && (
-                <div style={{ fontSize: '13px', color: '#065f46', background: '#ecfdf5', padding: '6px 10px', borderRadius: '6px', display: 'inline-block' }}>
-                  <strong>Nearest Institution: </strong> {challenge.institutions.name}
-                </div>
-              )}
+                {challenge.institutions?.name && challenge.assigned_institution_id && challenge.status !== 'submitted' && challenge.status !== 'under_review' && (
+                  <div style={{ marginTop: '8px', fontSize: '12px', color: '#047857', background: '#d1fae5', padding: '4px 8px', borderRadius: '4px', display: 'inline-block' }}>
+                    <strong>Assigned to: </strong> {challenge.institutions.name}
+                  </div>
+                )}
             </div>
             
             <div style={{ display: 'flex', gap: '8px', flexShrink: 0, opacity: isHovered ? 1 : 0, pointerEvents: isHovered ? 'auto' : 'none', transition: 'opacity 0.2s' }}>

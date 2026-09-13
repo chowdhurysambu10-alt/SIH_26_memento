@@ -27,6 +27,35 @@ const CATEGORIES_LIST = [
   'Public Administration',
 ];
 
+// Pure code hierarchy — mirrors the backend ChallengesService.getHierarchicalScore()
+// Water > Healthcare > Energy > Urban > Environment > Agriculture > Rural > Education > Accessibility > Admin
+const HIERARCHICAL_SCORES: Record<string, number> = {
+  'water & sanitation': 95,
+  'water': 95,
+  'healthcare': 92,
+  'clean energy': 80,
+  'energy': 80,
+  'urban infrastructure': 77,
+  'urban_development': 77,
+  'environment & forestry': 74,
+  'environment': 74,
+  'agriculture': 68,
+  'rural livelihoods': 65,
+  'rural_livelihoods': 65,
+  'education': 58,
+  'accessibility & inclusion': 54,
+  'accessibility': 54,
+  'public administration': 50,
+  'public_administration': 50,
+};
+
+function getHierarchicalScore(category: string): number {
+  if (!category) return 50;
+  const key = category.toLowerCase().trim();
+  return HIERARCHICAL_SCORES[key] ?? 50;
+}
+
+
 export const AiAnalysisDashboard: React.FC = () => {
   const { isAuthenticated } = useAuth();
   const { showAlert } = useUI();
@@ -38,6 +67,7 @@ export const AiAnalysisDashboard: React.FC = () => {
   // Override Modal State
   const [selectedChallenge, setSelectedChallenge] = useState<DashboardChallenge | null>(null);
   const [overrideCategory, setOverrideCategory] = useState<string>('Water & Sanitation');
+  const [overridePriority, setOverridePriority] = useState<number>(50);
 
   const [overrideNotes, setOverrideNotes] = useState<string>('');
   const [savingOverride, setSavingOverride] = useState<boolean>(false);
@@ -61,6 +91,7 @@ export const AiAnalysisDashboard: React.FC = () => {
   const openOverrideModal = (c: DashboardChallenge) => {
     setSelectedChallenge(c);
     setOverrideCategory(c.category || 'Water & Sanitation');
+    setOverridePriority(c.priority_score || 50);
 
     setOverrideNotes('');
   };
@@ -79,7 +110,8 @@ export const AiAnalysisDashboard: React.FC = () => {
       await dashboardsApi.overrideAiClassification(
         selectedChallenge.id,
         overrideCategory,
-        overrideNotes
+        overrideNotes,
+        overridePriority
       );
 
       // Update state locally
@@ -89,7 +121,7 @@ export const AiAnalysisDashboard: React.FC = () => {
             ? {
                 ...c,
                 category: overrideCategory,
-
+                priority_score: overridePriority,
                 model_used: 'human_override',
                 ai_confidence: 1.0,
               }
@@ -168,10 +200,9 @@ export const AiAnalysisDashboard: React.FC = () => {
                 <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontWeight: 600, fontSize: '13px' }}>
                   <th style={{ padding: '14px 18px' }}>Challenge Title</th>
                   <th style={{ padding: '14px 18px' }}>AI Category</th>
-                  <th style={{ padding: '14px 18px' }}>Confidence</th>
-
-                  <th style={{ padding: '14px 18px' }}>AI Summary</th>
-                  <th style={{ padding: '14px 18px' }}>Model</th>
+                  <th style={{ padding: '14px 18px' }}>Importance</th>
+                  <th style={{ padding: '14px 18px' }}>Support Count</th>
+                  <th style={{ padding: '14px 18px' }}>Hierarchical Score</th>
                   <th style={{ padding: '14px 18px' }}>Status</th>
                   <th style={{ padding: '14px 18px', textAlign: 'right' }}>Actions</th>
                 </tr>
@@ -183,11 +214,19 @@ export const AiAnalysisDashboard: React.FC = () => {
                   const model = c.model_used || 'gemma-2';
                   const isExpanded = expandedSummaryId === c.id;
 
-                  // Status logic:
-                  // Needs human review if confidence < 0.6, else Analyzed
+                  // Hierarchical Score: pure code, determined by category name
+                  const hierarchicalScore = getHierarchicalScore(c.category || '');
+
+                  // Importance: stored in priority_score (already computed via formula on backend)
+                  const importance = c.priority_score || hierarchicalScore;
+
+                  // Status: not analyzed if no ai_confidence stored
+                  const hasAiAnalysis = c.ai_confidence !== undefined && c.ai_confidence !== null;
                   let statusBadge = { label: 'Analyzed', color: '#15803d', bg: '#dcfce7', icon: CheckCircle };
-                  if (confidence < 0.6) {
-                    statusBadge = { label: 'Needs human review', color: '#b91c1c', bg: '#fee2e2', icon: AlertTriangle };
+                  if (!hasAiAnalysis) {
+                    statusBadge = { label: 'Not Analyzed', color: '#92400e', bg: '#fef3c7', icon: Clock };
+                  } else if (confidence < 0.3) {
+                    statusBadge = { label: 'Needs Review', color: '#b91c1c', bg: '#fee2e2', icon: AlertTriangle };
                   }
 
                   const IconComp = statusBadge.icon;
@@ -203,53 +242,23 @@ export const AiAnalysisDashboard: React.FC = () => {
                         <span className="tag tag-category">{c.category || 'Water & Sanitation'}</span>
                       </td>
 
+                      {/* IMPORTANCE: hierarchical base + AI severity + support boost */}
                       <td style={{ padding: '16px 18px', fontWeight: 600 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <div style={{ width: '45px', height: '6px', background: '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }}>
-                            <div style={{ width: `${Math.round(confidence * 100)}%`, height: '100%', background: confidence >= 0.7 ? '#16a34a' : '#eab308' }} />
+                            <div style={{ width: `${importance}%`, height: '100%', background: importance >= 75 ? '#16a34a' : importance >= 50 ? '#eab308' : '#ef4444' }} />
                           </div>
-                          <span>{Math.round(confidence * 100)}%</span>
+                          <span>{importance}</span>
                         </div>
                       </td>
 
-
-
-                      <td style={{ padding: '16px 18px', maxWidth: '240px', color: '#475569', fontSize: '13px' }}>
-                        {c.ai_summary ? (
-                          <div>
-                            <span>
-                              {isExpanded
-                                ? c.ai_summary
-                                : c.ai_summary.length > 65
-                                ? `${c.ai_summary.substring(0, 65)}...`
-                                : c.ai_summary}
-                            </span>
-                            {c.ai_summary.length > 65 && (
-                              <button
-                                onClick={() => setExpandedSummaryId(isExpanded ? null : c.id)}
-                                style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '12px', fontWeight: 600, cursor: 'pointer', marginLeft: '4px' }}
-                              >
-                                {isExpanded ? 'Show less' : 'More'}
-                              </button>
-                            )}
-                          </div>
-                        ) : (
-                          <span style={{ color: '#94a3b8' }}>Standard classification</span>
-                        )}
+                      <td style={{ padding: '16px 18px', fontWeight: 600, color: '#334155' }}>
+                        {c.support_count || 0}
                       </td>
 
-                      <td style={{ padding: '16px 18px', fontSize: '12.5px', fontFamily: 'monospace' }}>
-                        <span
-                          style={{
-                            background: model === 'human_override' ? '#fdf2f8' : '#f1f5f9',
-                            color: model === 'human_override' ? '#be185d' : '#334155',
-                            padding: '3px 8px',
-                            borderRadius: '4px',
-                            fontWeight: 600,
-                          }}
-                        >
-                          {model}
-                        </span>
+                      {/* HIERARCHICAL SCORE: pure code, fixed by category policy */}
+                      <td style={{ padding: '16px 18px', fontWeight: 700, color: '#4f46e5' }}>
+                        {hierarchicalScore}
                       </td>
 
                       <td style={{ padding: '16px 18px' }}>
@@ -284,6 +293,7 @@ export const AiAnalysisDashboard: React.FC = () => {
                   );
                 })}
               </tbody>
+
             </table>
           </div>
         )}
@@ -314,9 +324,19 @@ export const AiAnalysisDashboard: React.FC = () => {
                 </select>
               </div>
 
+              <div className="form-group" style={{ marginTop: '16px' }}>
+                <label className="form-label">Hierarchical Score (Priority)</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  className="input-field"
+                  value={overridePriority}
+                  onChange={(e) => setOverridePriority(Number(e.target.value))}
+                />
+              </div>
 
-
-              <div className="form-group">
+              <div className="form-group" style={{ marginTop: '16px' }}>
                 <label className="form-label">Reviewer Notes (Logged in Audit Log)</label>
                 <textarea
                   rows={2}

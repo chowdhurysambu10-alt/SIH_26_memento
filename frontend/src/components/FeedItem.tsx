@@ -106,6 +106,19 @@ export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, o
           {challenge.district || 'Jharkhand'}
         </span>
 
+        {challenge.location_text && (
+          <a 
+            href={challenge.location_text.startsWith('http') ? challenge.location_text : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(challenge.location_text)}`} 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="tag tag-new"
+            style={{ display: 'inline-flex', alignItems: 'center', background: '#eff6ff', color: '#2563eb', textDecoration: 'none', cursor: 'pointer' }}
+          >
+            <MapPin size={12} style={{ marginRight: 4 }} />
+            Exact Location
+          </a>
+        )}
+
         {challenge.categories?.name && (
           <span className="tag tag-category">
             <Tag size={12} style={{ display: 'inline', marginRight: 4 }} />
@@ -113,10 +126,10 @@ export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, o
           </span>
         )}
 
-        {challenge.institutions?.name && (
+        {challenge.institutions?.name && challenge.assigned_institution_id && challenge.status !== 'submitted' && challenge.status !== 'under_review' && (
           <span className="tag tag-category" style={{ background: '#ecfdf5', color: '#065f46' }}>
             <Building2 size={12} style={{ display: 'inline', marginRight: 4 }} />
-            Nearest Institution: {challenge.institutions.name}
+            Assigned to: {challenge.institutions.name}
           </span>
         )}
 

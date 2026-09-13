@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GemmaApiProvider } from './providers/gemma-api.provider';
-import { OllamaProvider } from './providers/ollama.provider';
 import {
   ClassificationResult,
   ExistingChallengeSnippet,
@@ -13,22 +12,13 @@ import { SupabaseService } from '../supabase/supabase.service';
 export class ClassificationService {
   private readonly logger = new Logger(ClassificationService.name);
   private primaryProvider: LlmProvider;
-  private fallbackProvider: LlmProvider;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly gemmaProvider: GemmaApiProvider,
-    private readonly ollamaProvider: OllamaProvider,
     private readonly supabaseService: SupabaseService,
   ) {
-    const defaultChoice = this.configService.get<string>('ai.defaultProvider');
-    if (defaultChoice === 'ollama') {
-      this.primaryProvider = this.ollamaProvider;
-      this.fallbackProvider = this.gemmaProvider;
-    } else {
-      this.primaryProvider = this.gemmaProvider;
-      this.fallbackProvider = this.ollamaProvider;
-    }
+    this.primaryProvider = this.gemmaProvider;
   }
 
   /**
@@ -58,25 +48,11 @@ export class ClassificationService {
         existing,
       );
     } catch (primaryErr) {
-      this.logger.warn(
-        `Primary provider (${this.primaryProvider.name}) failed: ${primaryErr.message}. Attempting fallback to ${this.fallbackProvider.name}...`,
+      this.logger.error(
+        `Primary provider (${this.primaryProvider.name}) failed: ${primaryErr.message}. Utilizing heuristic fallback.`,
       );
-
-      try {
-        providerUsed = this.fallbackProvider.name;
-        classification = await this.fallbackProvider.classifyAndDetectDuplicates(
-          title,
-          description,
-          district,
-          existing,
-        );
-      } catch (fallbackErr) {
-        this.logger.error(
-          `Fallback provider (${this.fallbackProvider.name}) also failed: ${fallbackErr.message}. Utilizing heuristic fallback.`,
-        );
-        providerUsed = 'Heuristic Fallback Engine';
-        classification = this.heuristicClassification(title, description, existing);
-      }
+      providerUsed = 'Heuristic Fallback Engine';
+      classification = this.heuristicClassification(title, description, existing);
     }
 
     // 2. Route to matching institution based on domain expertise and district

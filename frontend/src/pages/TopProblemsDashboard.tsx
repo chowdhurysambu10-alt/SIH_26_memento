@@ -256,6 +256,18 @@ export const TopProblemsDashboard: React.FC = () => {
                       {challenge.district || 'Jharkhand'}
                     </span>
 
+                    {challenge.location_text && (
+                      <a 
+                        href={challenge.location_text.startsWith('http') ? challenge.location_text : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(challenge.location_text)}`} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        style={{ display: 'inline-flex', alignItems: 'center', background: '#eff6ff', color: '#2563eb', padding: '4px 10px', borderRadius: '16px', fontSize: '11.5px', fontWeight: 600, textDecoration: 'none' }}
+                      >
+                        <MapPin size={11} style={{ marginRight: 4 }} />
+                        View Exact Location
+                      </a>
+                    )}
+
                     {challenge.category && (
                       <span className="tag tag-category">
                         <Tag size={11} style={{ display: 'inline', marginRight: 4 }} />
@@ -356,11 +368,6 @@ export const TopProblemsDashboard: React.FC = () => {
                     )}
                   </div>
 
-                  {challenge.ai_summary && (
-                    <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', borderLeft: '3px solid #2563eb', fontSize: '13px', color: '#334155', marginBottom: '14px' }}>
-                      <strong>AI Summary: </strong> {challenge.ai_summary}
-                    </div>
-                  )}
 
                   {/* Actions */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px', borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>

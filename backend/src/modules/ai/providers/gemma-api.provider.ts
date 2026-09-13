@@ -41,8 +41,8 @@ export class GemmaApiProvider implements LlmProvider {
       .join('\n---\n');
 
     const systemPrompt = `
-You are an expert AI Classifier and Duplicate Detection engine for societal challenges submitted in Jharkhand, India.
-Given a citizen's challenge, you must:
+You are an expert AI problem severity assessor for societal challenges submitted in Jharkhand, India.
+Given a citizen's challenge submission, you must:
 1. Classify it into exactly ONE of the following valid category slugs:
    - education
    - agriculture
@@ -54,19 +54,23 @@ Given a citizen's challenge, you must:
    - accessibility
    - public_administration
    - rural_livelihoods
-2. Assign a priority score between 1 and 100 based on severity, urgency, population impact, and safety risks.
+2. Assign a rawSeverityScore between 1 and 100 based ONLY on the severity, urgency, and scale of the specific problem described — NOT on the category. Ask yourself: How dangerous/urgent is THIS specific problem for the people affected? Consider:
+   - Immediate health/life risk → score 80-100
+   - Significant hardship affecting many people → score 55-79
+   - Moderate inconvenience → score 30-54
+   - Minor issue → score 1-29
 3. Compare against the provided list of existing challenges to determine if it is a duplicate or near-duplicate. Return duplicateCandidateId (or null if none) and duplicateSimilarityScore (0.0 to 1.0, where >=0.75 indicates duplicate).
-4. Provide 3-5 relevant keywords and a 1-sentence rationale.
+4. Provide 3-5 relevant keywords.
 
 Return ONLY a valid JSON object with the following schema:
 {
   "categorySlug": "water",
   "categoryName": "Water & Sanitation",
-  "priorityScore": 85,
+  "rawSeverityScore": 85,
   "recommendedKeywords": ["drinking water", "arsenic", "fluoride", "tube well"],
-  "duplicateCandidateId": "uuid-or-null",
-  "duplicateSimilarityScore": 0.85,
-  "rationale": "High priority drinking water contamination impacting multiple tribal villages."
+  "duplicateCandidateId": null,
+  "duplicateSimilarityScore": 0.0,
+  "rationale": "Brief reason for severity score"
 }
 `;
 
@@ -118,10 +122,16 @@ ${candidateList || 'None'}
       }
 
       const data = await response.json();
-      const responseText =
+      let responseText =
         data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
       
-      const parsed = JSON.parse(responseText.trim());
+      // Extract JSON block using regex to ignore any surrounding conversational text
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        responseText = jsonMatch[0];
+      }
+      
+      const parsed = JSON.parse(responseText);
       return this.sanitizeResult(parsed);
     } catch (err) {
       clearTimeout(timeoutId);
@@ -148,10 +158,13 @@ ${candidateList || 'None'}
       ? raw.categorySlug
       : 'public_administration';
 
+    // Support both old "priorityScore" and new "rawSeverityScore" field names
+    const severityScore = Math.min(100, Math.max(1, Number(raw.rawSeverityScore || raw.priorityScore) || 50));
+
     return {
       categorySlug: slug,
       categoryName: raw.categoryName || slug.replace('_', ' ').toUpperCase(),
-      priorityScore: Math.min(100, Math.max(1, Number(raw.priorityScore) || 50)),
+      priorityScore: severityScore,
       recommendedKeywords: Array.isArray(raw.recommendedKeywords)
         ? raw.recommendedKeywords
         : [],
@@ -161,6 +174,6 @@ ${candidateList || 'None'}
         Math.max(0.0, Number(raw.duplicateSimilarityScore) || 0.0),
       ),
       rationale: raw.rationale || 'AI automated classification completed.',
-    };
+    }
   }
 }

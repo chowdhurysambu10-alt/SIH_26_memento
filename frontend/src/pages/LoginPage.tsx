@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { authApi } from '../api/auth';
 import { useAuth } from '../context/AuthContext';
 import { useUI } from '../context/UIContext';
+import { JHARKHAND_DISTRICTS } from '../constants/districts';
 import {
   Globe,
   GraduationCap,
@@ -36,6 +37,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
+  const [otpVerified, setOtpVerified] = useState(false);
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
   
@@ -74,21 +76,35 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
       setError('Please enter the OTP');
       return;
     }
+    setLoading(true);
+    try {
+      await authApi.verifyOtp(email.trim(), otp);
+      setOtpVerified(true);
+      setError('');
+    } catch (err: any) {
+      setError(err.message || 'Invalid OTP');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
     if (!newPassword || newPassword.length < 6) {
       setError('Please enter a new password (min 6 characters)');
       return;
     }
     setLoading(true);
     try {
-      await authApi.resetPassword(email.trim(), otp, newPassword);
+      await authApi.resetPassword(email.trim(), newPassword);
       showAlert(`Your password has been reset successfully!`, 'success');
       setIsForgotPassword(false);
       setOtpSent(false);
+      setOtpVerified(false);
       setOtp('');
       setNewPassword('');
       setError('');
     } catch (err: any) {
-      setError(err.message || 'Invalid OTP');
+      setError(err.message || 'Failed to reset password');
     } finally {
       setLoading(false);
     }
@@ -248,6 +264,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
                 onClick={() => { 
                   if (isForgotPassword) {
                     setIsForgotPassword(false);
+                    setOtpSent(false);
+                    setOtpVerified(false);
+                    setOtp('');
+                    setNewPassword('');
+                    setError('');
                   } else {
                     setActiveRole(null); 
                     setError(''); 
@@ -332,7 +353,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
                         {loading ? 'Sending...' : 'Send Reset OTP'}
                       </button>
                     </>
-                  ) : (
+                  ) : !otpVerified ? (
                     <>
                       <div style={{ marginBottom: 20 }}>
                         <label style={styles.label}>Enter 6-Digit OTP</label>
@@ -345,6 +366,22 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
                           maxLength={6}
                         />
                       </div>
+                      {error && (
+                        <div style={{ ...styles.errorBanner, display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <AlertCircle size={16} /> {error}
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={handleVerifyOtp}
+                        disabled={loading}
+                        style={{ ...styles.submitBtn, background: activeRole.color, padding: '14px', fontSize: 16, opacity: loading ? 0.7 : 1 }}
+                      >
+                        {loading ? 'Verifying...' : 'Verify OTP'}
+                      </button>
+                    </>
+                  ) : (
+                    <>
                       <div style={{ marginBottom: 20 }}>
                         <label style={styles.label}>New Password</label>
                         <input
@@ -362,11 +399,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
                       )}
                       <button
                         type="button"
-                        onClick={handleVerifyOtp}
+                        onClick={handleResetPassword}
                         disabled={loading}
                         style={{ ...styles.submitBtn, background: activeRole.color, padding: '14px', fontSize: 16, opacity: loading ? 0.7 : 1 }}
                       >
-                        {loading ? 'Verifying...' : 'Verify OTP'}
+                        {loading ? 'Resetting...' : 'Reset Password'}
                       </button>
                     </>
                   )}
@@ -411,7 +448,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
                       required
                     >
                       <option value="" disabled>Select your district</option>
-                      {['Ranchi', 'East Singhbhum', 'Dhanbad', 'Bokaro', 'Hazaribagh', 'Palamu', 'Deoghar', 'Giridih', 'Ramgarh', 'West Singhbhum', 'Dumka'].map(d => (
+                      {JHARKHAND_DISTRICTS.map(d => (
                         <option key={d} value={d}>{d}</option>
                       ))}
                     </select>
