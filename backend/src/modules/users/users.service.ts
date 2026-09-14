@@ -6,10 +6,14 @@ import {
 } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { UserRole } from '../../common/constants/roles.enum';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   async getProfile(userId: string) {
     const admin = this.supabaseService.getAdminClient();
@@ -89,7 +93,7 @@ export class UsersService {
     return data;
   }
 
-  async verifyUser(targetUserId: string, callerRole: UserRole, status: boolean = true) {
+  async verifyUser(targetUserId: string, callerRole: UserRole, action: 'verify' | 'reject' | 'reverify' = 'verify') {
     if (callerRole !== UserRole.SUPER_ADMIN && callerRole !== UserRole.GOVT_VIEWER) {
       throw new ForbiddenException({
         statusCode: 403,
@@ -99,9 +103,21 @@ export class UsersService {
     }
 
     const admin = this.supabaseService.getAdminClient();
+    
+    let isVerified = false;
+    if (action === 'verify') isVerified = true;
+    
+    // Perform ban if rejected
+    if (action === 'reject') {
+      await admin.auth.admin.updateUserById(targetUserId, { ban_duration: '87600h' });
+    } else if (action === 'verify') {
+      // Unban if they were previously banned and are now verified
+      await admin.auth.admin.updateUserById(targetUserId, { ban_duration: 'none' });
+    }
+
     const { data, error } = await admin
       .from('users')
-      .update({ verified: status })
+      .update({ verified: isVerified })
       .eq('id', targetUserId)
       .select()
       .single();
@@ -112,6 +128,11 @@ export class UsersService {
         message: error.message,
         errorCode: 'VERIFY_FAILED',
       });
+    }
+
+    // Send email notification
+    if (data && data.email && data.name) {
+      this.notificationsService.sendVerificationEmail(data.email, data.name, action, data.role);
     }
 
     return data;

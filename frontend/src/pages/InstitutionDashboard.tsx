@@ -645,6 +645,7 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                     <span style={{ fontSize: '12px', fontWeight: 700, padding: '4px 10px', borderRadius: '6px', background: '#ede9fe', color: '#6d28d9' }}>{c.category || 'General'}</span>
+                    <span style={{ fontSize: '12px', fontWeight: 700, padding: '4px 10px', borderRadius: '6px', background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }}>{c.status.replace('_', ' ').toUpperCase()}</span>
                     {c.district && <span style={{ fontSize: '12px', color: '#64748b' }}>{c.district}</span>}
                     {c.location_text && (
                       <a 
@@ -925,6 +926,24 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
                       }}
                     >
                       <FileText size={16} /> Proposal Submitted
+                    </button>
+                  ) : c.status !== 'routed' ? (
+                    <button 
+                      disabled
+                      style={{
+                        background: '#f1f5f9',
+                        color: '#94a3b8',
+                        border: '1px solid #e2e8f0',
+                        padding: '10px 18px',
+                        borderRadius: '8px',
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        cursor: 'not-allowed'
+                      }}
+                    >
+                      <AlertCircle size={16} /> Bidding Not Open
                     </button>
                   ) : (
                     <button 

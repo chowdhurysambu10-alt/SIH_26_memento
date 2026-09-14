@@ -176,4 +176,52 @@ export class ChallengesController {
   ) {
     return this.challengesService.approveProposal(id, proposalId, user);
   }
+
+  @Patch(':id/proposals/:proposalId/reject')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.GOVT_VIEWER)
+  @ApiOperation({
+    summary: 'Reject a proposal (bid) for a challenge',
+  })
+  async rejectProposal(
+    @Param('id') id: string,
+    @Param('proposalId') proposalId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.challengesService.rejectProposal(id, proposalId, user);
+  }
+
+  @Patch(':id/proposals/clean-rejected')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.GOVT_VIEWER)
+  @ApiOperation({
+    summary: 'Clean (delete) all rejected proposals (bids) for a challenge',
+  })
+  async cleanRejectedBids(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.challengesService.cleanRejectedBids(id, user);
+  }
+
+  @Post('admin/export-archive')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.GOVT_VIEWER)
+  @ApiOperation({
+    summary: 'Export completed challenges to Excel',
+  })
+  async exportArchiveData(
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.challengesService.exportArchiveData(user);
+  }
+
+  @Post('admin/purge-archive')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.GOVT_VIEWER)
+  @ApiOperation({
+    summary: 'Purge exported challenges from database',
+  })
+  async purgeArchivedChallenges(
+    @Body('challengeIds') challengeIds: string[],
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.challengesService.purgeArchivedChallenges(challengeIds, user);
+  }
 }

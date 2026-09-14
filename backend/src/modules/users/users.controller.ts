@@ -44,9 +44,9 @@ export class UsersController {
   async verifyAccount(
     @Param('id') targetId: string,
     @CurrentUser() user: AuthenticatedUser,
-    @Body('status') status?: boolean,
+    @Body('action') action: 'verify' | 'reject' | 'reverify' = 'verify',
   ) {
-    return this.usersService.verifyUser(targetId, user.role, status ?? true);
+    return this.usersService.verifyUser(targetId, user.role, action);
   }
 
   @Get()
@@ -62,6 +62,16 @@ export class UsersController {
     // Prevent institutions from fetching all citizens/students
     const safeRole = user.role === UserRole.UNIVERSITY_ADMIN ? UserRole.UNIVERSITY_ADMIN : role;
     return this.usersService.getAllUsers(safeRole, district);
+  }
+
+  @Patch(':id/profile')
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Update any user profile (Super Admin only)' })
+  async updateAnyProfile(
+    @Param('id') targetId: string,
+    @Body() updates: { name?: string; email?: string; contact?: string; district?: string },
+  ) {
+    return this.usersService.updateProfile(targetId, updates);
   }
 
   @Delete(':id')

@@ -10,6 +10,8 @@ import { SupabaseService } from '../supabase/supabase.service';
 import { ClassificationService } from '../ai/classification.service';
 import { SettingsService } from '../settings/settings.service';
 import { CreateChallengeDto } from './dto/create-challenge.dto';
+import { CompressionUtil } from '../../utils/compression.util';
+import * as xlsx from 'xlsx';
 import { FilterChallengeDto } from './dto/filter-challenge.dto';
 import { OverrideRoutingDto } from './dto/override-routing.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
@@ -69,7 +71,7 @@ export class ChallengesService implements OnModuleInit {
   ) {
     const admin = this.supabaseService.getAdminClient();
     const mediaUrls = [...(dto.media_urls || [])];
-    const settings = this.settingsService.getSettings();
+    const settings = await this.settingsService.getSettings();
 
     if (settings.maintenanceMode) {
       throw new ForbiddenException('The platform is currently in maintenance mode. New submissions are disabled temporarily.');
@@ -85,11 +87,29 @@ export class ChallengesService implements OnModuleInit {
       if (file.size > settings.maxAttachmentSizeMB * 1024 * 1024) {
         throw new BadRequestException(`File size exceeds the maximum limit of ${settings.maxAttachmentSizeMB}MB.`);
       }
+      let uploadBuffer = file.buffer;
+      let originalName = file.originalname;
+      let mimeType = file.mimetype;
+
+      try {
+        if (mimeType.startsWith('image/')) {
+          const sharp = require('sharp');
+          uploadBuffer = await sharp(file.buffer)
+            .resize({ width: 1920, withoutEnlargement: true })
+            .webp({ quality: 80 })
+            .toBuffer();
+          originalName = originalName.replace(/\.[^/.]+$/, "") + ".webp";
+          mimeType = 'image/webp';
+        }
+      } catch (e) {
+        this.logger.warn(`Image compression failed for ${file.originalname}: ${e.message}`);
+      }
+
       try {
         const uploadRes = await this.supabaseService.uploadFile(
-          file.buffer,
-          file.originalname,
-          file.mimetype,
+          uploadBuffer,
+          originalName,
+          mimeType,
         );
         if (uploadRes && uploadRes.url) {
           mediaUrls.push(uploadRes.url);
@@ -97,7 +117,7 @@ export class ChallengesService implements OnModuleInit {
       } catch (err) {
         this.logger.warn(`Supabase Storage upload notice: ${err.message}. Using high-fidelity Data URI fallback...`);
         // Guaranteed fallback so the uploaded photo is never lost
-        const base64Data = `data:${file.mimetype || 'image/jpeg'};base64,${file.buffer.toString('base64')}`;
+        const base64Data = `data:${mimeType || 'image/jpeg'};base64,${uploadBuffer.toString('base64')}`;
         mediaUrls.push(base64Data);
       }
     }
@@ -208,7 +228,7 @@ export class ChallengesService implements OnModuleInit {
           model_used: providerUsed || 'gemma-3.5-flash-lite',
           ai_category: classification.categoryName,
           ai_priority_score: importance,          // computed importance score
-          ai_confidence: classification.priorityScore / 100, // raw AI severity (0-1)
+          ai_confidence: importance,              // Requested by user: store importance score instead of raw severity
           ai_summary: JSON.stringify({
             categorySlug: classification.categorySlug,
             rawSeverityScore: classification.priorityScore,
@@ -642,8 +662,8 @@ export class ChallengesService implements OnModuleInit {
 
     // Check challenge status
     const existing = await this.getChallengeById(id, user);
-    if (existing.status !== ChallengeStatus.SUBMITTED && existing.status !== ChallengeStatus.ROUTED) {
-      throw new BadRequestException('Challenge is not open for proposals.');
+    if (existing.status !== ChallengeStatus.ROUTED) {
+      throw new BadRequestException('Challenge is not open for proposals. It must be routed to institutions first.');
     }
 
     if (!dto.proposal_text || !dto.budget_estimate || !dto.timeline_estimate || !(dto.contact_phone || user.contact)) {
@@ -658,7 +678,7 @@ export class ChallengesService implements OnModuleInit {
         institution_id: orgId,
         budget_estimate: dto.budget_estimate,
         timeline_estimate: dto.timeline_estimate,
-        proposal_text: dto.proposal_text,
+        proposal_text: CompressionUtil.compressText(dto.proposal_text),
         contact_email: user.email,
         contact_phone: dto.contact_phone || user.contact,
         is_verified: true // Institutions able to use the platform are verified
@@ -693,6 +713,13 @@ export class ChallengesService implements OnModuleInit {
       .order('created_at', { ascending: false });
 
     if (error) throw new BadRequestException(error.message);
+    
+    if (data) {
+      data.forEach(p => {
+        if (p.proposal_text) p.proposal_text = CompressionUtil.decompressText(p.proposal_text);
+      });
+    }
+    
     return data || [];
   }
 
@@ -706,6 +733,13 @@ export class ChallengesService implements OnModuleInit {
       .order('created_at', { ascending: false });
 
     if (error) throw new BadRequestException(error.message);
+    
+    if (data) {
+      data.forEach(p => {
+        if (p.proposal_text) p.proposal_text = CompressionUtil.decompressText(p.proposal_text);
+      });
+    }
+    
     return data || [];
   }
 
@@ -751,6 +785,119 @@ export class ChallengesService implements OnModuleInit {
       .eq('id', id);
       
     return updatedProp;
+  }
+
+  async rejectProposal(id: string, proposalId: string, user: AuthenticatedUser) {
+    const admin = this.supabaseService.getAdminClient();
+    
+    // 1. Fetch proposal
+    const { data: proposal, error: propErr } = await admin
+      .from('proposals')
+      .select('*')
+      .eq('id', proposalId)
+      .eq('challenge_id', id)
+      .single();
+      
+    if (propErr || !proposal) {
+      throw new NotFoundException('Proposal not found');
+    }
+    
+    // 2. Reject the proposal
+    const { data: updatedProp, error: updateErr } = await admin
+      .from('proposals')
+      .update({ status: 'rejected' })
+      .eq('id', proposalId)
+      .select()
+      .single();
+      
+    if (updateErr) throw new BadRequestException('Failed to reject proposal');
+      
+    return updatedProp;
+  }
+
+  async cleanRejectedBids(id: string, user: AuthenticatedUser) {
+    const admin = this.supabaseService.getAdminClient();
+    
+    // Delete proposals for the challenge that have status 'rejected'
+    const { data, error } = await admin
+      .from('proposals')
+      .delete()
+      .eq('challenge_id', id)
+      .eq('status', 'rejected')
+      .select();
+      
+    if (error) {
+      throw new BadRequestException('Failed to clean rejected bids');
+    }
+    
+    return { success: true, count: data?.length || 0 };
+  }
+
+  async exportArchiveData(user: AuthenticatedUser) {
+    const admin = this.supabaseService.getAdminClient();
+    
+    // Fetch all completed/resolved challenges with their proposals
+    const { data: challenges, error: fetchErr } = await admin
+      .from('challenges')
+      .select('*, proposals(*)')
+      .in('status', ['completed', 'resolved']);
+      
+    if (fetchErr) throw new BadRequestException('Failed to fetch completed challenges');
+    if (!challenges || challenges.length === 0) return { success: true, archived: 0 };
+    
+    // Flatten data for Excel
+    const flatData = challenges.map(c => {
+      // Find the winning/assigned proposal if any
+      const winningProposal = c.proposals?.find((p: any) => p.institution_id === c.assigned_institution_id);
+      return {
+        'Challenge ID': c.id,
+        'Title': c.title,
+        'Status': c.status,
+        'Category': c.category,
+        'Priority Score': c.priority_score,
+        'Submitted By (User ID)': c.submitted_by,
+        'Assigned Institution ID': c.assigned_institution_id || 'None',
+        'Winning Mentor Name': winningProposal ? (winningProposal.mentor_name || 'N/A') : 'N/A',
+        'Winning Team Names': winningProposal ? (winningProposal.team_members?.join(', ') || 'N/A') : 'N/A',
+        'Estimated Budget (Rs)': winningProposal ? (winningProposal.estimated_budget_rs || 0) : 0,
+        'Estimated Time (Days)': winningProposal ? (winningProposal.estimated_time_days || 0) : 0,
+        'Total Bids': c.proposals?.length || 0,
+        'Created At': c.created_at,
+      };
+    });
+
+    // Create Excel Workbook
+    const worksheet = xlsx.utils.json_to_sheet(flatData);
+    const workbook = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(workbook, worksheet, 'Archived Challenges');
+
+    // Generate Base64 string
+    const excelBase64 = xlsx.write(workbook, { type: 'base64', bookType: 'xlsx' });
+    const fileName = `archive_completed_${Date.now()}.xlsx`;
+    const challengeIds = challenges.map(c => c.id);
+    
+    // We NO LONGER delete from the database here or upload to Supabase storage.
+    // The deletion will happen in a separate step ONLY after the client successfully downloads it.
+    
+    return { success: true, archived: challenges.length, excelBase64, fileName, challengeIds };
+  }
+
+  async purgeArchivedChallenges(challengeIds: string[], user: AuthenticatedUser) {
+    if (!challengeIds || challengeIds.length === 0) {
+      return { success: true, count: 0 };
+    }
+    
+    const admin = this.supabaseService.getAdminClient();
+    
+    // Delete them from active database
+    const { error: delErr } = await admin
+      .from('challenges')
+      .delete()
+      .in('id', challengeIds);
+      
+    if (delErr) throw new BadRequestException('Failed to purge challenges from database');
+    
+    return { success: true, count: challengeIds.length };
   }
 
   /**

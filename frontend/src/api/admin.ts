@@ -14,6 +14,19 @@ export const adminApi = {
     return Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : []);
   },
 
+  exportArchiveData: async (): Promise<any> => {
+    return apiClient<any>('/challenges/admin/export-archive', {
+      method: 'POST',
+    });
+  },
+
+  purgeArchivedChallenges: async (challengeIds: string[]): Promise<any> => {
+    return apiClient<any>('/challenges/admin/purge-archive', {
+      method: 'POST',
+      body: JSON.stringify({ challengeIds }),
+    });
+  },
+
   getVerificationRequests: async (): Promise<any[]> => {
     try {
       const users = await adminApi.getAllUsers();
@@ -40,10 +53,17 @@ export const adminApi = {
     return { success: true, message: 'User role updated' };
   },
 
-  verifyUser: async (userId: string, status: boolean = true): Promise<any> => {
+  verifyUser: async (userId: string, action: 'verify' | 'reject' | 'reverify' = 'verify'): Promise<any> => {
     return apiClient<any>(`/users/${userId}/verify`, {
       method: 'PATCH',
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ action }),
+    });
+  },
+
+  updateUserDetails: async (userId: string, updates: { name?: string; email?: string; contact?: string; district?: string }): Promise<any> => {
+    return apiClient<any>(`/users/${userId}/profile`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
     });
   },
 
@@ -73,7 +93,7 @@ export const adminApi = {
   },
 
   getSettings: async (): Promise<any> => {
-    return apiClient<any>('/settings');
+    return apiClient<any>(`/settings?t=${Date.now()}`);
   },
 
   updateSettings: async (updates: any): Promise<any> => {

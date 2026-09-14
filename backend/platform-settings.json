@@ -1,0 +1,11 @@
+{
+  "maintenanceMode": false,
+  "aiAutoTriage": true,
+  "allowPublicComments": true,
+  "dataRetentionDays": 365,
+  "enforceGeolocation": true,
+  "maxAttachmentSizeMB": 10,
+  "enableCommunityChat": true,
+  "systemBannerText": "",
+  "enableEmailService": true
+}

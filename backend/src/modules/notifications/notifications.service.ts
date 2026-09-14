@@ -1,5 +1,6 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, forwardRef, Inject } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
+import { SettingsService } from '../settings/settings.service';
 import * as nodemailer from 'nodemailer';
 
 @Injectable()
@@ -7,7 +8,10 @@ export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
   private transporter: nodemailer.Transporter;
 
-  constructor(private readonly supabaseService: SupabaseService) {
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    @Inject(forwardRef(() => SettingsService)) private readonly settingsService: SettingsService
+  ) {
     this.transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
@@ -112,6 +116,12 @@ export class NotificationsService {
     if (!users || users.length === 0) return { message: 'No users found for this role' };
 
     if (method === 'email') {
+      const settings = await this.settingsService.getSettings();
+      if (!settings.enableEmailService) {
+        this.logger.log(`Skipped broadcasting emails (Email Service Disabled)`);
+        return { message: 'Emails were not sent because the email service is disabled globally.' };
+      }
+
       const emailPromises = users.map(u => 
         this.transporter.sendMail({
           from: `"Memento Portal" <${process.env.SMTP_USER}>`,
@@ -145,6 +155,61 @@ export class NotificationsService {
       if (insertError) throw new BadRequestException(insertError.message);
 
       return { success: true, count: users.length, message: `Broadcasted to ${users.length} users` };
+    }
+  }
+
+  async sendVerificationEmail(email: string, name: string, action: 'verify' | 'reject' | 'reverify', role: string = 'university_admin') {
+    let subject = '';
+    let message = '';
+    
+    const roleType = role === 'student' ? 'student' : 'institution';
+
+    if (action === 'verify') {
+      subject = 'Verification Approved - Memento Portal';
+      message = `<h2 style="color: #16a34a;">Congratulations, ${name}!</h2>
+        <p>Your ${roleType} account has been successfully verified on the Memento Portal.</p>
+        <p>You now have full access to participate on the platform.</p>`;
+    } else if (action === 'reject') {
+      subject = 'Verification Rejected - Memento Portal';
+      message = `<h2 style="color: #dc2626;">Verification Rejected</h2>
+        <p>Dear ${name},</p>
+        <p>We regret to inform you that your verification request has been rejected, and your account has been disabled.</p>
+        <p>If you believe this was a mistake, please contact support.</p>`;
+    } else if (action === 'reverify') {
+      subject = 'Action Required: Verification Pending - Memento Portal';
+      if (role === 'student') {
+        message = `<h2 style="color: #ea580c;">Action Required: Verification Pending</h2>
+          <p>Dear ${name},</p>
+          <p>We are currently reviewing your student verification request.</p>
+          <p>Please log in to the portal and follow the formal process for requesting verification, ensuring you have provided a valid student ID card or letter from your institution.</p>`;
+      } else {
+        message = `<h2 style="color: #ea580c;">Action Required: Verification Pending</h2>
+          <p>Dear ${name},</p>
+          <p>We are currently reviewing your verification request but require additional proof of documentation.</p>
+          <p>Please reply directly to this email with a clear soft copy or photocopy of your official institutional documentation to proceed.</p>`;
+      }
+    }
+
+    const settings = await this.settingsService.getSettings();
+    if (!settings.enableEmailService) {
+      this.logger.log(`Skipped sending ${action} email to ${email} (Email Service Disabled)`);
+      return;
+    }
+
+    try {
+      await this.transporter.sendMail({
+        from: `"Memento Portal" <${process.env.SMTP_USER}>`,
+        to: email,
+        subject: subject,
+        html: `<div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+          ${message}
+          <hr style="border: none; border-top: 1px solid #eaeaea; margin: 20px 0;" />
+          <p style="font-size: 12px; color: #666;">This is an automated administrative email from the Memento portal.</p>
+        </div>`
+      });
+      this.logger.log(`Sent ${action} email to ${email}`);
+    } catch (err) {
+      this.logger.error(`Failed to send ${action} email to ${email}: ${err.message}`);
     }
   }
 }

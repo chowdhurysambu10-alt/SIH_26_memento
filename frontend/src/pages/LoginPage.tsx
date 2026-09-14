@@ -17,21 +17,24 @@ import {
   ChevronLeft
 } from 'lucide-react';
 
+import { useIsMobile } from '../hooks/useMediaQuery';
+
 interface LoginPageProps {
   onSuccess: () => void;
   onBack?: () => void;
 }
 
 const ROLES = [
-  { id: 'student', label: 'Student Portal', icon: GraduationCap, backendRole: 'student', color: '#10b981', desc: 'Join projects and earn credits' },
-  { id: 'institution', label: 'Institution Portal', icon: Building, backendRole: 'university_admin', color: '#8b5cf6', desc: 'Manage civic initiatives' },
-  { id: 'admin', label: 'Admin Portal', icon: Shield, backendRole: 'super_admin', color: '#ef4444', desc: 'Site control and oversight' },
-  { id: 'citizen', label: 'Citizen Portal', icon: Users, backendRole: 'citizen', color: '#3b82f6', desc: 'Report and support issues' },
+  { id: 'student', label: 'Continue as Student', icon: GraduationCap, backendRole: 'student', color: '#10b981', desc: 'Join projects and earn credits' },
+  { id: 'institution', label: 'Continue as Institution', icon: Building, backendRole: 'university_admin', color: '#8b5cf6', desc: 'Manage civic initiatives' },
+  { id: 'admin', label: 'Continue as Admin', icon: Shield, backendRole: 'super_admin', color: '#ef4444', desc: 'Site control and oversight' },
+  { id: 'citizen', label: 'Continue as Citizen', icon: Users, backendRole: 'citizen', color: '#3b82f6', desc: 'Report and support issues' },
 ];
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
   const { user, login, signup, logout } = useAuth();
   const { showAlert } = useUI();
+  const isMobile = useIsMobile();
 
   const [activeRole, setActiveRole] = useState<typeof ROLES[0] | null>(null);
   const [isSignUp, setIsSignUp] = useState(false);
@@ -171,16 +174,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
 
   if (user) {
     return (
-      <div style={styles.pageWrapper}>
-        <div style={styles.brandPanel}>
+      <div style={{ ...styles.pageWrapper, flexDirection: isMobile ? 'column' : 'row' }}>
+        <div style={{ ...styles.brandPanel, width: isMobile ? '100%' : '42%', padding: isMobile ? '32px 24px' : '60px 48px' }}>
           <div>
             <div style={{ marginBottom: 16 }}><Globe size={48} color="#fff" /></div>
             <h1 style={{ fontSize: 32, fontWeight: 700, color: '#fff', margin: '0 0 8px' }}>Memento</h1>
             <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.8)', margin: 0, lineHeight: 1.6 }}>Societal Innovation & Collaboration Platform</p>
           </div>
         </div>
-        <div style={styles.formPanel}>
-          <div style={styles.formInner}>
+        <div style={{ ...styles.formPanel, padding: isMobile ? '24px' : '40px 48px' }}>
+          <div style={{ ...styles.formInner, maxWidth: isMobile ? '100%' : 480 }}>
             <div style={{ textAlign: 'center', marginBottom: 32 }}>
               <div style={{ marginBottom: 12 }}><CheckCircle2 size={48} color="#2563eb" style={{ margin: '0 auto' }} /></div>
               <h2 style={{ fontSize: 28, fontWeight: 700, color: '#0f172a', margin: '0 0 8px' }}>Welcome, {user.name || 'User'}!</h2>
@@ -198,15 +201,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
   }
 
   return (
-    <div style={styles.pageWrapper}>
-      <div style={{ ...styles.brandPanel, background: activeRole ? `linear-gradient(135deg, ${activeRole.color} 0%, #1e40af 100%)` : styles.brandPanel.background }}>
+    <div style={{ ...styles.pageWrapper, flexDirection: isMobile ? 'column' : 'row' }}>
+      <div style={{ ...styles.brandPanel, width: isMobile ? '100%' : '42%', padding: isMobile ? '32px 24px' : '60px 48px', background: activeRole ? `linear-gradient(135deg, ${activeRole.color} 0%, #1e40af 100%)` : styles.brandPanel.background }}>
         <div style={{ transition: 'all 0.3s ease' }}>
-          <div style={{ marginBottom: 16 }}><Globe size={48} color="#fff" /></div>
-          <h1 style={{ fontSize: 32, fontWeight: 700, color: '#fff', margin: '0 0 8px' }}>Memento</h1>
-          <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.8)', margin: 0, lineHeight: 1.6 }}>Societal Innovation &<br />Collaboration Platform</p>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 8 }}>by Team Memento · SIH26043</p>
+          <div style={{ marginBottom: 16, display: isMobile ? 'none' : 'block' }}><Globe size={48} color="#fff" /></div>
+          <h1 style={{ fontSize: isMobile ? 24 : 32, fontWeight: 700, color: '#fff', margin: '0 0 8px' }}>Memento</h1>
+          {!isMobile && <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.8)', margin: 0, lineHeight: 1.6 }}>Societal Innovation &<br />Collaboration Platform</p>}
+          {!isMobile && <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 8 }}>by Team Memento · SIH26043</p>}
           
-          {activeRole && (
+          {activeRole && !isMobile && (
             <div style={{ marginTop: 40, padding: '24px', background: 'rgba(255,255,255,0.1)', borderRadius: 16, backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.2)' }}>
               <activeRole.icon size={32} color="#fff" style={{ marginBottom: 12 }} />
               <h3 style={{ color: '#fff', margin: '0 0 8px', fontSize: '20px' }}>{activeRole.label}</h3>
@@ -218,8 +221,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
         </div>
       </div>
 
-      <div style={styles.formPanel}>
-        <div style={styles.formInner}>
+      <div style={{ ...styles.formPanel, padding: isMobile ? '24px' : '40px 48px' }}>
+        <div style={{ ...styles.formInner, maxWidth: isMobile ? '100%' : 480 }}>
           {!activeRole ? (
             // ROLE SELECTION STEP
             <div>
@@ -227,7 +230,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
                 ← Back to Home
               </button>
               <h2 style={{ fontSize: 28, fontWeight: 700, color: '#0f172a', margin: '0 0 8px' }}>
-                Select Your Portal
+                Select Your Role
               </h2>
               <p style={{ color: '#64748b', fontSize: 15, margin: '0 0 32px' }}>
                 Choose how you want to log in to Memento to access tailored features.
@@ -277,7 +280,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
                 }} 
                 style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: 24, color: '#64748b', background: 'none', border: 'none', fontSize: '14px', fontWeight: 500, cursor: 'pointer' }}
               >
-                <ChevronLeft size={16} /> {isForgotPassword ? 'Back to Login' : 'Back to Portals'}
+                <ChevronLeft size={16} /> {isForgotPassword ? 'Back to Login' : 'Back to Roles'}
               </button>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>

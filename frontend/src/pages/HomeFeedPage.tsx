@@ -78,9 +78,9 @@ export const HomeFeedPage: React.FC<{ onNavigateLogin: () => void; onNavigateSub
     setHasMore(true);
   }, [sortBy, searchQuery]);
 
-  const handleSearch = (q: string) => {
+  const handleSearch = useCallback((q: string) => {
     setSearchQuery(q);
-  };
+  }, []);
 
   const lastElementRef = useCallback((node: HTMLDivElement | null) => {
     if (isLoading || loadingMore || !hasMore) return;

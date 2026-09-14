@@ -27,10 +27,10 @@ const MyPostedProblemItem: React.FC<{ challenge: Challenge; onDeleted?: (id: str
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  
+
   const [currentTitle, setCurrentTitle] = useState(challenge.title || 'Untitled Challenge');
   const [currentDescription, setCurrentDescription] = useState(challenge.description || '');
-  
+
   const [editTitle, setEditTitle] = useState(currentTitle);
   const [editDescription, setEditDescription] = useState(currentDescription);
 
@@ -73,7 +73,7 @@ const MyPostedProblemItem: React.FC<{ challenge: Challenge; onDeleted?: (id: str
   if (isDeleted) return null;
 
   return (
-    <div 
+    <div
       style={{ padding: '16px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0', transition: 'all 0.2s' }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -93,7 +93,7 @@ const MyPostedProblemItem: React.FC<{ challenge: Challenge; onDeleted?: (id: str
           </span>
         </div>
       </div>
-      
+
       {isEditing ? (
         <div style={{ marginBottom: '16px', marginTop: '12px' }}>
           <input
@@ -136,7 +136,7 @@ const MyPostedProblemItem: React.FC<{ challenge: Challenge; onDeleted?: (id: str
           <p style={{ fontSize: '14px', color: '#475569', lineHeight: 1.6, whiteSpace: 'pre-wrap', marginBottom: '0' }}>
             {currentDescription}
           </p>
-          
+
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: '12px' }}>
             <div>
               {challenge.ai_summary && (
@@ -144,13 +144,13 @@ const MyPostedProblemItem: React.FC<{ challenge: Challenge; onDeleted?: (id: str
                   <strong>AI Analysis: </strong> {challenge.ai_summary}
                 </div>
               )}
-                {challenge.institutions?.name && challenge.assigned_institution_id && challenge.status !== 'submitted' && challenge.status !== 'under_review' && (
-                  <div style={{ marginTop: '8px', fontSize: '12px', color: '#047857', background: '#d1fae5', padding: '4px 8px', borderRadius: '4px', display: 'inline-block' }}>
-                    <strong>Assigned to: </strong> {challenge.institutions.name}
-                  </div>
-                )}
+              {challenge.institutions?.name && challenge.assigned_institution_id && challenge.status !== 'submitted' && challenge.status !== 'under_review' && (
+                <div style={{ marginTop: '8px', fontSize: '12px', color: '#047857', background: '#d1fae5', padding: '4px 8px', borderRadius: '4px', display: 'inline-block' }}>
+                  <strong>Assigned to: </strong> {challenge.institutions.name}
+                </div>
+              )}
             </div>
-            
+
             <div style={{ display: 'flex', gap: '8px', flexShrink: 0, opacity: isHovered ? 1 : 0, pointerEvents: isHovered ? 'auto' : 'none', transition: 'opacity 0.2s' }}>
               <button
                 type="button"
@@ -217,10 +217,20 @@ export const StatisticsPage: React.FC<StatisticsPageProps> = ({ hideMyProblems =
     loadStats();
   }, []);
 
+  const myChallenges = user ? challenges.filter((c) => c.submitted_by === user.id) : [];
+
+  // For Admin (hideMyProblems = true), show global stats
   const totalChallenges = overview?.totals?.challenges ?? challenges.length;
   const resolvedChallenges = (overview?.statusBreakdown?.completed || 0) + (overview?.statusBreakdown?.validated || 0);
-  const pendingChallenges = Math.max(0, totalChallenges - resolvedChallenges);
-  const myChallenges = user ? challenges.filter((c) => c.submitted_by === user.id) : [];
+  const adminPendingReview = (overview?.statusBreakdown?.submitted || 0) + (overview?.statusBreakdown?.under_review || 0);
+  // Under Action = Total - Resolved - Pending Review
+  const adminUnderAction = Math.max(0, totalChallenges - resolvedChallenges - adminPendingReview);
+
+  // For User, show local stats
+  const myTotal = myChallenges.length;
+  const myResolved = myChallenges.filter(c => ['completed', 'validated'].includes(c.status)).length;
+  const myPendingReview = myChallenges.filter(c => ['submitted', 'under_review'].includes(c.status)).length;
+  const myUnderAction = myChallenges.filter(c => ['routed', 'team_formed', 'in_progress'].includes(c.status)).length;
 
   // Trending problems sorted by support count (greater than 0)
   const trendingProblems = challenges
@@ -313,23 +323,46 @@ export const StatisticsPage: React.FC<StatisticsPageProps> = ({ hideMyProblems =
         <div className="statistics-dashboard">
           {/* Overview Stats */}
           <div className="stats-overview">
-            <div className="stat-box">
-              <h4>Total Challenges</h4>
-              <p>{totalChallenges}</p>
-            </div>
-            <div className="stat-box">
-              <h4>Resolved</h4>
-              <p style={{ color: '#16a34a' }}>{resolvedChallenges}</p>
-            </div>
-            <div className="stat-box">
-              <h4>Under Action</h4>
-              <p style={{ color: '#eab308' }}>{pendingChallenges}</p>
-            </div>
-            {user && !hideMyProblems && (
-              <div className="stat-box" style={{ background: '#eff6ff', borderColor: '#bfdbfe' }}>
-                <h4>My Posts</h4>
-                <p style={{ color: '#2563eb' }}>{myChallenges.length}</p>
-              </div>
+            {hideMyProblems ? (
+              /* Global Admin Stats */
+              <>
+                <div className="stat-box">
+                  <h4>Total Challenges</h4>
+                  <p>{totalChallenges}</p>
+                </div>
+                <div className="stat-box">
+                  <h4>Pending Review</h4>
+                  <p style={{ color: '#f97316' }}>{adminPendingReview}</p>
+                </div>
+                <div className="stat-box">
+                  <h4>Under Action</h4>
+                  <p style={{ color: '#eab308' }}>{adminUnderAction}</p>
+                </div>
+                <div className="stat-box">
+                  <h4>Resolved</h4>
+                  <p style={{ color: '#16a34a' }}>{resolvedChallenges}</p>
+                </div>
+              </>
+            ) : (
+              /* Personal User Stats */
+              <>
+                <div className="stat-box" style={{ background: '#eff6ff', borderColor: '#bfdbfe' }}>
+                  <h4>My Total Posts</h4>
+                  <p style={{ color: '#2563eb' }}>{myTotal}</p>
+                </div>
+                <div className="stat-box">
+                  <h4>Pending Review</h4>
+                  <p style={{ color: '#f97316' }}>{myPendingReview}</p>
+                </div>
+                <div className="stat-box">
+                  <h4>Under Action</h4>
+                  <p style={{ color: '#eab308' }}>{myUnderAction}</p>
+                </div>
+                <div className="stat-box">
+                  <h4>Resolved</h4>
+                  <p style={{ color: '#16a34a' }}>{myResolved}</p>
+                </div>
+              </>
             )}
           </div>
 

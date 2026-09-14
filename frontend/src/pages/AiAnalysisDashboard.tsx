@@ -62,6 +62,9 @@ export const AiAnalysisDashboard: React.FC = () => {
   const [challenges, setChallenges] = useState<DashboardChallenge[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [search, setSearch] = useState<string>('');
+  const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [filterAnalysisStatus, setFilterAnalysisStatus] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<string>('importance_desc');
   const [expandedSummaryId, setExpandedSummaryId] = useState<string | null>(null);
 
   // Override Modal State
@@ -138,12 +141,56 @@ export const AiAnalysisDashboard: React.FC = () => {
     }
   };
 
-  const filteredChallenges = challenges.filter(
-    (c) =>
-      c.title.toLowerCase().includes(search.toLowerCase()) ||
-      (c.category && c.category.toLowerCase().includes(search.toLowerCase())) ||
-      c.district.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredAndSortedChallenges = challenges
+    .filter((c) => {
+      // 1. Text Search
+      if (search) {
+        const query = search.toLowerCase();
+        if (
+          !c.title.toLowerCase().includes(query) &&
+          !(c.category && c.category.toLowerCase().includes(query)) &&
+          !c.district.toLowerCase().includes(query)
+        ) {
+          return false;
+        }
+      }
+
+      // 2. Category Filter
+      if (filterCategory !== 'all' && c.category !== filterCategory) {
+        return false;
+      }
+
+      // 3. AI Analysis Status Filter
+      if (filterAnalysisStatus !== 'all') {
+        const hasAiAnalysis = c.ai_confidence !== undefined && c.ai_confidence !== null;
+        const confidence = c.ai_confidence !== undefined ? Number(c.ai_confidence) : 0.88;
+        
+        let status = 'Analyzed';
+        if (!hasAiAnalysis) status = 'Not Analyzed';
+
+        if (filterAnalysisStatus !== status) return false;
+      }
+
+      return true;
+    })
+    .sort((a, b) => {
+      const importanceA = a.priority_score || getHierarchicalScore(a.category || '');
+      const importanceB = b.priority_score || getHierarchicalScore(b.category || '');
+      
+      const hierarchicalA = getHierarchicalScore(a.category || '');
+      const hierarchicalB = getHierarchicalScore(b.category || '');
+      
+      const supportA = a.support_count || 0;
+      const supportB = b.support_count || 0;
+
+      switch (sortBy) {
+        case 'importance_desc': return importanceB - importanceA;
+        case 'importance_asc': return importanceA - importanceB;
+        case 'hierarchical_desc': return hierarchicalB - hierarchicalA;
+        case 'support_desc': return supportB - supportA;
+        default: return 0;
+      }
+    });
 
   return (
     <div style={{ maxWidth: '1180px', margin: '0 auto', padding: '24px 20px 80px' }}>
@@ -170,16 +217,48 @@ export const AiAnalysisDashboard: React.FC = () => {
         </button>
       </div>
 
-      {/* Search Input */}
-      <div style={{ marginBottom: '20px', position: 'relative', maxWidth: '400px' }}>
-        <Search size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-        <input
-          type="text"
-          placeholder="Filter by challenge title, category, or district..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{ paddingLeft: '38px', borderRadius: '8px', fontSize: '14px' }}
-        />
+      {/* Controls Container (Search, Filters, Sort) */}
+      <div style={{ marginBottom: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ position: 'relative', flex: '1 1 300px' }}>
+          <Search size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+          <input
+            type="text"
+            placeholder="Search by title, category, or district..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ paddingLeft: '38px', borderRadius: '8px', fontSize: '14px', width: '100%', border: '1px solid #cbd5e1' }}
+          />
+        </div>
+        
+        <select
+          value={filterCategory}
+          onChange={(e) => setFilterCategory(e.target.value)}
+          style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', background: '#fff', outline: 'none', minWidth: '150px' }}
+        >
+          <option value="all">All Categories</option>
+          {CATEGORIES_LIST.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+
+        <select
+          value={filterAnalysisStatus}
+          onChange={(e) => setFilterAnalysisStatus(e.target.value)}
+          style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', background: '#fff', outline: 'none', minWidth: '150px' }}
+        >
+          <option value="all">All AI Statuses</option>
+          <option value="Analyzed">Analyzed</option>
+          <option value="Not Analyzed">Not Analyzed</option>
+        </select>
+
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
+          style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', background: '#fff', outline: 'none', minWidth: '180px' }}
+        >
+          <option value="importance_desc">Sort: Highest Importance</option>
+          <option value="importance_asc">Sort: Lowest Importance</option>
+          <option value="hierarchical_desc">Sort: Hierarchical Score</option>
+          <option value="support_desc">Sort: Most Supported</option>
+        </select>
       </div>
 
       {/* Table Container */}
@@ -189,7 +268,7 @@ export const AiAnalysisDashboard: React.FC = () => {
             <Sparkles size={32} className="animate-spin" style={{ margin: '0 auto 12px', color: '#7c3aed' }} />
             <p>Fetching AI inference logs...</p>
           </div>
-        ) : filteredChallenges.length === 0 ? (
+        ) : filteredAndSortedChallenges.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px', color: '#64748b' }}>
             <p>No challenge records found.</p>
           </div>
@@ -208,7 +287,7 @@ export const AiAnalysisDashboard: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredChallenges.map((c) => {
+                {filteredAndSortedChallenges.map((c) => {
                   const confidence = c.ai_confidence !== undefined ? Number(c.ai_confidence) : 0.88;
 
                   const model = c.model_used || 'gemma-2';
@@ -225,8 +304,6 @@ export const AiAnalysisDashboard: React.FC = () => {
                   let statusBadge = { label: 'Analyzed', color: '#15803d', bg: '#dcfce7', icon: CheckCircle };
                   if (!hasAiAnalysis) {
                     statusBadge = { label: 'Not Analyzed', color: '#92400e', bg: '#fef3c7', icon: Clock };
-                  } else if (confidence < 0.3) {
-                    statusBadge = { label: 'Needs Review', color: '#b91c1c', bg: '#fee2e2', icon: AlertTriangle };
                   }
 
                   const IconComp = statusBadge.icon;

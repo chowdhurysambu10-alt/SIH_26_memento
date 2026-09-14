@@ -193,10 +193,10 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
               />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '20px', marginBottom: '20px' }}>
               <div>
                 <label className="form-label">District *</label>
-                <select value={district} onChange={(e) => setDistrict(e.target.value)}>
+                <select className="input-field" value={district} onChange={(e) => setDistrict(e.target.value)}>
                   <optgroup label="West Bengal">
                     {WEST_BENGAL_DISTRICTS.map((d) => (
                       <option key={d} value={d}>{d}</option>
@@ -212,7 +212,7 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
 
               <div>
                 <label className="form-label">Category (Optional)</label>
-                <select value={category} onChange={(e) => setCategory(e.target.value)}>
+                <select className="input-field" value={category} onChange={(e) => setCategory(e.target.value)}>
                   {CATEGORIES.map((c) => (
                     <option key={c} value={c}>{c}</option>
                   ))}
@@ -234,7 +234,7 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
 
             <div className="input-group" style={{ marginBottom: '24px' }}>
               <label htmlFor="p-location">Exact Location (Optional)</label>
-              <div style={{ display: 'flex', gap: '12px' }}>
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                 <input
                   id="p-location"
                   type="text"
@@ -242,14 +242,14 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
                   placeholder="e.g. Google Maps link or Village Name"
                   value={locationText}
                   onChange={(e) => setLocationText(e.target.value)}
-                  style={{ flex: 1 }}
+                  style={{ flex: '1 1 200px', minWidth: '200px' }}
                 />
                 <button
                   type="button"
                   onClick={handleGetCurrentLocation}
                   disabled={locationLoading}
                   style={{
-                    padding: '0 16px',
+                    padding: '12px 16px',
                     background: '#f8fafc',
                     border: '1px solid #cbd5e1',
                     borderRadius: '8px',
@@ -258,7 +258,9 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
                     cursor: locationLoading ? 'not-allowed' : 'pointer',
                     display: 'flex',
                     alignItems: 'center',
+                    justifyContent: 'center',
                     gap: '8px',
+                    flex: '1 0 auto',
                     whiteSpace: 'nowrap'
                   }}
                 >
@@ -351,11 +353,23 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
                   style={{
                     border: '2px dashed #cbd5e1',
                     borderRadius: '12px',
-                    padding: '24px 16px',
+                    padding: '32px 20px',
                     textAlign: 'center',
                     background: '#f8fafc',
                     cursor: 'pointer',
                     transition: 'all 0.2s',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = '#3b82f6';
+                    e.currentTarget.style.background = '#eff6ff';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = '#cbd5e1';
+                    e.currentTarget.style.background = '#f8fafc';
                   }}
                 >
                   <UploadCloud size={28} style={{ margin: '0 auto 8px', color: '#2563eb' }} />

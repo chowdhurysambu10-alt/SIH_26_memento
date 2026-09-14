@@ -10,7 +10,7 @@ export interface DashboardChallenge {
 
   support_count?: number;
   priority_score?: number;
-  status: 'submitted' | 'under_action' | 'resolved' | 'under_review' | 'claimed' | 'in_progress' | 'completed';
+  status: 'submitted' | 'routed' | 'under_action' | 'resolved' | 'under_review' | 'claimed' | 'in_progress' | 'completed';
   user_id?: string;
   created_at: string;
   ai_summary?: string;
@@ -168,6 +168,18 @@ export const dashboardsApi = {
 
   approveProposal: async (challengeId: string, proposalId: string): Promise<any> => {
     return apiClient<any>(`/challenges/${challengeId}/proposals/${proposalId}/approve`, {
+      method: 'PATCH',
+    });
+  },
+
+  rejectProposal: async (challengeId: string, proposalId: string): Promise<any> => {
+    return apiClient<any>(`/challenges/${challengeId}/proposals/${proposalId}/reject`, {
+      method: 'PATCH',
+    });
+  },
+
+  cleanRejectedBids: async (challengeId: string): Promise<any> => {
+    return apiClient<any>(`/challenges/${challengeId}/proposals/clean-rejected`, {
       method: 'PATCH',
     });
   },

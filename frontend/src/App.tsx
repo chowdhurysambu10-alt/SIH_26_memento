@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Plus } from 'lucide-react';
+import { DesktopModeWarning } from './components/DesktopModeWarning';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { UIProvider } from './context/UIContext';
 import { Header, NavTab } from './components/Header';
@@ -54,10 +55,31 @@ export function AppContent() {
   const [platformSettings, setPlatformSettings] = useState<any>(null);
 
   useEffect(() => {
-    fetch('/api/v1/settings')
-      .then(res => res.ok ? res.json() : null)
-      .then(data => data && setPlatformSettings(data))
-      .catch(() => {});
+    const fetchSettings = () => {
+      fetch(`/api/v1/settings?t=${Date.now()}`)
+        .then(res => res.ok ? res.json() : null)
+        .then(resData => { 
+          if (resData) {
+            // Unwrap from NestJS interceptor format if it exists
+            const actualData = (resData.data !== undefined) ? resData.data : resData;
+            setPlatformSettings(actualData);
+          }
+        })
+        .catch(err => console.error('Failed to fetch settings:', err));
+    };
+
+    const handleSettingsUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail) {
+        setPlatformSettings(customEvent.detail);
+      } else {
+        fetchSettings();
+      }
+    };
+
+    fetchSettings();
+    window.addEventListener('platform-settings-updated', handleSettingsUpdate);
+    return () => window.removeEventListener('platform-settings-updated', handleSettingsUpdate);
   }, []);
 
   useEffect(() => {
@@ -104,13 +126,16 @@ export function AppContent() {
   }
 
   return (
-    <div>
+    <div className="app-container" style={{ position: 'relative' }}>
+      <DesktopModeWarning />
       {platformSettings?.systemBannerText && (
         <div style={{ background: '#f59e0b', color: '#fff', padding: '12px', textAlign: 'center', fontWeight: 600, fontSize: '14px', position: 'sticky', top: 0, zIndex: 1000 }}>
           {platformSettings.systemBannerText}
         </div>
       )}
-      <Header activeTab={activeTab} setActiveTab={setActiveTab} platformSettings={platformSettings} />
+      {!['admin-dashboard', 'institution-dashboard', 'student-dashboard', 'login'].includes(activeTab) && (
+        <Header activeTab={activeTab} setActiveTab={setActiveTab} platformSettings={platformSettings} />
+      )}
 
       {activeTab === 'home' && <LandingPage onNavigate={(tab) => setActiveTab(tab)} />}
 
@@ -126,7 +151,7 @@ export function AppContent() {
 
       {activeTab === 'statistics' && <StatisticsPage />}
 
-      {activeTab === 'community' && <CommunityPage />}
+      {activeTab === 'community' && <CommunityPage platformSettings={platformSettings} />}
 
       {activeTab === 'admin-dashboard' && <AdminPortal />}
       {activeTab === 'institution-dashboard' && <InstitutionPortal />}
@@ -135,13 +160,13 @@ export function AppContent() {
       {activeTab === 'about' && <AboutPage />}
 
       {/* Floating Plus Button */}
-      {isAuthenticated && ((user?.role === 'citizen' && activeTab !== 'about') || (user?.role !== 'citizen' && activeTab === 'feed')) && (
+      {(!isAuthenticated && activeTab !== 'about') || (isAuthenticated && ((user?.role === 'citizen' && activeTab !== 'about') || (user?.role !== 'citizen' && activeTab === 'feed'))) ? (
         <button
           onClick={() => setActiveTab('submit')}
           style={{
             position: 'fixed',
-            bottom: '40px',
-            right: '40px',
+            bottom: '24px',
+            right: '24px',
             width: '60px',
             height: '60px',
             borderRadius: '50%',
@@ -154,7 +179,7 @@ export function AppContent() {
             justifyContent: 'center',
             cursor: 'pointer',
             transition: 'transform 0.2s, background 0.2s',
-            zIndex: 100,
+            zIndex: 1000,
           }}
           onMouseEnter={e => {
             e.currentTarget.style.transform = 'scale(1.05)';
@@ -167,7 +192,7 @@ export function AppContent() {
         >
           <Plus size={28} strokeWidth={2.5} />
         </button>
-      )}
+      ) : null}
     </div>
   );
 }

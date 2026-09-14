@@ -25,6 +25,14 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
   const [broadcasting, setBroadcasting] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editDesc, setEditDesc] = useState('');
+  
+  // User Edit State
+  const [editingUser, setEditingUser] = useState<any | null>(null);
+  const [editUserName, setEditUserName] = useState('');
+  const [editUserEmail, setEditUserEmail] = useState('');
+  const [editUserContact, setEditUserContact] = useState('');
+  const [editUserDistrict, setEditUserDistrict] = useState('');
+
   const [institutions, setInstitutions] = useState<any[]>([]);
   const [editAssignedInstitutionId, setEditAssignedInstitutionId] = useState<string>('');
 
@@ -37,6 +45,7 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
     enforceGeolocation: false,
     maxAttachmentSizeMB: 10,
     enableCommunityChat: true,
+    enableEmailService: true,
     systemBannerText: '',
   });
   const [savingSettings, setSavingSettings] = useState(false);
@@ -114,6 +123,7 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
     setGlobalLoading(true);
     try {
       await adminApi.updateSettings(platformSettings);
+      window.dispatchEvent(new CustomEvent('platform-settings-updated', { detail: platformSettings }));
       showAlert('Settings saved successfully!', 'success');
     } catch (e: any) {
       showAlert('Failed to save settings: ' + e.message, 'error');
@@ -147,6 +157,52 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
     }
   };
 
+  const handleArchiveCompleted = async () => {
+    if (!(await showConfirm('Are you sure you want to archive and permanently delete all completed/resolved challenges? An Excel file will be downloaded first.'))) return;
+    setGlobalLoading(true);
+    try {
+      const res = await adminApi.exportArchiveData();
+      if (res.archived === 0) {
+        showAlert('No completed challenges found to archive.', 'info');
+      } else {
+        if (res.excelBase64) {
+          try {
+            // Convert base64 to Blob and download
+            const byteString = atob(res.excelBase64);
+            const ab = new ArrayBuffer(byteString.length);
+            const ia = new Uint8Array(ab);
+            for (let i = 0; i < byteString.length; i++) {
+              ia[i] = byteString.charCodeAt(i);
+            }
+            const blob = new Blob([ab], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', res.fileName || 'archive.xlsx');
+            document.body.appendChild(link);
+            link.click();
+            link.parentNode?.removeChild(link);
+            window.URL.revokeObjectURL(url);
+            
+            // Only purge if download was successfully triggered
+            await adminApi.purgeArchivedChallenges(res.challengeIds);
+            showAlert(`Successfully exported and purged ${res.archived} challenges!`, 'success');
+          } catch (downloadErr) {
+            console.error('Download failed', downloadErr);
+            showAlert(`Export generated, but failed to download Excel file. Deletion was aborted to prevent data loss.`, 'error');
+          }
+        } else {
+            showAlert(`Failed to generate Excel file. Deletion was aborted.`, 'error');
+        }
+        fetchPosts();
+      }
+    } catch (e: any) {
+      showAlert('Failed to archive challenges: ' + e.message, 'error');
+    } finally {
+      setGlobalLoading(false);
+    }
+  };
+
   const handleDeletePost = async (id: string) => {
     if (!(await showConfirm('Are you sure you want to delete this post?'))) return;
     try {
@@ -160,17 +216,46 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
     }
   };
 
-  const handleVerifyUser = async (id: string, isFromRequestsView = false, status: boolean = true) => {
+  const handleVerifyUser = async (id: string, action: 'verify' | 'reject' | 'reverify', isFromRequestsView = false) => {
     try {
       setGlobalLoading(true);
-      await adminApi.verifyUser(id, status);
+      await adminApi.verifyUser(id, action);
       if (isFromRequestsView) {
         fetchVerificationRequests();
       } else {
         fetchUsers();
       }
-    } catch (e) {
-      showAlert(`Failed to ${status ? 'verify' : 'unverify'} user`, 'error');
+      showAlert(`Verification action '${action}' processed successfully!`, 'success');
+    } catch (e: any) {
+      showAlert(`Failed to process verification action`, 'error');
+    } finally {
+      setGlobalLoading(false);
+    }
+  };
+
+  const openEditUserModal = (u: any) => {
+    setEditingUser(u);
+    setEditUserName(u.name || '');
+    setEditUserEmail(u.email || '');
+    setEditUserContact(u.contact || '');
+    setEditUserDistrict(u.district || '');
+  };
+
+  const handleSaveUserEdit = async () => {
+    if (!editingUser) return;
+    try {
+      setGlobalLoading(true);
+      await adminApi.updateUserDetails(editingUser.id, {
+        name: editUserName,
+        email: editUserEmail,
+        contact: editUserContact,
+        district: editUserDistrict,
+      });
+      showAlert('User details updated successfully!', 'success');
+      setEditingUser(null);
+      fetchUsers(true);
+    } catch (e: any) {
+      showAlert(e.message || 'Failed to update user', 'error');
     } finally {
       setGlobalLoading(false);
     }
@@ -403,6 +488,7 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
                   </div>
                   <ChevronRight size={16} color="#94a3b8" />
                 </button>
+
               </div>
             </div>
           </div>
@@ -450,7 +536,9 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
         <h2 style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>Platform Settings</h2>
         <p style={{ color: '#64748b' }}>Configure global platform behavior.</p>
         
-        <form onSubmit={handleSaveSettings} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '32px', marginTop: '24px', maxWidth: '600px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div style={{ display: 'flex', gap: '24px', marginTop: '24px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <div style={{ flex: '1 1 600px', maxWidth: '600px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <form onSubmit={handleSaveSettings} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
@@ -527,6 +615,21 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
             </label>
           </div>
 
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#0f172a' }}>Enable Email Service</h4>
+              <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#64748b' }}>Allow the backend to send automated emails (e.g., verification, notifications).</p>
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+              <input 
+                type="checkbox" 
+                checked={platformSettings.enableEmailService}
+                onChange={e => setPlatformSettings({...platformSettings, enableEmailService: e.target.checked})}
+                style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+              />
+            </label>
+          </div>
+
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
             <div style={{ flex: 1 }}>
               <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#0f172a', marginBottom: '8px' }}>Data Retention (Days)</h4>
@@ -569,7 +672,67 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
           >
             {savingSettings ? 'Saving...' : 'Save Settings'}
           </button>
-        </form>
+          </form>
+
+          <div style={{ background: '#fff', border: '1px solid #fecaca', borderRadius: '12px', padding: '32px', display: 'flex', flexDirection: 'column', gap: '16px', boxShadow: '0 4px 6px -1px rgba(220, 38, 38, 0.05)' }}>
+            <div>
+              <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#991b1b', marginBottom: '8px' }}>Danger Zone</h4>
+              <p style={{ margin: '0 0 12px', fontSize: '14px', color: '#64748b' }}>Permanently archive and delete completed challenges. An Excel file will be downloaded.</p>
+              <button 
+                type="button"
+                onClick={handleArchiveCompleted} 
+                style={{ width: '100%', padding: '12px 16px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer', color: '#991b1b', fontWeight: 600, transition: 'all 0.2s' }}
+              >
+                <Trash2 size={18} color="#dc2626" /> Archive & Purge Completed Challenges
+              </button>
+            </div>
+          </div>
+        </div>
+
+          <div style={{ flex: '1 1 400px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
+            <h3 style={{ margin: '0 0 16px', color: '#0f172a', fontSize: '18px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ display: 'inline-block', width: '4px', height: '18px', background: '#3b82f6', borderRadius: '2px' }}></span>
+              Admin Manual
+            </h3>
+            <p style={{ color: '#64748b', fontSize: '14px', lineHeight: 1.6, marginBottom: '20px' }}>
+              Welcome to the Memento Admin Controls. Here is a quick reference guide for system toggles:
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <h4 style={{ margin: '0 0 4px', fontSize: '14px', color: '#0f172a', fontWeight: 600 }}>Maintenance Mode</h4>
+                <p style={{ margin: 0, fontSize: '13px', color: '#64748b', lineHeight: 1.5 }}>Completely halts new submissions from the public dashboard. Useful during major platform upgrades or critical bugs.</p>
+              </div>
+              <div>
+                <h4 style={{ margin: '0 0 4px', fontSize: '14px', color: '#0f172a', fontWeight: 600 }}>AI Auto-Triage</h4>
+                <p style={{ margin: 0, fontSize: '13px', color: '#64748b', lineHeight: 1.5 }}>Enables the Google Gemini integration. Problems will automatically be tagged, categorized, and scored by severity.</p>
+              </div>
+              <div>
+                <h4 style={{ margin: '0 0 4px', fontSize: '14px', color: '#0f172a', fontWeight: 600 }}>Allow Public Comments</h4>
+                <p style={{ margin: 0, fontSize: '13px', color: '#64748b', lineHeight: 1.5 }}>Lets citizens comment on issues. Turn off to restrict interactions.</p>
+              </div>
+              <div>
+                <h4 style={{ margin: '0 0 4px', fontSize: '14px', color: '#0f172a', fontWeight: 600 }}>Enforce Geolocation</h4>
+                <p style={{ margin: 0, fontSize: '13px', color: '#64748b', lineHeight: 1.5 }}>Rejects problem submissions missing precise GPS coordinates.</p>
+              </div>
+              <div>
+                <h4 style={{ margin: '0 0 4px', fontSize: '14px', color: '#0f172a', fontWeight: 600 }}>Community Chat Enabled</h4>
+                <p style={{ margin: 0, fontSize: '13px', color: '#64748b', lineHeight: 1.5 }}>Shows the Discord integration tab to all users for community discussion.</p>
+              </div>
+              <div>
+                <h4 style={{ margin: '0 0 4px', fontSize: '14px', color: '#0f172a', fontWeight: 600 }}>Data Retention Rules</h4>
+                <p style={{ margin: 0, fontSize: '13px', color: '#64748b', lineHeight: 1.5 }}>Ensure this complies with state laws regarding digital civic data. Changing this will permanently purge older records.</p>
+              </div>
+              <div>
+                <h4 style={{ margin: '0 0 4px', fontSize: '14px', color: '#0f172a', fontWeight: 600 }}>Global System Banner</h4>
+                <p style={{ margin: 0, fontSize: '13px', color: '#64748b', lineHeight: 1.5 }}>Displays an alert at the top of the entire platform. Leave blank to hide.</p>
+              </div>
+              <div>
+                <h4 style={{ margin: '0 0 4px', fontSize: '14px', color: '#0f172a', fontWeight: 600 }}>Danger Zone (Archive)</h4>
+                <p style={{ margin: 0, fontSize: '13px', color: '#64748b', lineHeight: 1.5 }}>Safely export all completed challenges and their proposals to an Excel file, and then purge them from the database to save storage space. Ensure you keep a secure cloud backup of the downloaded files, as the data will be permanently deleted from the database.</p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -647,18 +810,28 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
                   </div>
                 </div>
                 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '24px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '24px', minWidth: '160px' }}>
                   <button 
-                    onClick={() => handleVerifyUser(req.id, true)}
-                    style={{ padding: '8px 24px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                    onClick={() => handleVerifyUser(req.id, 'verify', true)}
+                    style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}
                   >
-                    <ShieldCheck size={16} /> Approve
+                    <ShieldCheck size={16} /> Verify
                   </button>
                   <button 
-                    style={{ padding: '8px 24px', background: '#fff', color: '#ef4444', border: '1px solid #fca5a5', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}
-                    onClick={() => showAlert('Rejection flow coming soon', 'info')}
+                    onClick={() => handleVerifyUser(req.id, 'reverify', true)}
+                    style={{ padding: '8px 16px', background: '#fff', color: '#ea580c', border: '1px solid #fed7aa', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}
                   >
-                    Reject
+                    <Mail size={16} /> Re-verify
+                  </button>
+                  <button 
+                    onClick={() => {
+                      if (window.confirm(`Are you sure you want to REJECT and BAN ${req.name}?`)) {
+                        handleVerifyUser(req.id, 'reject', true);
+                      }
+                    }}
+                    style={{ padding: '8px 16px', background: '#fff', color: '#ef4444', border: '1px solid #fca5a5', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}
+                  >
+                    <ShieldAlert size={16} /> Reject
                   </button>
                 </div>
               </div>
@@ -803,22 +976,15 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
 
                     <td style={{ padding: '16px' }}>
                       <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                        <a 
-                          href={`mailto:${u.email}`}
-                          style={{ color: '#3b82f6', textDecoration: 'none', display: 'flex', alignItems: 'center' }}
-                          title="Send Email"
-                        >
-                          <Mail size={18} />
-                        </a>
                         {(u.role === 'university_admin' || u.role === 'student') && (
                           <button 
                             onClick={() => {
                               if (u.verified) {
                                 if (window.confirm(`Are you sure you want to REVOKE verification for ${u.name || 'this user'}?`)) {
-                                  handleVerifyUser(u.id, false, false);
+                                  handleVerifyUser(u.id, 'reject', false);
                                 }
                               } else {
-                                handleVerifyUser(u.id, false, true);
+                                handleVerifyUser(u.id, 'verify', false);
                               }
                             }}
                             style={{ background: 'transparent', border: 'none', color: u.verified ? '#ef4444' : '#10b981', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
@@ -827,6 +993,13 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
                             {u.verified ? <ShieldAlert size={18} /> : <ShieldCheck size={18} />}
                           </button>
                         )}
+                        <button 
+                          onClick={() => openEditUserModal(u)}
+                          style={{ background: 'transparent', border: 'none', color: '#2563eb', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                          title="Edit User"
+                        >
+                          <Edit2 size={18} />
+                        </button>
                         <button 
                           onClick={() => handleDeleteUser(u.id)}
                           style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
@@ -928,6 +1101,66 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
               <button className="btn btn-outline" onClick={() => setEditingPost(null)}>Cancel</button>
               <button className="btn btn-primary" onClick={handleSavePostEdit}>Save Changes</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit User Modal */}
+      {editingUser && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '600px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '20px', fontWeight: 700, margin: 0 }}>Edit User Details</h3>
+              <button className="modal-close" onClick={() => setEditingUser(null)} style={{ position: 'static' }}>
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="form-group" style={{ marginBottom: '16px' }}>
+              <label className="form-label">Name / Organization Name</label>
+              <input 
+                type="text" 
+                className="input-field" 
+                value={editUserName}
+                onChange={(e) => setEditUserName(e.target.value)}
+              />
+            </div>
+            
+            <div className="form-group" style={{ marginBottom: '16px' }}>
+              <label className="form-label">Email Address</label>
+              <input 
+                type="email" 
+                className="input-field" 
+                value={editUserEmail}
+                onChange={(e) => setEditUserEmail(e.target.value)}
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+              <div className="form-group">
+                <label className="form-label">Contact Number</label>
+                <input 
+                  type="text" 
+                  className="input-field" 
+                  value={editUserContact}
+                  onChange={(e) => setEditUserContact(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">District</label>
+                <input 
+                  type="text" 
+                  className="input-field" 
+                  value={editUserDistrict}
+                  onChange={(e) => setEditUserDistrict(e.target.value)}
+                />
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button className="btn btn-outline" onClick={() => setEditingUser(null)}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleSaveUserEdit}>Save Changes</button>
             </div>
           </div>
         </div>

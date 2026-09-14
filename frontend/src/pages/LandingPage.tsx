@@ -367,11 +367,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
         <div className="hero-content">
           <div className="badge-pill">
             <span className="pulse-beacon" />
-            <span>Smart India Hackathon 2026</span>
+            <span>Memento</span>
           </div>
 
           <h1 className="hero-title">
-            Real Problems <br /> Real People
+            Real Problems, <br /> Real People,
             <span className="hero-title-accent"> Real Solutions</span>
           </h1>
 

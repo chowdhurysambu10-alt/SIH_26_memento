@@ -9,9 +9,23 @@ const DISCORD_CHANNEL_2 = import.meta.env.VITE_DISCORD_CHANNEL_2 || '15472223462
 const DISCORD_CHANNEL_3 = import.meta.env.VITE_DISCORD_CHANNEL_3 || '1547222485496234055';
 const DISCORD_CHANNEL_RULES = import.meta.env.VITE_DISCORD_CHANNEL_RULES || '1546951489128366132';
 
-export const CommunityPage: React.FC = () => {
+export const CommunityPage: React.FC<{ platformSettings?: any }> = ({ platformSettings }) => {
   const [activeChannel, setActiveChannel] = useState(DISCORD_CHANNEL_MAIN);
   const [runTour, setRunTour] = useState(false);
+
+  if (platformSettings?.enableCommunityChat === false) {
+    return (
+      <div style={{ maxWidth: '95%', margin: '0 auto', padding: '100px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+        <HelpCircle size={64} color="#94a3b8" style={{ marginBottom: '24px' }} />
+        <h2 style={{ fontSize: '28px', fontWeight: 800, color: '#0f172a', margin: '0 0 16px' }}>
+          Community Chat is Disabled
+        </h2>
+        <p style={{ fontSize: '16px', color: '#64748b', maxWidth: '500px' }}>
+          The community chat has been temporarily disabled by the platform administrators. Please check back later.
+        </p>
+      </div>
+    );
+  }
 
   const steps: Step[] = [
     {
@@ -37,8 +51,8 @@ export const CommunityPage: React.FC = () => {
   ];
 
   return (
-    <div style={{ maxWidth: '95%', margin: '0 auto', padding: '20px', height: 'calc(100vh - 80px)', boxSizing: 'border-box', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-      
+    <div style={{ maxWidth: '95%', margin: '0 auto', padding: '20px 20px 80px 20px', minHeight: 'calc(100vh - 80px)', boxSizing: 'border-box', display: 'flex', flexDirection: 'column' }}>
+
       {/* @ts-ignore */}
       <Joyride
         steps={steps}
@@ -62,57 +76,69 @@ export const CommunityPage: React.FC = () => {
         }}
       />
 
-      <div style={{ marginBottom: '16px', textAlign: 'center', flexShrink: 0, position: 'relative' }}>
-        <button 
-          onClick={() => setRunTour(true)}
-          className="btn btn-outline"
-          style={{ position: 'absolute', right: 0, top: 0, display: 'flex', alignItems: 'center', gap: '8px', color: '#2563eb', borderColor: '#bfdbfe', background: '#eff6ff', padding: '8px 16px' }}
-        >
-          <HelpCircle size={18} />
-          Guide
-        </button>
+      <div style={{ marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '16px', flexShrink: 0 }}>
 
-        <h2 style={{ fontSize: '32px', fontWeight: 800, color: '#0f172a', margin: '0 0 8px' }}>
-          MEMENTO CONNECT
-        </h2>
-        <p style={{ fontSize: '16px', color: '#64748b', margin: '0 0 16px' }}>
-          Join the conversation, report issues, and collaborate with other innovators and citizens.
-        </p>
-        
-        <div className="tour-step-roles" style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-          <button 
+        {/* Header & Guide Button row */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+          <div>
+            <h2 style={{ fontSize: '28px', fontWeight: 800, color: '#0f172a', margin: '0 0 4px', textAlign: 'left' }}>
+              MEMENTO CONNECT
+            </h2>
+            <p style={{ fontSize: '15px', color: '#64748b', margin: 0, textAlign: 'left', maxWidth: '600px' }}>
+              Join the conversation, report issues, and collaborate with other innovators and citizens.
+            </p>
+          </div>
+          <button
+            onClick={() => setRunTour(true)}
+            className="btn btn-outline"
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#2563eb', borderColor: '#bfdbfe', background: '#eff6ff', padding: '8px 16px', whiteSpace: 'nowrap' }}
+          >
+            <HelpCircle size={18} />
+            Guide
+          </button>
+        </div>
+
+        {/* Role tabs */}
+        <div className="tour-step-roles" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-start' }}>
+          <button
             onClick={() => setActiveChannel(DISCORD_CHANNEL_MAIN)}
             className={`btn ${activeChannel === DISCORD_CHANNEL_MAIN ? 'btn-primary' : 'btn-outline'}`}
+            style={{ fontSize: '13px', padding: '8px 14px' }}
           >
             I'm a citizen
           </button>
-          <button 
+          <button
             onClick={() => setActiveChannel(DISCORD_CHANNEL_2)}
             className={`btn ${activeChannel === DISCORD_CHANNEL_2 ? 'btn-primary' : 'btn-outline'}`}
+            style={{ fontSize: '13px', padding: '8px 14px' }}
           >
             I'm a student
           </button>
-          <button 
+          <button
             onClick={() => setActiveChannel(DISCORD_CHANNEL_3)}
             className={`btn ${activeChannel === DISCORD_CHANNEL_3 ? 'btn-primary' : 'btn-outline'}`}
+            style={{ fontSize: '13px', padding: '8px 14px' }}
           >
-            connect as an institution
+            Institution
           </button>
-          <button 
+          <button
             onClick={() => setActiveChannel(DISCORD_CHANNEL_RULES)}
             className={`tour-step-rules btn ${activeChannel === DISCORD_CHANNEL_RULES ? 'btn-primary' : 'btn-outline'}`}
+            style={{ fontSize: '13px', padding: '8px 14px' }}
           >
             Community Rules
           </button>
         </div>
       </div>
-      
-      <div className="tour-step-chat" style={{ flex: 1, minHeight: 0, borderRadius: '12px', overflow: 'hidden', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)', background: '#fff' }}>
-        <WidgetBot
-          server={DISCORD_SERVER_ID}
-          channel={activeChannel}
-          style={{ width: '100%', height: '100%' }}
-        />
+
+      <div className="tour-step-chat" style={{ flex: 1, minHeight: '80vh', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)', background: '#fff', position: 'relative' }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+          <WidgetBot
+            server={DISCORD_SERVER_ID}
+            channel={activeChannel}
+            style={{ width: '100%', height: '100%' }}
+          />
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
-import * as fs from 'fs';
-import * as path from 'path';
+import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
+import { SupabaseService } from '../supabase/supabase.service';
 
 export interface PlatformSettings {
   maintenanceMode: boolean;
@@ -10,13 +9,13 @@ export interface PlatformSettings {
   enforceGeolocation: boolean;
   maxAttachmentSizeMB: number;
   enableCommunityChat: boolean;
+  enableEmailService: boolean;
   systemBannerText: string;
 }
 
 @Injectable()
 export class SettingsService {
   private readonly logger = new Logger(SettingsService.name);
-  private readonly settingsPath = path.join(process.cwd(), 'platform-settings.json');
   
   private defaultSettings: PlatformSettings = {
     maintenanceMode: false,
@@ -26,29 +25,74 @@ export class SettingsService {
     enforceGeolocation: false,
     maxAttachmentSizeMB: 10,
     enableCommunityChat: true,
+    enableEmailService: true,
     systemBannerText: '',
   };
 
-  getSettings(): PlatformSettings {
+  constructor(private readonly supabaseService: SupabaseService) {}
+
+  async getSettings(): Promise<PlatformSettings> {
+    const admin = this.supabaseService.getAdminClient();
     try {
-      if (fs.existsSync(this.settingsPath)) {
-        const data = fs.readFileSync(this.settingsPath, 'utf8');
-        return JSON.parse(data);
+      const { data, error } = await admin
+        .from('platform_settings')
+        .select('*')
+        .eq('id', 1)
+        .single();
+        
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return this.defaultSettings; // Row not found
+        }
+        throw error;
+      }
+      
+      if (data) {
+        return {
+          maintenanceMode: data.maintenance_mode,
+          aiAutoTriage: data.ai_auto_triage,
+          allowPublicComments: data.allow_public_comments,
+          dataRetentionDays: data.data_retention_days,
+          enforceGeolocation: data.enforce_geolocation,
+          maxAttachmentSizeMB: data.max_attachment_size_mb,
+          enableCommunityChat: data.enable_community_chat,
+          enableEmailService: data.enable_email_service,
+          systemBannerText: data.system_banner_text || '',
+        };
       }
     } catch (err) {
-      this.logger.error('Failed to read settings', err);
+      this.logger.error('Failed to read settings from Supabase', err);
     }
     return this.defaultSettings;
   }
 
-  updateSettings(updates: Partial<PlatformSettings>): PlatformSettings {
-    const current = this.getSettings();
-    const merged = { ...current, ...updates };
+  async updateSettings(updates: Partial<PlatformSettings>): Promise<PlatformSettings> {
+    const admin = this.supabaseService.getAdminClient();
+    
+    // Map camelCase to snake_case
+    const dbUpdates: any = {};
+    if (updates.maintenanceMode !== undefined) dbUpdates.maintenance_mode = updates.maintenanceMode;
+    if (updates.aiAutoTriage !== undefined) dbUpdates.ai_auto_triage = updates.aiAutoTriage;
+    if (updates.allowPublicComments !== undefined) dbUpdates.allow_public_comments = updates.allowPublicComments;
+    if (updates.dataRetentionDays !== undefined) dbUpdates.data_retention_days = updates.dataRetentionDays;
+    if (updates.enforceGeolocation !== undefined) dbUpdates.enforce_geolocation = updates.enforceGeolocation;
+    if (updates.maxAttachmentSizeMB !== undefined) dbUpdates.max_attachment_size_mb = updates.maxAttachmentSizeMB;
+    if (updates.enableCommunityChat !== undefined) dbUpdates.enable_community_chat = updates.enableCommunityChat;
+    if (updates.enableEmailService !== undefined) dbUpdates.enable_email_service = updates.enableEmailService;
+    if (updates.systemBannerText !== undefined) dbUpdates.system_banner_text = updates.systemBannerText;
+
     try {
-      fs.writeFileSync(this.settingsPath, JSON.stringify(merged, null, 2));
+      const { error } = await admin
+        .from('platform_settings')
+        .update(dbUpdates)
+        .eq('id', 1);
+
+      if (error) throw error;
     } catch (err) {
-      this.logger.error('Failed to write settings', err);
+      this.logger.error('Failed to write settings to Supabase', err);
+      throw new InternalServerErrorException('Failed to update settings in database.');
     }
-    return merged;
+    
+    return this.getSettings();
   }
 }

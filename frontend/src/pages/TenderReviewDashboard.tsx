@@ -71,12 +71,79 @@ export const TenderReviewDashboard: React.FC = () => {
     }
   };
 
+  const handleRejectProposal = async (proposalId: string, challengeId: string) => {
+    if (!window.confirm('Are you sure you want to reject this bid?')) return;
+    
+    setGlobalLoading(true);
+    try {
+      await dashboardsApi.rejectProposal(challengeId, proposalId);
+      showAlert('Proposal rejected.', 'success');
+      setViewProposalModal(null);
+      if (expandedChallengeId === challengeId) {
+         loadProposals(challengeId);
+      }
+    } catch (e: any) {
+      showAlert('Failed to reject proposal: ' + e.message, 'error');
+    } finally {
+      setGlobalLoading(false);
+    }
+  };
+
+  const handleCleanRejected = async (challengeId: string) => {
+    if (!window.confirm('Are you sure you want to permanently delete all rejected bids for this challenge?')) return;
+    
+    setGlobalLoading(true);
+    try {
+      await dashboardsApi.cleanRejectedBids(challengeId);
+      showAlert('Rejected bids cleaned successfully.', 'success');
+      loadProposals(challengeId);
+    } catch (e: any) {
+      showAlert('Failed to clean rejected bids: ' + e.message, 'error');
+    } finally {
+      setGlobalLoading(false);
+    }
+  };
+
+  const handleExportBidsCSV = (challengeTitle: string) => {
+    if (proposals.length === 0) {
+      showAlert('No bids to export.', 'error');
+      return;
+    }
+    const headers = ['ID', 'Institution', 'District', 'Budget', 'Timeline', 'Status', 'Contact Email', 'Contact Phone', 'Date'];
+    const rows = proposals.map(p => {
+      const escapedInst = (p.institutions?.name || 'Unknown').replace(/"/g, '""');
+      return [
+        p.id,
+        `"${escapedInst}"`,
+        `"${p.institutions?.district || ''}"`,
+        `"${p.budget_estimate || ''}"`,
+        `"${p.timeline_estimate || ''}"`,
+        p.status || 'N/A',
+        p.contact_email || '',
+        p.contact_phone || '',
+        new Date(p.created_at).toLocaleDateString()
+      ];
+    });
+    const csvContent = [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const safeTitle = challengeTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    link.setAttribute('download', `bids_${safeTitle}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showAlert('Bids exported successfully!', 'success');
+  };
+
   if (loading) {
     return <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Loading active tenders...</div>;
   }
 
   return (
-    <div>
+    <div style={{ paddingTop: '16px' }}>
       <div style={{ marginBottom: '24px' }}>
         <h2 style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a', margin: '0 0 8px' }}>Tender Review Dashboard</h2>
         <p style={{ fontSize: '15px', color: '#64748b', margin: 0 }}>Review and approve proposals (bids) organized by problem (challenge).</p>
@@ -121,7 +188,28 @@ export const TenderReviewDashboard: React.FC = () => {
               {/* Problem Card Body - Bids */}
               {isExpanded && (
                 <div style={{ padding: '24px', borderTop: '1px solid #e2e8f0', background: '#fff' }}>
-                  <h4 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 600, color: '#0f172a' }}>Submitted Bids</h4>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#0f172a' }}>Submitted Bids</h4>
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      {proposals.length > 0 && (
+                        <button
+                          onClick={() => handleExportBidsCSV(c.title)}
+                          style={{ padding: '6px 12px', background: '#fff', border: '1px solid #cbd5e1', color: '#0f172a', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                          Export Bids (CSV)
+                        </button>
+                      )}
+                      {proposals.some(p => p.status === 'rejected') && (
+                        <button
+                          onClick={() => handleCleanRejected(c.id)}
+                          style={{ padding: '6px 12px', background: '#fff', border: '1px solid #cbd5e1', color: '#ef4444', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        >
+                          <X size={14} /> Clean Rejected Bids
+                        </button>
+                      )}
+                    </div>
+                  </div>
                   
                   {loadingProposals ? (
                     <div style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>Loading bids...</div>
@@ -219,12 +307,20 @@ export const TenderReviewDashboard: React.FC = () => {
                 style={{ padding: '10px 20px', background: '#fff', border: '1px solid #cbd5e1', color: '#475569', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}
               >Close</button>
               {viewProposalModal.status === 'submitted' && (
-                <button 
-                  onClick={() => handleApproveProposal(viewProposalModal.id, viewProposalModal.challengeId)}
-                  style={{ padding: '10px 24px', background: '#16a34a', border: 'none', color: '#fff', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-                >
-                  <CheckCircle size={18} /> Approve & Assign
-                </button>
+                <>
+                  <button 
+                    onClick={() => handleRejectProposal(viewProposalModal.id, viewProposalModal.challengeId)}
+                    style={{ padding: '10px 24px', background: '#ef4444', border: 'none', color: '#fff', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <X size={18} /> Reject Bid
+                  </button>
+                  <button 
+                    onClick={() => handleApproveProposal(viewProposalModal.id, viewProposalModal.challengeId)}
+                    style={{ padding: '10px 24px', background: '#16a34a', border: 'none', color: '#fff', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <CheckCircle size={18} /> Approve & Assign
+                  </button>
+                </>
               )}
             </div>
           </div>

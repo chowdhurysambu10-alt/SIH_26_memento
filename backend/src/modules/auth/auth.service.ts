@@ -11,6 +11,8 @@ import * as path from 'path';
 import * as nodemailer from 'nodemailer';
 import { SignupDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
+import { SettingsService } from '../settings/settings.service';
+import { Inject, forwardRef } from '@nestjs/common';
 
 @Injectable()
 export class AuthService {
@@ -24,7 +26,10 @@ export class AuthService {
   
   private transporter: nodemailer.Transporter;
 
-  constructor(private readonly supabaseService: SupabaseService) {
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    @Inject(forwardRef(() => SettingsService)) private readonly settingsService: SettingsService
+  ) {
     this.transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
@@ -283,6 +288,11 @@ export class AuthService {
     this.dailyOtpRequests.set(email.trim(), requestStats);
 
     if (!contact && process.env.SMTP_USER) {
+      const settings = await this.settingsService.getSettings();
+      if (!settings.enableEmailService) {
+        this.logger.log(`Skipped sending OTP email to ${email} (Email Service Disabled)`);
+        return { message: 'OTP flow is skipped because email service is disabled.' };
+      }
       // Send email via Nodemailer if no contact is provided (email flow)
       try {
         await this.transporter.sendMail({

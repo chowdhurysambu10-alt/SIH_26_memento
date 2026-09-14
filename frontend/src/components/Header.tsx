@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { ChevronDown, LogOut, User as UserIcon, Bell, ShieldAlert, Headset } from 'lucide-react';
+import { ChevronDown, LogOut, User as UserIcon, Bell, ShieldAlert, Headset, Menu, X } from 'lucide-react';
 import { NotificationsModal } from './NotificationsModal';
 import { VerificationRequestModal } from './VerificationRequestModal';
 import { ProfileModal } from './ProfileModal';
 import { useNotifications } from '../hooks/useNotifications';
+import { useIsMobile } from '../hooks/useMediaQuery';
 
 export type NavTab = 'home' | 'feed' | 'top-problems' | 'submit' | 'statistics' | 'community' | 'helpdesk' | 'about' | 'login' | 'admin-dashboard' | 'institution-dashboard' | 'student-dashboard';
 
@@ -17,10 +18,13 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, platformSettings }) => {
   const { user, isAuthenticated, logout } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  
+  const isMobile = useIsMobile();
 
   const { notifications } = useNotifications();
   const unreadCount = notifications.filter(n => !n.isRead).length;
@@ -38,14 +42,36 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, platfor
   return (
     <>
       <header className="header">
-        <div className="header-content">
+        <div className="header-content" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: isMobile ? '12px 16px' : '0 32px' }}>
           <div className="logo" onClick={() => setActiveTab('home')}>
             Memento
           </div>
 
-          <nav className="header-nav">
-            <button
-              className={`nav-link ${activeTab === 'home' ? 'active' : ''}`}
+          {isMobile ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              {isAuthenticated && user && (
+                <button
+                  className="btn btn-outline"
+                  style={{ padding: '6px', borderRadius: '8px', position: 'relative' }}
+                  onClick={() => setIsNotificationsOpen(true)}
+                >
+                  <Bell size={20} />
+                  {unreadCount > 0 && (
+                    <div style={{ position: 'absolute', top: '-2px', right: '-2px', width: '10px', height: '10px', background: '#ef4444', borderRadius: '50%', border: '2px solid #fff' }}></div>
+                  )}
+                </button>
+              )}
+              <button
+                style={{ background: 'none', border: 'none', color: '#0f172a', cursor: 'pointer' }}
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              >
+                {isMobileMenuOpen ? <X size={28} /> : <Menu size={28} />}
+              </button>
+            </div>
+          ) : (
+            <nav className="header-nav">
+              <button
+                className={`nav-link ${activeTab === 'home' ? 'active' : ''}`}
               onClick={() => setActiveTab('home')}
             >
               Home
@@ -62,21 +88,19 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, platfor
             >
               Top Problems
             </button>
-
             <button
               className={`nav-link ${activeTab === 'statistics' ? 'active' : ''}`}
               onClick={() => setActiveTab('statistics')}
             >
               Statistics
             </button>
-            {platformSettings?.enableCommunityChat !== false && (
-              <button
-                className={`nav-link ${activeTab === 'community' ? 'active' : ''}`}
-                onClick={() => setActiveTab('community')}
-              >
-                Community
-              </button>
-            )}
+
+            <button
+              className={`nav-link ${activeTab === 'community' ? 'active' : ''}`}
+              onClick={() => setActiveTab('community')}
+            >
+              Community
+            </button>
             <button
               className={`nav-link ${activeTab === 'about' ? 'active' : ''}`}
               onClick={() => setActiveTab('about')}
@@ -239,7 +263,66 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, platfor
               </button>
             )}
           </nav>
+          )}
         </div>
+        
+        {/* Mobile Menu Overlay */}
+        {isMobile && isMobileMenuOpen && (
+          <div style={{ 
+            position: 'absolute', top: '100%', left: 0, right: 0, 
+            background: '#fff', borderBottom: '1px solid #e2e8f0', 
+            padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', zIndex: 999 
+          }}>
+            {[
+              { id: 'home', label: 'Home' },
+              { id: 'feed', label: 'Feed' },
+              { id: 'top-problems', label: 'Top Problems' },
+              { id: 'statistics', label: 'Statistics' },
+              { id: 'community', label: 'Community' },
+              { id: 'about', label: 'About' },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                style={{
+                  background: 'none', border: 'none', textAlign: 'left',
+                  fontSize: '16px', fontWeight: activeTab === tab.id ? 700 : 500,
+                  color: activeTab === tab.id ? '#2563eb' : '#64748b',
+                  padding: '8px 0'
+                }}
+                onClick={() => { setActiveTab(tab.id as any); setIsMobileMenuOpen(false); }}
+              >
+                {tab.label}
+              </button>
+            ))}
+
+            <div style={{ height: '1px', background: '#e2e8f0', margin: '8px 0' }}></div>
+
+            {isAuthenticated && user ? (
+              <>
+                <div style={{ marginBottom: '8px' }}>
+                  <p style={{ fontWeight: 700, margin: '0 0 4px', fontSize: '15px' }}>{user.name || 'User'}</p>
+                  <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>{user.email}</p>
+                </div>
+                {user.role === 'super_admin' && (
+                  <button onClick={() => { setActiveTab('admin-dashboard'); setIsMobileMenuOpen(false); }} className="btn btn-outline" style={{ justifyContent: 'flex-start' }}>Admin Panel</button>
+                )}
+                {(user.role === 'university_admin' || user.role === 'faculty') && (
+                  <button onClick={() => { setActiveTab('institution-dashboard'); setIsMobileMenuOpen(false); }} className="btn btn-outline" style={{ justifyContent: 'flex-start' }}>Institution Portal</button>
+                )}
+                {user.role === 'student' && (
+                  <button onClick={() => { setActiveTab('student-dashboard'); setIsMobileMenuOpen(false); }} className="btn btn-outline" style={{ justifyContent: 'flex-start' }}>Student Portal</button>
+                )}
+                {user.role !== 'super_admin' && (
+                  <button onClick={() => { setIsProfileModalOpen(true); setIsMobileMenuOpen(false); }} className="btn btn-outline" style={{ justifyContent: 'flex-start' }}><UserIcon size={16}/> Profile</button>
+                )}
+                <button onClick={() => { logout(); setIsMobileMenuOpen(false); }} className="btn btn-outline" style={{ color: '#ef4444', borderColor: '#fca5a5', justifyContent: 'flex-start' }}><LogOut size={16}/> Log Out</button>
+              </>
+            ) : (
+              <button onClick={() => { setActiveTab('login'); setIsMobileMenuOpen(false); }} className="btn btn-primary" style={{ justifyContent: 'center' }}>Sign In</button>
+            )}
+          </div>
+        )}
       </header>
       <NotificationsModal
         isOpen={isNotificationsOpen}

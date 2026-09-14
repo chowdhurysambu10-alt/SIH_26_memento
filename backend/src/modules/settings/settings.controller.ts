@@ -13,8 +13,8 @@ export class SettingsController {
 
   @Get()
   @ApiOperation({ summary: 'Get public platform settings' })
-  getSettings() {
-    return this.settingsService.getSettings();
+  async getSettings() {
+    return await this.settingsService.getSettings();
   }
 
   @Patch()
@@ -22,7 +22,7 @@ export class SettingsController {
   @UseGuards(SupabaseAuthGuard, RolesGuard)
   @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Update platform settings (Admin only)' })
-  updateSettings(@Body() updates: Partial<PlatformSettings>) {
-    return this.settingsService.updateSettings(updates);
+  async updateSettings(@Body() updates: Partial<PlatformSettings>) {
+    return await this.settingsService.updateSettings(updates);
   }
 }

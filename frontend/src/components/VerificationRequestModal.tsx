@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { X, ShieldCheck } from 'lucide-react';
+import { X, ShieldCheck, UploadCloud } from 'lucide-react';
 import { authApi } from '../api/auth';
 import { useAuth } from '../context/AuthContext';
+import { CustomDatePicker } from './CustomDatePicker';
 
 interface VerificationRequestModalProps {
   onClose: () => void;
@@ -25,7 +26,8 @@ export const VerificationRequestModal: React.FC<VerificationRequestModalProps> =
   const [dob, setDob] = useState('');
   const [collegeEmail, setCollegeEmail] = useState('');
   const [apaarId, setApaarId] = useState('');
-  const [studentRegId, setStudentRegId] = useState('');
+  const [idCardFile, setIdCardFile] = useState<File | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [studentAffiliation, setStudentAffiliation] = useState('');
 
   const isInstitution = user?.role === 'university_admin';
@@ -55,7 +57,7 @@ export const VerificationRequestModal: React.FC<VerificationRequestModalProps> =
           dateOfBirth: dob,
           collegeEmail: collegeEmail,
           apaarId: apaarId,
-          registrationId: studentRegId,
+          idCardPic: idCardFile,
           affiliation: studentAffiliation,
         };
       }
@@ -131,16 +133,58 @@ export const VerificationRequestModal: React.FC<VerificationRequestModalProps> =
                   <input required type="text" value={studentId} onChange={e => setStudentId(e.target.value)} style={inputStyle} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#475569', marginBottom: '4px' }}>College or School Name *</label>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#475569', marginBottom: '4px' }}>College Name *</label>
                   <input required type="text" value={collegeName} onChange={e => setCollegeName(e.target.value)} style={inputStyle} />
                 </div>
-                <div>
+                <div style={{ position: 'relative' }}>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#475569', marginBottom: '4px' }}>Date of Birth *</label>
-                  <input required type="date" value={dob} onChange={e => setDob(e.target.value)} style={inputStyle} />
+                  <CustomDatePicker value={dob} onChange={setDob} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#475569', marginBottom: '4px' }}>Registration ID *</label>
-                  <input required type="text" value={studentRegId} onChange={e => setStudentRegId(e.target.value)} style={inputStyle} />
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#475569', marginBottom: '8px' }}>Picture of ID Card *</label>
+                  
+                  {idCardFile ? (
+                    <div style={{ position: 'relative', height: '120px', borderRadius: '12px', overflow: 'hidden', border: '2px solid #e2e8f0' }}>
+                      <img src={URL.createObjectURL(idCardFile)} alt="ID Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <button
+                        type="button"
+                        onClick={() => setIdCardFile(null)}
+                        style={{ position: 'absolute', top: '8px', right: '8px', background: 'rgba(239, 68, 68, 0.9)', color: '#fff', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }}
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      style={{
+                        border: '2px dashed #cbd5e1',
+                        borderRadius: '12px',
+                        padding: '24px 20px',
+                        textAlign: 'center',
+                        background: '#f8fafc',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = '#3b82f6';
+                        e.currentTarget.style.background = '#eff6ff';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = '#cbd5e1';
+                        e.currentTarget.style.background = '#f8fafc';
+                      }}
+                    >
+                      <UploadCloud size={24} style={{ margin: '0 auto 8px', color: '#2563eb' }} />
+                      <span style={{ fontSize: '14px', color: '#334155', fontWeight: 600, display: 'block' }}>Click to Upload ID Card</span>
+                      <span style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', display: 'block' }}>JPG, PNG (Max 5MB)</span>
+                    </div>
+                  )}
+                  <input required={!idCardFile} type="file" accept="image/*" ref={fileInputRef} onChange={e => setIdCardFile(e.target.files?.[0] || null)} style={{ display: 'none' }} />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#475569', marginBottom: '4px' }}>College Mail ID (Optional)</label>
