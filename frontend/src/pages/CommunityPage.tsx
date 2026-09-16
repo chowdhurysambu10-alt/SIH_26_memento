@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import WidgetBot from '@widgetbot/react-embed';
+import { MessageSquare, Users, GraduationCap, Building2, BookOpen } from 'lucide-react';
 
 const DISCORD_SERVER_ID = import.meta.env.VITE_DISCORD_SERVER_ID || '1546942698760437894';
 const DISCORD_CHANNEL_MAIN = import.meta.env.VITE_DISCORD_CHANNEL_MAIN || '1546942699217879050';
@@ -11,48 +12,57 @@ export const CommunityPage: React.FC = () => {
   const [activeChannel, setActiveChannel] = useState(DISCORD_CHANNEL_MAIN);
 
   return (
-    <div style={{ maxWidth: '95%', margin: '0 auto', padding: '20px', height: 'calc(100vh - 80px)', boxSizing: 'border-box', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ marginBottom: '16px', textAlign: 'center', flexShrink: 0 }}>
-        <h2 style={{ fontSize: '32px', fontWeight: 800, color: '#0f172a', margin: '0 0 8px' }}>
-          MEMENTO CONNECT
-        </h2>
-        <p style={{ fontSize: '16px', color: '#64748b', margin: '0 0 16px' }}>
-          Join the conversation, report issues, and collaborate with other innovators and citizens.
+    <div className="community-page-wrapper">
+      <div className="community-header-panel">
+        <div className="community-badge-pill">
+          <MessageSquare size={14} color="#2563eb" /> Live Community Connect
+        </div>
+        <h2 className="community-main-title">Memento Connect</h2>
+        <p className="community-subtitle">
+          Collaborate in real-time with innovators, students, faculty, and citizens across Jharkhand.
         </p>
-        
-        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-          <button 
+
+        <div className="community-channels-switch">
+          <button
+            type="button"
             onClick={() => setActiveChannel(DISCORD_CHANNEL_MAIN)}
-            className={`btn ${activeChannel === DISCORD_CHANNEL_MAIN ? 'btn-primary' : 'btn-outline'}`}
+            className={`community-channel-btn ${
+              activeChannel === DISCORD_CHANNEL_MAIN ? 'active' : ''
+            }`}
           >
-            I'm a citizen
+            <Users size={14} /> Citizen Hub
           </button>
-          <button 
+          <button
+            type="button"
             onClick={() => setActiveChannel(DISCORD_CHANNEL_2)}
-            className={`btn ${activeChannel === DISCORD_CHANNEL_2 ? 'btn-primary' : 'btn-outline'}`}
+            className={`community-channel-btn ${activeChannel === DISCORD_CHANNEL_2 ? 'active' : ''}`}
           >
-            I'm a student
+            <GraduationCap size={14} /> Student Forum
           </button>
-          <button 
+          <button
+            type="button"
             onClick={() => setActiveChannel(DISCORD_CHANNEL_3)}
-            className={`btn ${activeChannel === DISCORD_CHANNEL_3 ? 'btn-primary' : 'btn-outline'}`}
+            className={`community-channel-btn ${activeChannel === DISCORD_CHANNEL_3 ? 'active' : ''}`}
           >
-            connect as an institution
+            <Building2 size={14} /> Institution Desk
           </button>
-          <button 
+          <button
+            type="button"
             onClick={() => setActiveChannel(DISCORD_CHANNEL_RULES)}
-            className={`btn ${activeChannel === DISCORD_CHANNEL_RULES ? 'btn-primary' : 'btn-outline'}`}
+            className={`community-channel-btn ${
+              activeChannel === DISCORD_CHANNEL_RULES ? 'active' : ''
+            }`}
           >
-            Community Rules
+            <BookOpen size={14} /> Guidelines
           </button>
         </div>
       </div>
-      
-      <div style={{ flex: 1, minHeight: 0, borderRadius: '12px', overflow: 'hidden', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)', background: '#fff' }}>
+
+      <div className="community-embed-container">
         <WidgetBot
           server={DISCORD_SERVER_ID}
           channel={activeChannel}
-          style={{ width: '100%', height: '100%' }}
+          style={{ width: '100%', height: '100%', border: 'none' }}
         />
       </div>
     </div>

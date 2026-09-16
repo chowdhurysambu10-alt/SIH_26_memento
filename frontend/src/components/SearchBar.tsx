@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 
 interface SearchBarProps {
   onSearch: (query: string) => void;
@@ -13,6 +13,11 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onSearch }) => {
     onSearch(searchTerm.trim());
   };
 
+  const handleClear = () => {
+    setSearchTerm('');
+    onSearch('');
+  };
+
   return (
     <div className="search-container">
       <form className="search-bar-wrapper" onSubmit={handleSubmit}>
@@ -21,12 +26,22 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onSearch }) => {
           <input
             type="text"
             className="search-input"
-            placeholder="Search challenges, solutions, districts, or tags..."
+            placeholder="Search problems, districts, tags..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
+          {searchTerm && (
+            <button
+              type="button"
+              className="search-clear-btn"
+              onClick={handleClear}
+              aria-label="Clear search"
+            >
+              <X size={15} />
+            </button>
+          )}
         </div>
-        <button type="submit" className="btn btn-primary">
+        <button type="submit" className="btn btn-primary search-submit-btn">
           Search
         </button>
       </form>

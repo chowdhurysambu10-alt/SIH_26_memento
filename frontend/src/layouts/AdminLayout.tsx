@@ -14,7 +14,8 @@ import {
   BarChart3,
   ShieldCheck,
   Megaphone,
-  Home
+  Home,
+  Shield,
 } from 'lucide-react';
 import { NotificationsModal } from '../components/NotificationsModal';
 import { useNotifications } from '../hooks/useNotifications';
@@ -25,13 +26,18 @@ interface AdminLayoutProps {
   setActiveView: (view: string) => void;
 }
 
-export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeView, setActiveView }) => {
+export const AdminLayout: React.FC<AdminLayoutProps> = ({
+  children,
+  activeView,
+  setActiveView,
+}) => {
   const { user, logout } = useAuth();
   const [isSidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isNotificationsOpen, setNotificationsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const { notifications } = useNotifications();
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -44,141 +50,115 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeView, 
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
+  const handleNav = (id: string) => {
+    setActiveView(id);
+    setMobileMenuOpen(false);
+  };
+
   return (
-    <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden', background: '#f8fafc' }}>
-      
-      {/* Sidebar */}
-      <aside style={{
-        width: isSidebarOpen ? '260px' : '80px',
-        background: '#0f172a',
-        color: '#fff',
-        transition: 'width 0.3s',
-        display: 'flex',
-        flexDirection: 'column',
-        position: 'relative',
-        zIndex: 10
-      }}>
-        <div style={{ padding: '24px 20px', display: 'flex', alignItems: 'center', justifyContent: isSidebarOpen ? 'space-between' : 'center', borderBottom: '1px solid #1e293b' }}>
-          {isSidebarOpen && <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: '#fff' }}>Memento<span style={{color: '#ef4444'}}>.admin</span></h1>}
-          <button onClick={() => setSidebarOpen(!isSidebarOpen)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-            <Menu size={20} />
+    <div className="portal-layout-container">
+      {/* Desktop Sidebar */}
+      <aside className={`portal-desktop-sidebar admin-sidebar ${isSidebarOpen ? 'expanded' : 'collapsed'}`}>
+        <div className="sidebar-brand-header">
+          {isSidebarOpen && (
+            <div className="sidebar-brand-title">
+              <Shield size={20} color="#ef4444" />
+              <span>
+                Memento<span style={{ color: '#ef4444' }}>.admin</span>
+              </span>
+            </div>
+          )}
+          <button
+            type="button"
+            className="sidebar-collapse-btn"
+            onClick={() => setSidebarOpen(!isSidebarOpen)}
+            aria-label="Toggle sidebar"
+          >
+            <Menu size={18} />
           </button>
         </div>
 
-        <nav style={{ flex: 1, padding: '20px 12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {navItems.map(item => {
+        <nav className="sidebar-nav-list">
+          {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeView === item.id;
             return (
               <button
                 key={item.id}
+                type="button"
+                className={`sidebar-nav-item ${isActive ? 'active' : ''}`}
                 onClick={() => setActiveView(item.id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  padding: '12px',
-                  background: isActive ? '#1e293b' : 'transparent',
-                  color: isActive ? '#fff' : '#94a3b8',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  justifyContent: isSidebarOpen ? 'flex-start' : 'center',
-                  transition: 'all 0.2s'
-                }}
                 title={!isSidebarOpen ? item.label : undefined}
-                onMouseEnter={(e) => {
-                  if (!isActive) {
-                    e.currentTarget.style.background = '#1e293b';
-                    e.currentTarget.style.color = '#fff';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive) {
-                    e.currentTarget.style.background = 'transparent';
-                    e.currentTarget.style.color = '#94a3b8';
-                  }
-                }}
               >
-                <Icon size={20} color={isActive ? '#ef4444' : 'currentColor'} />
-                {isSidebarOpen && <span style={{ fontSize: '15px', fontWeight: isActive ? 600 : 500 }}>{item.label}</span>}
+                <Icon size={18} color={isActive ? '#ef4444' : 'currentColor'} />
+                {isSidebarOpen && <span>{item.label}</span>}
               </button>
             );
           })}
         </nav>
 
-        <div style={{ padding: '20px 12px', borderTop: '1px solid #1e293b' }}>
+        <div className="sidebar-footer-actions">
           <button
+            type="button"
+            className="sidebar-footer-btn"
             onClick={() => window.dispatchEvent(new CustomEvent('navigate', { detail: 'feed' }))}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '12px',
-              background: 'transparent',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              width: '100%',
-              justifyContent: isSidebarOpen ? 'flex-start' : 'center',
-              marginBottom: '8px'
-            }}
           >
-            <Home size={20} />
-            {isSidebarOpen && <span style={{ fontSize: '15px', fontWeight: 600 }}>Public Feed</span>}
+            <Home size={18} />
+            {isSidebarOpen && <span>Public Feed</span>}
           </button>
-          
+
           <button
+            type="button"
+            className="sidebar-footer-btn logout-link"
             onClick={logout}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '12px',
-              background: 'transparent',
-              color: '#ef4444',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              width: '100%',
-              justifyContent: isSidebarOpen ? 'flex-start' : 'center',
-            }}
           >
-            <LogOut size={20} />
-            {isSidebarOpen && <span style={{ fontSize: '15px', fontWeight: 600 }}>Sign Out</span>}
+            <LogOut size={18} />
+            {isSidebarOpen && <span>Sign Out</span>}
           </button>
         </div>
       </aside>
 
       {/* Main Content Area */}
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        
+      <main className="portal-main-area">
         {/* Topbar */}
-        <header style={{ height: '70px', background: '#fff', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', color: '#64748b' }}>
-            <Search size={20} />
-            <input 
-              type="text" 
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search across platform..." 
-              style={{ border: 'none', outline: 'none', fontSize: '15px', width: '300px' }} 
-            />
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-            <button onClick={() => setNotificationsOpen(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', position: 'relative' }}>
-              <Bell size={20} />
-              {unreadCount > 0 && (
-                <div style={{ position: 'absolute', top: '-4px', right: '-4px', width: '8px', height: '8px', background: '#ef4444', borderRadius: '50%' }}></div>
-              )}
+        <header className="portal-topbar">
+          <div className="portal-topbar-left">
+            <button
+              type="button"
+              className="portal-mobile-menu-btn"
+              onClick={() => setMobileMenuOpen(true)}
+              aria-label="Open menu"
+            >
+              <Menu size={22} />
             </button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '14px', fontWeight: 600, color: '#0f172a' }}>{user?.name || 'Super Admin'}</div>
-                <div style={{ fontSize: '12px', color: '#64748b' }}>System Administrator</div>
+            <div className="portal-topbar-search">
+              <Search size={16} color="#64748b" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search across platform..."
+                className="portal-search-input"
+              />
+            </div>
+          </div>
+
+          <div className="portal-topbar-right">
+            <button
+              type="button"
+              className="portal-topbar-icon-btn"
+              onClick={() => setNotificationsOpen(true)}
+              aria-label="Notifications"
+            >
+              <Bell size={18} />
+              {unreadCount > 0 && <span className="topbar-badge-dot" />}
+            </button>
+            <div className="portal-user-profile-summary">
+              <div className="portal-user-text">
+                <div className="portal-user-name">{user?.name || 'Super Admin'}</div>
+                <div className="portal-user-role">System Administrator</div>
               </div>
-              <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#fee2e2', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '16px' }}>
+              <div className="portal-user-avatar admin-avatar">
                 {user?.name?.charAt(0) || 'A'}
               </div>
             </div>
@@ -186,8 +166,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeView, 
         </header>
 
         {/* Scrollable Content */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '32px' }}>
-          {React.Children.map(children, child => {
+        <div className="portal-content-scroll">
+          {React.Children.map(children, (child) => {
             if (React.isValidElement(child)) {
               return React.cloneElement(child as React.ReactElement<any>, { searchQuery });
             }
@@ -196,7 +176,82 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeView, 
         </div>
       </main>
 
-      <NotificationsModal isOpen={isNotificationsOpen} onClose={() => setNotificationsOpen(false)} />
+      {/* Mobile Drawer */}
+      <div
+        className={`mobile-drawer-overlay ${mobileMenuOpen ? 'open' : ''}`}
+        onClick={() => setMobileMenuOpen(false)}
+      >
+        <div
+          className="mobile-drawer-sheet open admin-drawer"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="drawer-header">
+            <div className="sidebar-brand-title">
+              <Shield size={20} color="#ef4444" />
+              <span>
+                Memento<span style={{ color: '#ef4444' }}>.admin</span>
+              </span>
+            </div>
+            <button
+              type="button"
+              className="drawer-close-btn"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          <div className="drawer-nav-sections">
+            <div className="drawer-section-title">Admin Management</div>
+            <div className="drawer-nav-list">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeView === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={`drawer-nav-link ${isActive ? 'active' : ''}`}
+                    onClick={() => handleNav(item.id)}
+                  >
+                    <Icon size={18} color={isActive ? '#ef4444' : 'currentColor'} />
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="drawer-footer">
+            <button
+              type="button"
+              className="btn btn-outline w-100"
+              style={{ marginBottom: '8px' }}
+              onClick={() => {
+                setMobileMenuOpen(false);
+                window.dispatchEvent(new CustomEvent('navigate', { detail: 'feed' }));
+              }}
+            >
+              <Home size={16} /> Public Feed
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline w-100 logout-btn"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                logout();
+              }}
+            >
+              <LogOut size={16} /> Sign Out
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <NotificationsModal
+        isOpen={isNotificationsOpen}
+        onClose={() => setNotificationsOpen(false)}
+      />
     </div>
   );
 };

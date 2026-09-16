@@ -18,22 +18,25 @@ import {
   Legend,
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
-import { Edit, Trash2, Save, XCircle } from 'lucide-react';
+import { Edit, Trash2, Save, XCircle, BarChart3, TrendingUp } from 'lucide-react';
 
-const MyPostedProblemItem: React.FC<{ challenge: Challenge; onDeleted?: (id: string) => void }> = ({ challenge, onDeleted }) => {
+const MyPostedProblemItem: React.FC<{ challenge: Challenge; onDeleted?: (id: string) => void }> = ({
+  challenge,
+  onDeleted,
+}) => {
   const [isDeleted, setIsDeleted] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
-  
+
   const [currentTitle, setCurrentTitle] = useState(challenge.title || 'Untitled Challenge');
   const [currentDescription, setCurrentDescription] = useState(challenge.description || '');
-  
+
   const [editTitle, setEditTitle] = useState(currentTitle);
   const [editDescription, setEditDescription] = useState(currentDescription);
 
   const handleDelete = async () => {
-    if (!window.confirm('Are you sure you want to delete this challenge? This action cannot be undone.')) return;
+    if (!window.confirm('Are you sure you want to delete this challenge? This action cannot be undone.'))
+      return;
     try {
       await challengesApi.deleteChallenge(challenge.id);
       setIsDeleted(true);
@@ -50,7 +53,10 @@ const MyPostedProblemItem: React.FC<{ challenge: Challenge; onDeleted?: (id: str
     }
     setIsSaving(true);
     try {
-      await challengesApi.updateChallenge(challenge.id, { title: editTitle, description: editDescription });
+      await challengesApi.updateChallenge(challenge.id, {
+        title: editTitle,
+        description: editDescription,
+      });
       setCurrentTitle(editTitle);
       setCurrentDescription(editDescription);
       setIsEditing(false);
@@ -64,34 +70,26 @@ const MyPostedProblemItem: React.FC<{ challenge: Challenge; onDeleted?: (id: str
   if (isDeleted) return null;
 
   return (
-    <div 
-      style={{ padding: '16px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0', transition: 'all 0.2s' }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', alignItems: 'center' }}>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <span style={{ fontSize: '12px', fontWeight: 600, color: '#2563eb', background: '#eff6ff', padding: '4px 8px', borderRadius: '4px' }}>
+    <div className="my-posted-card card-dynamic">
+      <div className="my-posted-header">
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+          <span className="tag tag-district">
             {(challenge.status || 'SUBMITTED').replace('_', ' ').toUpperCase()}
           </span>
-          <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', background: '#f1f5f9', padding: '4px 8px', borderRadius: '4px' }}>
-            {challenge.district}
-          </span>
+          <span className="tag tag-category">{challenge.district}</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ fontSize: '13px', color: '#64748b' }}>
-            {new Date(challenge.created_at).toLocaleDateString()}
-          </span>
-        </div>
+        <span style={{ fontSize: '12px', color: '#64748b' }}>
+          {new Date(challenge.created_at).toLocaleDateString()}
+        </span>
       </div>
-      
+
       {isEditing ? (
         <div style={{ marginBottom: '16px', marginTop: '12px' }}>
           <input
             className="input-field"
             value={editTitle}
             onChange={(e) => setEditTitle(e.target.value)}
-            style={{ fontWeight: 700, fontSize: '16px', marginBottom: '8px' }}
+            style={{ fontWeight: 700, fontSize: '15px', marginBottom: '8px' }}
           />
           <textarea
             className="input-field"
@@ -104,61 +102,57 @@ const MyPostedProblemItem: React.FC<{ challenge: Challenge; onDeleted?: (id: str
             <button
               type="button"
               className="btn btn-outline"
-              style={{ padding: '6px 12px', fontSize: '13px', color: '#64748b' }}
+              style={{ padding: '8px 14px', fontSize: '13px' }}
               onClick={() => setIsEditing(false)}
               disabled={isSaving}
             >
-              <XCircle size={15} /> Cancel
+              <XCircle size={14} /> Cancel
             </button>
             <button
               type="button"
               className="btn btn-primary"
-              style={{ padding: '6px 12px', fontSize: '13px' }}
+              style={{ padding: '8px 16px', fontSize: '13px' }}
               onClick={handleSaveEdit}
               disabled={isSaving}
             >
-              <Save size={15} /> {isSaving ? 'Saving...' : 'Save'}
+              <Save size={14} /> {isSaving ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
         </div>
       ) : (
         <>
-          <h4 style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', margin: '0 0 8px' }}>{currentTitle}</h4>
-          <p style={{ fontSize: '14px', color: '#475569', lineHeight: 1.6, whiteSpace: 'pre-wrap', marginBottom: '0' }}>
-            {currentDescription}
-          </p>
-          
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: '12px' }}>
+          <h4 className="my-posted-title">{currentTitle}</h4>
+          <p className="my-posted-desc">{currentDescription}</p>
+
+          <div className="my-posted-footer">
             <div>
               {challenge.ai_summary && (
-                <div style={{ marginBottom: '8px', padding: '10px', background: '#ffffff', borderRadius: '6px', borderLeft: '3px solid #2563eb', fontSize: '13px', color: '#334155' }}>
+                <div className="ai-summary-callout" style={{ marginBottom: '6px' }}>
                   <strong>AI Analysis: </strong> {challenge.ai_summary}
                 </div>
               )}
               {challenge.institutions?.name && (
-                <div style={{ fontSize: '13px', color: '#065f46', background: '#ecfdf5', padding: '6px 10px', borderRadius: '6px', display: 'inline-block' }}>
-                  <strong>Nearest Institution: </strong> {challenge.institutions.name}
+                <div className="institution-pill-assigned">
+                  <strong>Nearest Lab: </strong> {challenge.institutions.name}
                 </div>
               )}
             </div>
-            
-            <div style={{ display: 'flex', gap: '8px', flexShrink: 0, opacity: isHovered ? 1 : 0, pointerEvents: isHovered ? 'auto' : 'none', transition: 'opacity 0.2s' }}>
+
+            <div className="my-posted-actions">
               <button
                 type="button"
-                className="interaction-btn"
-                style={{ color: '#2563eb' }}
+                className="interaction-btn edit-btn"
                 onClick={() => setIsEditing(true)}
               >
-                <Edit size={15} />
+                <Edit size={14} />
                 <span>Edit</span>
               </button>
               <button
                 type="button"
-                className="interaction-btn"
-                style={{ color: '#ef4444' }}
+                className="interaction-btn delete-btn"
                 onClick={handleDelete}
               >
-                <Trash2 size={15} />
+                <Trash2 size={14} />
                 <span>Delete</span>
               </button>
             </div>
@@ -213,7 +207,6 @@ export const StatisticsPage: React.FC<StatisticsPageProps> = ({ hideMyProblems =
     ? (overview.statusBreakdown.completed || 0) + (overview.statusBreakdown.validated || 0)
     : challenges.filter((c) => c.status === 'completed' || c.status === 'validated').length;
 
-  // Under Action: ONLY count problems actively allowed/approved by admin and being worked on
   const underActionChallenges = overview?.statusBreakdown
     ? (overview.statusBreakdown.under_review || 0) +
       (overview.statusBreakdown.routed || 0) +
@@ -224,19 +217,17 @@ export const StatisticsPage: React.FC<StatisticsPageProps> = ({ hideMyProblems =
         ['under_review', 'routed', 'team_formed', 'in_progress', 'under_action'].includes(c.status)
       ).length;
 
-  // Newly submitted challenges awaiting admin approval/action
   const submittedChallenges = overview?.statusBreakdown
-    ? (overview.statusBreakdown.submitted || 0)
+    ? overview.statusBreakdown.submitted || 0
     : challenges.filter((c) => c.status === 'submitted' || !c.status).length;
   const myChallenges = user ? challenges.filter((c) => c.submitted_by === user.id) : [];
 
-  // Trending problems sorted by support count (greater than 0)
   const trendingProblems = challenges
     .filter((c) => (c.support_count || 0) > 0)
     .sort((a, b) => (b.support_count || 0) - (a.support_count || 0))
     .slice(0, 5);
 
-  // Compute monthly chart data
+  // Monthly chart data
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const postedByMonth: Record<string, number> = {};
   const solvedByMonth: Record<string, number> = {};
@@ -258,7 +249,7 @@ export const StatisticsPage: React.FC<StatisticsPageProps> = ({ hideMyProblems =
 
   const chartLabels = allMonths.map((m) => {
     const [year, month] = m.split('-');
-    return `${monthNames[parseInt(month) - 1]} ${year}`;
+    return `${monthNames[parseInt(month) - 1]} ${year.slice(2)}`;
   });
 
   const chartData = {
@@ -268,21 +259,23 @@ export const StatisticsPage: React.FC<StatisticsPageProps> = ({ hideMyProblems =
         label: 'Submitted',
         data: allMonths.map((m) => postedByMonth[m] || 0),
         borderColor: '#2563eb',
-        backgroundColor: 'transparent',
-        borderWidth: 3,
-        tension: 0,
+        backgroundColor: 'rgba(37, 99, 235, 0.08)',
+        borderWidth: 2.5,
+        tension: 0.3,
         pointRadius: 4,
         pointBackgroundColor: '#2563eb',
+        fill: true,
       },
       {
         label: 'Resolved',
         data: allMonths.map((m) => solvedByMonth[m] || 0),
         borderColor: '#16a34a',
-        backgroundColor: 'transparent',
-        borderWidth: 3,
-        tension: 0,
+        backgroundColor: 'rgba(22, 163, 74, 0.08)',
+        borderWidth: 2.5,
+        tension: 0.3,
         pointRadius: 4,
         pointBackgroundColor: '#16a34a',
+        fill: true,
       },
     ],
   };
@@ -293,127 +286,137 @@ export const StatisticsPage: React.FC<StatisticsPageProps> = ({ hideMyProblems =
     plugins: {
       legend: {
         position: 'top' as const,
-        labels: { font: { family: 'Inter', size: 13 }, padding: 16 },
+        labels: { font: { family: 'Inter', size: 12 }, boxWidth: 12, padding: 12 },
       },
     },
     scales: {
       y: {
         beginAtZero: true,
-        ticks: { stepSize: 1, font: { family: 'Inter', size: 12 } },
-        grid: { color: 'rgba(0,0,0,0.05)' },
+        ticks: { stepSize: 1, font: { family: 'Inter', size: 11 } },
+        grid: { color: 'rgba(0,0,0,0.04)' },
       },
       x: {
-        ticks: { font: { family: 'Inter', size: 12 } },
-        grid: { color: 'rgba(0,0,0,0.03)' },
+        ticks: { font: { family: 'Inter', size: 11 } },
+        grid: { color: 'rgba(0,0,0,0.02)' },
       },
     },
   };
 
   return (
-    <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '24px 20px 60px' }}>
-      <div className="feed-header" style={{ marginBottom: '24px' }}>
-        <h2>Analytics Dashboard</h2>
+    <div className="analytics-page-container">
+      <div className="feed-header-bar" style={{ marginBottom: '20px' }}>
+        <div>
+          <h2 className="feed-heading">Analytics & Insights Dashboard</h2>
+          <p className="feed-subheading">Live telemetry on civic reports, AI routing, and resolutions.</p>
+        </div>
       </div>
 
       {loading ? (
-        <p style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>Loading analytics...</p>
+        <div className="top-problems-loading">
+          <BarChart3 size={32} className="animate-spin" color="#2563eb" style={{ margin: '0 auto 12px' }} />
+          <p>Compiling database analytics...</p>
+        </div>
       ) : (
         <div className="statistics-dashboard">
-          {/* Overview Stats */}
+          {/* Overview Metric Boxes */}
           <div className="stats-overview">
-            <div className="stat-box">
-              <h4>Total Challenges</h4>
+            <div className="stat-box card-dynamic">
+              <h4>Total Reports</h4>
               <p>{totalChallenges}</p>
             </div>
-            <div className="stat-box">
-              <h4>Submitted (Awaiting Action)</h4>
+            <div className="stat-box card-dynamic">
+              <h4>Submitted (Awaiting)</h4>
               <p style={{ color: '#6366f1' }}>{submittedChallenges}</p>
             </div>
-            <div className="stat-box">
+            <div className="stat-box card-dynamic">
               <h4>Under Action</h4>
-              <p style={{ color: '#eab308' }}>{underActionChallenges}</p>
+              <p style={{ color: '#d97706' }}>{underActionChallenges}</p>
             </div>
-            <div className="stat-box">
+            <div className="stat-box card-dynamic">
               <h4>Resolved</h4>
               <p style={{ color: '#16a34a' }}>{resolvedChallenges}</p>
             </div>
             {user && !hideMyProblems && (
-              <div className="stat-box" style={{ background: '#eff6ff', borderColor: '#bfdbfe' }}>
+              <div className="stat-box my-posts-stat-box card-dynamic">
                 <h4>My Posts</h4>
                 <p style={{ color: '#2563eb' }}>{myChallenges.length}</p>
               </div>
             )}
           </div>
 
-          {/* Left Column: Districts & Categories */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <div className="stats-card">
+          {/* Left Column: Breakdown Cards */}
+          <div className="stats-column">
+            <div className="stats-card card-dynamic">
               <h3>Challenges by District</h3>
               <div className="stats-card-content">
                 {districts.length > 0 ? (
                   districts.map((d, i) => (
                     <div key={i} className="stat-row">
                       <span>{d.district || 'Unspecified'}</span>
-                      <span style={{ fontWeight: 600 }}>{d.total ?? 0}</span>
+                      <span style={{ fontWeight: 700, color: '#2563eb' }}>{d.total ?? 0}</span>
                     </div>
                   ))
                 ) : (
-                  <p style={{ color: '#64748b', fontSize: '14px' }}>No district records found.</p>
+                  <p style={{ color: '#64748b', fontSize: '13.5px' }}>No district records found.</p>
                 )}
               </div>
             </div>
 
-            <div className="stats-card">
+            <div className="stats-card card-dynamic">
               <h3>Challenges by Category</h3>
               <div className="stats-card-content">
                 {categories.length > 0 ? (
                   categories.map((c, i) => (
                     <div key={i} className="stat-row">
                       <span>{c.name || 'General'}</span>
-                      <span style={{ fontWeight: 600 }}>{c.total ?? 0}</span>
+                      <span style={{ fontWeight: 700, color: '#2563eb' }}>{c.total ?? 0}</span>
                     </div>
                   ))
                 ) : (
-                  <p style={{ color: '#64748b', fontSize: '14px' }}>No category records found.</p>
+                  <p style={{ color: '#64748b', fontSize: '13.5px' }}>No category records found.</p>
                 )}
               </div>
             </div>
           </div>
 
           {/* Right Column: Trending & Chart */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <div className="stats-card">
-              <h3>Trending / Most Supported Challenges</h3>
-              <div className="stats-card-content" style={{ maxHeight: '400px', overflowY: 'auto', paddingRight: '8px' }}>
+          <div className="stats-column">
+            <div className="stats-card card-dynamic">
+              <h3>Trending / Most Supported</h3>
+              <div className="stats-card-content">
                 {trendingProblems.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     {trendingProblems.map((p) => (
-                      <div key={p.id} style={{ padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
-
-                          <span style={{ color: '#64748b', fontWeight: 500 }}>
-                            {(p.status || 'SUBMITTED').replace('_', ' ').toUpperCase()} • {p.district}
+                      <div key={p.id} className="trending-mini-card">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '3px' }}>
+                          <span className="tag tag-district" style={{ padding: '2px 6px', fontSize: '10.5px' }}>
+                            {p.district}
+                          </span>
+                          <span style={{ fontWeight: 700, color: '#ef4444' }}>
+                            ★ {p.support_count} Upvotes
                           </span>
                         </div>
-                        <h4 style={{ fontSize: '15px', fontWeight: 600, color: '#0f172a', margin: '4px 0' }}>{p.title}</h4>
+                        <h4 style={{ fontSize: '14.5px', fontWeight: 700, color: '#0f172a', margin: '4px 0' }}>
+                          {p.title}
+                        </h4>
                         <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>
-                          {p.description && p.description.length > 90 ? p.description.substring(0, 90) + '...' : p.description}
+                          {p.description && p.description.length > 80
+                            ? p.description.substring(0, 80) + '...'
+                            : p.description}
                         </p>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p style={{ color: '#64748b', fontSize: '14px' }}>No trending challenges yet.</p>
+                  <p style={{ color: '#64748b', fontSize: '13.5px' }}>No trending challenges yet.</p>
                 )}
               </div>
             </div>
 
-            <div className="stats-card" style={{ height: '320px' }}>
-              <h3>Submissions vs Resolved</h3>
-              <div className="stats-card-content" style={{ overflow: 'hidden' }}>
-                <div style={{ height: '100%' }}>
-                  <Line data={chartData} options={chartOptions} />
-                </div>
+            <div className="stats-card card-dynamic" style={{ minHeight: '280px' }}>
+              <h3>Submissions vs Resolutions</h3>
+              <div className="stats-card-content" style={{ overflow: 'hidden', height: '220px' }}>
+                <Line data={chartData} options={chartOptions} />
               </div>
             </div>
           </div>
@@ -422,11 +425,11 @@ export const StatisticsPage: React.FC<StatisticsPageProps> = ({ hideMyProblems =
 
       {/* My Problems Section */}
       {!loading && user && !hideMyProblems && (
-        <div className="stats-card" style={{ marginTop: '24px' }}>
-          <h3>My Posted Problems</h3>
+        <div className="stats-card card-dynamic" style={{ marginTop: '24px' }}>
+          <h3>My Submitted Problems</h3>
           <div className="stats-card-content">
             {myChallenges.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 {myChallenges.map((c) => (
                   <MyPostedProblemItem
                     key={c.id}

@@ -10,6 +10,9 @@ import {
   X,
   Camera,
   Image as ImageIcon,
+  MapPin,
+  Tag,
+  FileText,
 } from 'lucide-react';
 
 import { WEST_BENGAL_DISTRICTS, JHARKHAND_DISTRICTS } from '../constants/districts';
@@ -41,6 +44,12 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
   const [files, setFiles] = useState<File[]>([]);
   const [filePreviews, setFilePreviews] = useState<{ url: string; file: File; isVideo: boolean }[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState<any>(null);
+  const [error, setError] = useState('');
+  const [showMediaOptions, setShowMediaOptions] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputCameraRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const previews = files.map((file) => ({
@@ -54,12 +63,6 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
       previews.forEach((p) => URL.revokeObjectURL(p.url));
     };
   }, [files]);
-  const [submitSuccess, setSubmitSuccess] = useState<any>(null);
-  const [error, setError] = useState('');
-  const [showMediaOptions, setShowMediaOptions] = useState(false);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const fileInputCameraRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,282 +107,275 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
   };
 
   return (
-    <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '24px 20px 80px' }}>
-      <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '32px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
-          <div style={{ marginBottom: '24px' }}>
-            <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a' }}>Submit a Societal Challenge</h2>
-            <p style={{ color: '#64748b', fontSize: '14.5px', marginTop: '4px' }}>
-              Report local civic, environmental, agricultural, or infrastructure challenges. Powered by automated AI classification & routing.
+    <div className="submit-page-container">
+      <div className="submit-card-wrapper">
+        <div className="submit-card-header">
+          <div className="submit-badge-pill">
+            <Sparkles size={14} color="#2563eb" /> AI-Powered Crowdsourcing
+          </div>
+          <h2 className="submit-main-title">Submit a Societal Challenge</h2>
+          <p className="submit-subtitle">
+            Report civic, environmental, agricultural, or infrastructure challenges. Gemma 2 AI
+            will automatically analyze, prioritize, and route this to university labs.
+          </p>
+        </div>
+
+        {error && (
+          <div className="auth-error-alert" style={{ marginBottom: '20px' }}>
+            <AlertCircle size={18} style={{ flexShrink: 0 }} />
+            <span>{error}</span>
+          </div>
+        )}
+
+        {submitSuccess && (
+          <div className="submission-success-banner animate-fade-in">
+            <div className="success-banner-title">
+              <CheckCircle size={22} /> Challenge Submitted & AI Classified!
+            </div>
+            <p className="success-banner-desc">
+              Your problem has been registered and routed to university innovation labs across
+              Jharkhand.
             </p>
+            {submitSuccess.category && (
+              <div className="success-category-tag">
+                <Tag size={13} style={{ marginRight: 4 }} /> AI Category: {submitSuccess.category}
+              </div>
+            )}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="submit-form">
+          <div className="form-group">
+            <label htmlFor="p-title" className="form-label">
+              <FileText size={14} style={{ display: 'inline', marginRight: 4 }} />
+              Challenge Title *
+            </label>
+            <input
+              id="p-title"
+              type="text"
+              className="input-field"
+              placeholder="e.g. Arsenic Contamination in Borewell Water Supply"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+            />
           </div>
 
-          {error && (
-            <div style={{ background: '#fee2e2', color: '#b91c1c', padding: '12px 16px', borderRadius: '8px', fontSize: '14px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <AlertCircle size={16} /> {error}
-            </div>
-          )}
-
-          {submitSuccess && (
-            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#15803d', fontWeight: 700, fontSize: '16px', marginBottom: '8px' }}>
-                <CheckCircle size={20} /> Challenge Submitted & AI Classified!
-              </div>
-              <p style={{ fontSize: '14px', color: '#166534', margin: '0 0 10px' }}>
-                Your problem has been routed to university innovation labs across Jharkhand.
-              </p>
-              {submitSuccess.category && (
-                <div style={{ display: 'flex', gap: '10px', fontSize: '13px' }}>
-                  <span className="tag tag-category">Category: {submitSuccess.category}</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit}>
-            <div className="input-group">
-              <label htmlFor="p-title">Challenge Title *</label>
-              <input
-                id="p-title"
-                type="text"
-                className="input-field"
-                placeholder="e.g. Arsenic Contamination in Borewell Water Supply"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                required
-              />
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-              <div>
-                <label className="form-label">District *</label>
-                <select value={district} onChange={(e) => setDistrict(e.target.value)}>
-                  <optgroup label="West Bengal">
-                    {WEST_BENGAL_DISTRICTS.map((d) => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Jharkhand">
-                    {JHARKHAND_DISTRICTS.map((d) => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </optgroup>
-                </select>
-              </div>
-
-              <div>
-                <label className="form-label">Category (Optional)</label>
-                <select value={category} onChange={(e) => setCategory(e.target.value)}>
-                  {CATEGORIES.map((c) => (
-                    <option key={c} value={c}>{c}</option>
+          <div className="form-responsive-row">
+            <div className="form-group" style={{ flex: 1 }}>
+              <label className="form-label">
+                <MapPin size={14} style={{ display: 'inline', marginRight: 4 }} />
+                District *
+              </label>
+              <select
+                value={district}
+                onChange={(e) => setDistrict(e.target.value)}
+                className="input-field select-field"
+              >
+                <optgroup label="West Bengal">
+                  {WEST_BENGAL_DISTRICTS.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
                   ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="input-group">
-              <label htmlFor="p-desc">Detailed Description *</label>
-              <textarea
-                id="p-desc"
-                rows={4}
-                placeholder="Describe the affected community, symptoms, severity, and any existing measures taken..."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="form-group" style={{ marginBottom: '24px' }}>
-              <label className="form-label">Evidence Media (Photo/Video)</label>
-              {files.length > 0 && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '12px', marginBottom: '14px' }}>
-                  {filePreviews.map((preview, index) => (
-                    <div
-                      key={index}
-                      style={{
-                        position: 'relative',
-                        height: '110px',
-                        borderRadius: '10px',
-                        overflow: 'hidden',
-                        border: '2px solid #e2e8f0',
-                        background: '#f8fafc',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-                      }}
-                    >
-                      {preview.isVideo ? (
-                        <video
-                          src={preview.url}
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                      ) : (
-                        <img
-                          src={preview.url}
-                          alt={preview.file.name}
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFiles((prev) => prev.filter((_, i) => i !== index));
-                        }}
-                        style={{
-                          position: 'absolute',
-                          top: '6px',
-                          right: '6px',
-                          background: 'rgba(239, 68, 68, 0.9)',
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: '50%',
-                          width: '24px',
-                          height: '24px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'pointer',
-                          boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                        }}
-                        title="Remove photo"
-                      >
-                        <X size={14} />
-                      </button>
-                      <div
-                        style={{
-                          position: 'absolute',
-                          bottom: 0,
-                          left: 0,
-                          right: 0,
-                          background: 'rgba(15, 23, 42, 0.75)',
-                          color: '#fff',
-                          fontSize: '10px',
-                          padding: '3px 6px',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                        }}
-                      >
-                        {preview.file.name}
-                      </div>
-                    </div>
+                </optgroup>
+                <optgroup label="Jharkhand">
+                  {JHARKHAND_DISTRICTS.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
                   ))}
-                </div>
-              )}
+                </optgroup>
+              </select>
+            </div>
 
-              <div style={{ position: 'relative' }}>
-                <div
-                  className="upload-area"
-                  onClick={() => setShowMediaOptions(true)}
-                  style={{
-                    border: '2px dashed #cbd5e1',
-                    borderRadius: '12px',
-                    padding: '24px 16px',
-                    textAlign: 'center',
-                    background: '#f8fafc',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                  }}
-                >
-                  <UploadCloud size={28} style={{ margin: '0 auto 8px', color: '#2563eb' }} />
-                  <span style={{ fontSize: '14px', color: '#334155', fontWeight: 600, display: 'block' }}>
-                    {files.length > 0 ? '+ Add More Photos/Videos' : 'Click to Upload Photos or Video'}
-                  </span>
-                  <span style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', display: 'block' }}>
-                    PNG, JPG, WEBP, or MP4 (Max 10MB each)
-                  </span>
-                </div>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label className="form-label">
+                <Tag size={14} style={{ display: 'inline', marginRight: 4 }} />
+                Category (Optional)
+              </label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="input-field select-field"
+              >
+                {CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
 
-                {showMediaOptions && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    marginTop: '8px',
-                    background: '#ffffff',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '12px',
-                    boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)',
-                    zIndex: 1000,
-                    width: '240px',
-                    overflow: 'hidden',
-                    display: 'flex',
-                    flexDirection: 'column'
-                  }}>
+          <div className="form-group">
+            <label htmlFor="p-desc" className="form-label">
+              Detailed Description *
+            </label>
+            <textarea
+              id="p-desc"
+              rows={4}
+              className="input-field textarea-field"
+              placeholder="Describe the affected community, symptoms, severity, and any existing measures taken..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">
+              <Camera size={14} style={{ display: 'inline', marginRight: 4 }} />
+              Evidence Media (Photo/Video)
+            </label>
+
+            {/* Uploaded File Previews Grid */}
+            {files.length > 0 && (
+              <div className="media-preview-grid">
+                {filePreviews.map((preview, index) => (
+                  <div key={index} className="media-preview-card">
+                    {preview.isVideo ? (
+                      <video src={preview.url} className="preview-media-item" />
+                    ) : (
+                      <img
+                        src={preview.url}
+                        alt={preview.file.name}
+                        className="preview-media-item"
+                      />
+                    )}
                     <button
                       type="button"
                       onClick={() => {
-                        setShowMediaOptions(false);
-                        fileInputCameraRef.current?.click();
+                        setFiles((prev) => prev.filter((_, i) => i !== index));
                       }}
-                      style={{ padding: '14px 16px', background: 'none', border: 'none', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '15px', color: '#0f172a', fontWeight: 500, cursor: 'pointer', textAlign: 'left' }}
+                      className="preview-remove-btn"
+                      title="Remove file"
+                      aria-label="Remove file"
                     >
-                      <Camera size={18} color="#2563eb" /> Take a Photo/Video
+                      <X size={14} />
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowMediaOptions(false);
-                        fileInputRef.current?.click();
-                      }}
-                      style={{ padding: '14px 16px', background: 'none', border: 'none', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '15px', color: '#0f172a', fontWeight: 500, cursor: 'pointer', textAlign: 'left' }}
-                    >
-                      <ImageIcon size={18} color="#2563eb" /> Choose from Gallery
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowMediaOptions(false)}
-                      style={{ padding: '10px 16px', background: '#f8fafc', border: 'none', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', color: '#64748b', cursor: 'pointer' }}
-                    >
-                      Cancel
-                    </button>
+                    <div className="preview-filename-badge">{preview.file.name}</div>
                   </div>
-                )}
+                ))}
               </div>
+            )}
 
-              <input
-                type="file"
-                ref={fileInputRef}
-                accept="image/*,video/*"
-                multiple
-                style={{ display: 'none' }}
-                onChange={(e) => {
-                  if (e.target.files && e.target.files.length > 0) {
-                    const newFiles = Array.from(e.target.files);
-                    setFiles((prev) => [...prev, ...newFiles]);
-                  }
-                }}
-              />
-              <input
-                type="file"
-                ref={fileInputCameraRef}
-                accept="image/*,video/*"
-                capture="environment"
-                style={{ display: 'none' }}
-                onChange={(e) => {
-                  if (e.target.files && e.target.files[0]) {
-                    const snapped = e.target.files[0];
-                    setFiles((prev) => [...prev, snapped]);
-                  }
-                }}
-              />
+            {/* Upload Drop Zone Trigger */}
+            <div
+              className="upload-drop-zone"
+              onClick={() => setShowMediaOptions(true)}
+            >
+              <UploadCloud size={30} color="#2563eb" style={{ margin: '0 auto 8px' }} />
+              <span className="upload-main-text">
+                {files.length > 0 ? '+ Add More Evidence' : 'Tap to Upload Photo or Video'}
+              </span>
+              <span className="upload-sub-text">
+                Camera capture, PNG, JPG, WEBP, or MP4 (Max 10MB)
+              </span>
             </div>
 
-            <button
-              type="submit"
-              disabled={submitting}
-              className="btn btn-primary w-100"
-              style={{ padding: '14px', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-            >
-              {submitting ? (
-                <>
-                  <Sparkles size={18} className="animate-spin" /> Analyzing & Submitting with AI...
-                </>
-              ) : (
-                <>
-                  <Send size={18} /> Submit Challenge to Platform
-                </>
-              )}
-            </button>
-          </form>
+            {/* Mobile / Desktop Media Options Popup / Bottom Sheet */}
+            {showMediaOptions && (
+              <div
+                className="media-modal-backdrop"
+                onClick={() => setShowMediaOptions(false)}
+              >
+                <div
+                  className="media-options-sheet animate-fade-in"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="sheet-handle-bar" />
+                  <h4 className="sheet-title">Add Evidence Media</h4>
+
+                  <button
+                    type="button"
+                    className="sheet-option-btn"
+                    onClick={() => {
+                      setShowMediaOptions(false);
+                      fileInputCameraRef.current?.click();
+                    }}
+                  >
+                    <div className="sheet-option-icon camera-icon">
+                      <Camera size={20} />
+                    </div>
+                    <div style={{ textAlign: 'left' }}>
+                      <strong>Take Photo / Video</strong>
+                      <p>Open device camera directly</p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="sheet-option-btn"
+                    onClick={() => {
+                      setShowMediaOptions(false);
+                      fileInputRef.current?.click();
+                    }}
+                  >
+                    <div className="sheet-option-icon gallery-icon">
+                      <ImageIcon size={20} />
+                    </div>
+                    <div style={{ textAlign: 'left' }}>
+                      <strong>Choose from Gallery</strong>
+                      <p>Select existing files from storage</p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="sheet-cancel-btn"
+                    onClick={() => setShowMediaOptions(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept="image/*,video/*"
+              multiple
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                if (e.target.files && e.target.files.length > 0) {
+                  const newFiles = Array.from(e.target.files);
+                  setFiles((prev) => [...prev, ...newFiles]);
+                }
+              }}
+            />
+            <input
+              type="file"
+              ref={fileInputCameraRef}
+              accept="image/*,video/*"
+              capture="environment"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                if (e.target.files && e.target.files[0]) {
+                  const snapped = e.target.files[0];
+                  setFiles((prev) => [...prev, snapped]);
+                }
+              }}
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={submitting}
+            className="btn btn-primary submit-submit-btn"
+          >
+            {submitting ? (
+              <>
+                <Sparkles size={18} className="animate-spin" /> Analyzing & Submitting with AI...
+              </>
+            ) : (
+              <>
+                <Send size={18} /> Submit Challenge to Platform
+              </>
+            )}
+          </button>
+        </form>
       </div>
     </div>
   );

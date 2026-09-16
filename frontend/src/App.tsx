@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Header, NavTab } from './components/Header';
+import { BottomNav } from './components/BottomNav';
 import { HomeFeedPage } from './pages/HomeFeedPage';
 import { StatisticsPage } from './pages/StatisticsPage';
 import { CommunityPage } from './pages/CommunityPage';
@@ -54,8 +55,8 @@ export function AppContent() {
   useEffect(() => {
     const apiBase = import.meta.env.VITE_API_BASE_URL || '/api/v1';
     fetch(`${apiBase}/settings`)
-      .then(res => res.ok ? res.json() : null)
-      .then(data => data && setPlatformSettings(data))
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => data && setPlatformSettings(data))
       .catch(() => {});
   }, []);
 
@@ -70,31 +71,40 @@ export function AppContent() {
       hasRouted.current = true;
       if (user.role === 'super_admin' && activeTab !== 'admin-dashboard') {
         setActiveTab('admin-dashboard');
-      } else if ((user.role === 'university_admin' || user.role === 'faculty') && activeTab !== 'institution-dashboard') {
+      } else if (
+        (user.role === 'university_admin' || user.role === 'faculty') &&
+        activeTab !== 'institution-dashboard'
+      ) {
         setActiveTab('institution-dashboard');
       } else if (user.role === 'student' && activeTab !== 'student-dashboard') {
         setActiveTab('student-dashboard');
       }
-    } else if (!isAuthenticated && ['admin-dashboard', 'institution-dashboard', 'student-dashboard'].includes(activeTab)) {
+    } else if (
+      !isAuthenticated &&
+      ['admin-dashboard', 'institution-dashboard', 'student-dashboard'].includes(activeTab)
+    ) {
       setActiveTab('home');
     }
   }, [isAuthenticated, user, activeTab]);
 
   if (activeTab === 'login') {
-    return <LoginPage
-      onSuccess={() => {
-        if (user?.role === 'super_admin') setActiveTab('admin-dashboard');
-        else if (user?.role === 'university_admin' || user?.role === 'faculty') setActiveTab('institution-dashboard');
-        else if (user?.role === 'student') setActiveTab('student-dashboard');
-        else setActiveTab('home');
-      }}
-      onBack={() => setActiveTab('home')}
-    />;
+    return (
+      <LoginPage
+        onSuccess={() => {
+          if (user?.role === 'super_admin') setActiveTab('admin-dashboard');
+          else if (user?.role === 'university_admin' || user?.role === 'faculty')
+            setActiveTab('institution-dashboard');
+          else if (user?.role === 'student') setActiveTab('student-dashboard');
+          else setActiveTab('home');
+        }}
+        onBack={() => setActiveTab('home')}
+      />
+    );
   }
 
   if (['admin-dashboard', 'institution-dashboard', 'student-dashboard'].includes(activeTab)) {
     return (
-      <div>
+      <div className="portal-root-wrapper">
         {activeTab === 'admin-dashboard' && <AdminPortal />}
         {activeTab === 'institution-dashboard' && <InstitutionPortal />}
         {activeTab === 'student-dashboard' && <StudentPortal />}
@@ -103,77 +113,65 @@ export function AppContent() {
   }
 
   return (
-    <div>
+    <div className="app-shell">
       {platformSettings?.systemBannerText && (
-        <div style={{ background: '#f59e0b', color: '#fff', padding: '12px', textAlign: 'center', fontWeight: 600, fontSize: '14px', position: 'sticky', top: 0, zIndex: 1000 }}>
+        <div className="system-top-banner">
           {platformSettings.systemBannerText}
         </div>
       )}
-      <Header activeTab={activeTab} setActiveTab={setActiveTab} platformSettings={platformSettings} />
+      <Header
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        platformSettings={platformSettings}
+      />
 
-      {activeTab === 'home' && <LandingPage onNavigate={(tab) => setActiveTab(tab)} />}
+      <div className="page-content-wrapper">
+        {activeTab === 'home' && <LandingPage onNavigate={(tab) => setActiveTab(tab)} />}
 
-      {activeTab === 'feed' && <HomeFeedPage onNavigateLogin={() => setActiveTab('login')} onNavigateSubmit={() => setActiveTab('submit')} />}
+        {activeTab === 'feed' && (
+          <HomeFeedPage
+            onNavigateLogin={() => setActiveTab('login')}
+            onNavigateSubmit={() => setActiveTab('submit')}
+          />
+        )}
 
-      {activeTab === 'top-problems' && <TopProblemsDashboard />}
+        {activeTab === 'top-problems' && <TopProblemsDashboard />}
 
-      {activeTab === 'submit' && (
-        <ProblemEntryDashboard onNavigateLogin={() => setActiveTab('login')} />
-      )}
+        {activeTab === 'submit' && (
+          <ProblemEntryDashboard onNavigateLogin={() => setActiveTab('login')} />
+        )}
 
+        {activeTab === 'statistics' && <StatisticsPage />}
 
+        {activeTab === 'community' && <CommunityPage />}
 
-      {activeTab === 'statistics' && <StatisticsPage />}
+        {activeTab === 'about' && (
+          <div className="about-page-container">
+            <h2>About Memento</h2>
+            <p>
+              Jharkhand Societal Innovation & Collaboration Platform (SIH 2026 Problem Statement
+              26043). Powered by Google AI Studio (Gemma 2), PostgreSQL Row-Level Security, and
+              automated multi-stakeholder routing.
+            </p>
+          </div>
+        )}
+      </div>
 
-      {activeTab === 'community' && <CommunityPage />}
+      {/* Floating Action Button for Desktop / Tablet */}
+      {isAuthenticated &&
+        ((user?.role === 'citizen' && activeTab !== 'about' && activeTab !== 'submit') ||
+          (user?.role !== 'citizen' && activeTab === 'feed')) && (
+          <button
+            className="floating-action-fab desktop-only-fab"
+            onClick={() => setActiveTab('submit')}
+            aria-label="Submit new problem"
+          >
+            <Plus size={26} strokeWidth={2.5} />
+          </button>
+        )}
 
-      {activeTab === 'admin-dashboard' && <AdminPortal />}
-      {activeTab === 'institution-dashboard' && <InstitutionPortal />}
-      {activeTab === 'student-dashboard' && <StudentPortal />}
-
-      {activeTab === 'about' && (
-        <div style={{ maxWidth: '800px', margin: '60px auto', textAlign: 'center', padding: '20px' }}>
-          <h2 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '12px' }}>About Memento</h2>
-          <p style={{ color: '#64748b', fontSize: '15px', lineHeight: 1.7 }}>
-            Jharkhand Societal Innovation & Collaboration Platform (SIH 2026 Problem Statement 26043). Powered by Google AI Studio (Gemma 2), PostgreSQL Row-Level Security, and automated multi-stakeholder routing.
-          </p>
-        </div>
-      )}
-
-      {/* Floating Plus Button */}
-      {isAuthenticated && ((user?.role === 'citizen' && activeTab !== 'about') || (user?.role !== 'citizen' && activeTab === 'feed')) && (
-        <button
-          onClick={() => setActiveTab('submit')}
-          style={{
-            position: 'fixed',
-            bottom: '40px',
-            right: '40px',
-            width: '60px',
-            height: '60px',
-            borderRadius: '50%',
-            background: '#2563eb',
-            color: '#fff',
-            border: 'none',
-            boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            transition: 'transform 0.2s, background 0.2s',
-            zIndex: 100,
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.transform = 'scale(1.05)';
-            e.currentTarget.style.background = '#1d4ed8';
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.transform = 'scale(1)';
-            e.currentTarget.style.background = '#2563eb';
-          }}
-        >
-          <Plus size={28} strokeWidth={2.5} />
-        </button>
-      )}
+      {/* Mobile Bottom Navigation Bar */}
+      <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
     </div>
   );
 }
