@@ -19,7 +19,6 @@ import {
 } from 'lucide-react';
 import { NotificationsModal } from '../components/NotificationsModal';
 import { useNotifications } from '../hooks/useNotifications';
-import { useIsMobile } from '../hooks/useMediaQuery';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -47,14 +46,11 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeView, 
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
-  const isMobile = useIsMobile();
-
   return (
-    <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', height: '100vh', width: '100vw', overflow: 'hidden', background: '#f8fafc' }}>
+    <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden', background: '#f8fafc' }}>
 
       {/* Sidebar */}
-      {!isMobile && (
-        <aside style={{
+      <aside style={{
           width: isSidebarOpen ? '260px' : '80px',
           background: '#0f172a',
           color: '#fff',
@@ -144,28 +140,21 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeView, 
             </button>
           </div>
         </aside>
-      )}
 
       {/* Main Content Area */}
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', paddingBottom: isMobile ? '64px' : '0' }}>
+      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
         {/* Topbar */}
-        <header style={{ height: '70px', background: '#fff', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? '0 16px' : '0 32px' }}>
+        <header style={{ height: '70px', background: '#fff', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', color: '#64748b' }}>
-            {isMobile ? (
-              <h1 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>Memento<span style={{ color: '#ef4444' }}>.admin</span></h1>
-            ) : (
-              <>
-                <Search size={20} />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  placeholder="Search across platform..."
-                  style={{ border: 'none', outline: 'none', fontSize: '15px', width: '300px' }}
-                />
-              </>
-            )}
+            <Search size={20} />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search across platform..."
+              style={{ border: 'none', outline: 'none', fontSize: '15px', width: '300px' }}
+            />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <button onClick={() => setNotificationsOpen(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', position: 'relative' }}>
@@ -175,12 +164,10 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeView, 
               )}
             </button>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              {!isMobile && (
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '14px', fontWeight: 600, color: '#0f172a' }}>{user?.name || 'Super Admin'}</div>
-                  <div style={{ fontSize: '12px', color: '#64748b' }}>System Administrator</div>
-                </div>
-              )}
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '14px', fontWeight: 600, color: '#0f172a' }}>{user?.name || 'Super Admin'}</div>
+                <div style={{ fontSize: '12px', color: '#64748b' }}>System Administrator</div>
+              </div>
               <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#fee2e2', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '14px' }}>
                 {user?.name?.charAt(0) || 'A'}
               </div>
@@ -189,7 +176,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeView, 
         </header>
 
         {/* Scrollable Content */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '16px' : '32px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '32px' }}>
           {React.Children.map(children, child => {
             if (React.isValidElement(child)) {
               return React.cloneElement(child as React.ReactElement<any>, { searchQuery });
@@ -199,47 +186,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeView, 
         </div>
       </main>
 
-      {/* Mobile Bottom Navigation */}
-      {isMobile && (
-        <nav style={{
-          position: 'fixed', bottom: 0, left: 0, right: 0, height: '64px',
-          background: '#fff', borderTop: '1px solid #e2e8f0',
-          display: 'flex', alignItems: 'center', zIndex: 1000,
-          boxShadow: '0 -4px 6px -1px rgba(0,0,0,0.05)',
-          overflowX: 'auto', whiteSpace: 'nowrap', padding: '0 8px'
-        }}>
-          {navItems.map(item => {
-            const Icon = item.icon;
-            const isActive = activeView === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveView(item.id)}
-                style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
-                  background: 'none', border: 'none', padding: '8px 12px', cursor: 'pointer',
-                  color: isActive ? '#ef4444' : '#64748b', minWidth: '64px', flexShrink: 0
-                }}
-              >
-                <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />
-                <span style={{ fontSize: '10px', fontWeight: isActive ? 600 : 500 }}>{item.label}</span>
-              </button>
-            );
-          })}
-          <div style={{ width: '1px', height: '32px', background: '#e2e8f0', margin: '0 8px', flexShrink: 0 }}></div>
-          <button
-            onClick={() => window.dispatchEvent(new CustomEvent('navigate', { detail: 'feed' }))}
-            style={{
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
-              background: 'none', border: 'none', padding: '8px 12px', cursor: 'pointer',
-              color: '#64748b', minWidth: '64px', flexShrink: 0
-            }}
-          >
-            <Home size={22} />
-            <span style={{ fontSize: '10px', fontWeight: 500 }}>Feed</span>
-          </button>
-        </nav>
-      )}
+
 
       <NotificationsModal isOpen={isNotificationsOpen} onClose={() => setNotificationsOpen(false)} />
     </div>

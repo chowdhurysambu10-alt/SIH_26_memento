@@ -31,8 +31,8 @@ export class AuthController {
   @Post('request-otp')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Request an OTP for password reset' })
-  async requestOtp(@Body() dto: { email: string; contact?: string }) {
-    return this.authService.requestOtp(dto.email, dto.contact);
+  async requestOtp(@Body() dto: { email: string }) {
+    return this.authService.requestOtp(dto.email);
   }
 
   @Public()

@@ -17,8 +17,6 @@ import {
   ChevronLeft
 } from 'lucide-react';
 
-import { useIsMobile } from '../hooks/useMediaQuery';
-
 interface LoginPageProps {
   onSuccess: () => void;
   onBack?: () => void;
@@ -34,7 +32,6 @@ const ROLES = [
 export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
   const { user, login, signup, logout } = useAuth();
   const { showAlert } = useUI();
-  const isMobile = useIsMobile();
 
   const [activeRole, setActiveRole] = useState<typeof ROLES[0] | null>(null);
   const [isSignUp, setIsSignUp] = useState(false);
@@ -43,6 +40,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
   const [otpVerified, setOtpVerified] = useState(false);
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
   
   const [name, setName] = useState('');
   const [orgName, setOrgName] = useState('');
@@ -56,58 +54,55 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Resend OTP 60s cooldown timer
+  React.useEffect(() => {
+    let timer: any;
+    if (resendCooldown > 0) {
+      timer = setInterval(() => {
+        setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [resendCooldown]);
+
   const handleForgotPassword = async () => {
-    if (!email.trim()) {
-      setError('Please enter your Registered Email Address first.');
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email.trim() || !emailRegex.test(email.trim())) {
+      setError('Please enter a valid Registered Email Address.');
       return;
     }
     setLoading(true);
+    setError('');
     try {
-      await authApi.requestOtp(email.trim());
-      showAlert(`A password reset OTP has been sent to your email`, 'success');
-      setError('');
+      const res = await authApi.requestOtp(email.trim());
+      showAlert(res?.message || 'A 6-digit recovery OTP has been sent to your email.', 'success');
       setOtpSent(true);
+      setResendCooldown(60);
+      setOtp('');
     } catch (err: any) {
-      setError(err.message || 'Failed to request OTP');
+      setError(err.message || 'Failed to send OTP. Please verify your email.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleVerifyOtp = async () => {
-    if (!otp.trim()) {
-      setError('Please enter the OTP');
+    const cleanOtp = otp.trim();
+    if (!cleanOtp || cleanOtp.length < 6 || cleanOtp.length > 8 || !/^\d{6,8}$/.test(cleanOtp)) {
+      setError('Please enter the valid recovery OTP code.');
       return;
     }
     setLoading(true);
+    setError('');
     try {
-      await authApi.verifyOtp(email.trim(), otp);
+      await authApi.verifyOtp(email.trim(), cleanOtp);
+      showAlert('OTP verified successfully! Please set your new password.', 'success');
       setOtpVerified(true);
       setError('');
     } catch (err: any) {
-      setError(err.message || 'Invalid OTP');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResetPassword = async () => {
-    if (!newPassword || newPassword.length < 6) {
-      setError('Please enter a new password (min 6 characters)');
-      return;
-    }
-    setLoading(true);
-    try {
-      await authApi.resetPassword(email.trim(), newPassword);
-      showAlert(`Your password has been reset successfully!`, 'success');
-      setIsForgotPassword(false);
-      setOtpSent(false);
-      setOtpVerified(false);
-      setOtp('');
-      setNewPassword('');
-      setError('');
-    } catch (err: any) {
-      setError(err.message || 'Failed to reset password');
+      setError(err.message || 'Invalid or expired OTP. Please check the code or request a new one.');
     } finally {
       setLoading(false);
     }
@@ -115,6 +110,41 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
 
   const passRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
   const showPasswordError = isSignUp && password.length > 0 && !passRegex.test(password);
+  const showResetPasswordError = newPassword.length > 0 && !passRegex.test(newPassword);
+  const showMismatchError = confirmPassword.length > 0 && newPassword !== confirmPassword;
+
+  const handleResetPassword = async () => {
+    if (!newPassword) {
+      setError('Please enter your new password.');
+      return;
+    }
+    if (!passRegex.test(newPassword)) {
+      setError('Password must be at least 8 characters and contain 1 uppercase, 1 lowercase, 1 number, and 1 special character.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match. Please ensure both passwords are identical.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const res = await authApi.resetPassword(email.trim(), newPassword);
+      showAlert(res?.message || 'Your password has been reset successfully! Please sign in with your new password.', 'success');
+      setIsForgotPassword(false);
+      setOtpSent(false);
+      setOtpVerified(false);
+      setOtp('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setPassword('');
+      setError('');
+    } catch (err: any) {
+      setError(err.message || 'Failed to reset password. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -174,16 +204,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
 
   if (user) {
     return (
-      <div style={{ ...styles.pageWrapper, flexDirection: isMobile ? 'column' : 'row' }}>
-        <div style={{ ...styles.brandPanel, width: isMobile ? '100%' : '42%', padding: isMobile ? '32px 24px' : '60px 48px' }}>
+      <div style={styles.pageWrapper}>
+        <div style={styles.brandPanel}>
           <div>
             <div style={{ marginBottom: 16 }}><Globe size={48} color="#fff" /></div>
             <h1 style={{ fontSize: 32, fontWeight: 700, color: '#fff', margin: '0 0 8px' }}>Memento</h1>
             <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.8)', margin: 0, lineHeight: 1.6 }}>Societal Innovation & Collaboration Platform</p>
           </div>
         </div>
-        <div style={{ ...styles.formPanel, padding: isMobile ? '24px' : '40px 48px' }}>
-          <div style={{ ...styles.formInner, maxWidth: isMobile ? '100%' : 480 }}>
+        <div style={styles.formPanel}>
+          <div style={styles.formInner}>
             <div style={{ textAlign: 'center', marginBottom: 32 }}>
               <div style={{ marginBottom: 12 }}><CheckCircle2 size={48} color="#2563eb" style={{ margin: '0 auto' }} /></div>
               <h2 style={{ fontSize: 28, fontWeight: 700, color: '#0f172a', margin: '0 0 8px' }}>Welcome, {user.name || 'User'}!</h2>
@@ -201,15 +231,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
   }
 
   return (
-    <div style={{ ...styles.pageWrapper, flexDirection: isMobile ? 'column' : 'row' }}>
-      <div style={{ ...styles.brandPanel, width: isMobile ? '100%' : '42%', padding: isMobile ? '32px 24px' : '60px 48px', background: activeRole ? `linear-gradient(135deg, ${activeRole.color} 0%, #1e40af 100%)` : styles.brandPanel.background }}>
+    <div style={styles.pageWrapper}>
+      <div style={{ ...styles.brandPanel, background: activeRole ? `linear-gradient(135deg, ${activeRole.color} 0%, #1e40af 100%)` : styles.brandPanel.background }}>
         <div style={{ transition: 'all 0.3s ease' }}>
-          <div style={{ marginBottom: 16, display: isMobile ? 'none' : 'block' }}><Globe size={48} color="#fff" /></div>
-          <h1 style={{ fontSize: isMobile ? 24 : 32, fontWeight: 700, color: '#fff', margin: '0 0 8px' }}>Memento</h1>
-          {!isMobile && <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.8)', margin: 0, lineHeight: 1.6 }}>Societal Innovation &<br />Collaboration Platform</p>}
-          {!isMobile && <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 8 }}>by Team Memento · SIH26043</p>}
+          <div style={{ marginBottom: 16 }}><Globe size={48} color="#fff" /></div>
+          <h1 style={{ fontSize: 32, fontWeight: 700, color: '#fff', margin: '0 0 8px' }}>Memento</h1>
+          <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.8)', margin: 0, lineHeight: 1.6 }}>Societal Innovation &<br />Collaboration Platform</p>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 8 }}>by Team Memento · SIH26043</p>
           
-          {activeRole && !isMobile && (
+          {activeRole && (
             <div style={{ marginTop: 40, padding: '24px', background: 'rgba(255,255,255,0.1)', borderRadius: 16, backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.2)' }}>
               <activeRole.icon size={32} color="#fff" style={{ marginBottom: 12 }} />
               <h3 style={{ color: '#fff', margin: '0 0 8px', fontSize: '20px' }}>{activeRole.label}</h3>
@@ -221,8 +251,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
         </div>
       </div>
 
-      <div style={{ ...styles.formPanel, padding: isMobile ? '24px' : '40px 48px' }}>
-        <div style={{ ...styles.formInner, maxWidth: isMobile ? '100%' : 480 }}>
+      <div style={styles.formPanel}>
+        <div style={styles.formInner}>
           {!activeRole ? (
             // ROLE SELECTION STEP
             <div>
@@ -271,6 +301,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
                     setOtpVerified(false);
                     setOtp('');
                     setNewPassword('');
+                    setConfirmPassword('');
                     setError('');
                   } else {
                     setActiveRole(null); 
@@ -331,16 +362,20 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
                 <div>
                   {!otpSent ? (
                     <>
-                      <div style={{ marginBottom: 14 }}>
-                        <label style={styles.label}>Registered Email Address (Required)</label>
+                      <div style={{ marginBottom: 16 }}>
+                        <label style={styles.label}>Registered Email Address</label>
                         <input
                           type="email"
                           value={email}
-                          onChange={(e) => setEmail(e.target.value)}
+                          onChange={(e) => { setEmail(e.target.value); setError(''); }}
                           placeholder="name@domain.com"
                           style={styles.input}
                           required
+                          autoFocus
                         />
+                        <p style={{ fontSize: 13, color: '#64748b', marginTop: 6, margin: '6px 0 0' }}>
+                          A 6-digit recovery OTP will be sent directly to this address via Supabase Auth.
+                        </p>
                       </div>
                       {error && (
                         <div style={{ ...styles.errorBanner, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -353,20 +388,26 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
                         disabled={loading}
                         style={{ ...styles.submitBtn, background: activeRole.color, padding: '14px', fontSize: 16, opacity: loading ? 0.7 : 1 }}
                       >
-                        {loading ? 'Sending...' : 'Send Reset OTP'}
+                        {loading ? 'Sending Recovery OTP...' : 'Send Reset OTP'}
                       </button>
                     </>
                   ) : !otpVerified ? (
                     <>
+                      <div style={{ marginBottom: 16, padding: '12px 14px', background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                        <p style={{ margin: 0, fontSize: 13, color: '#475569', lineHeight: 1.5 }}>
+                          A 6-digit OTP code has been sent to <strong style={{ color: '#0f172a' }}>{email}</strong>. Please check your inbox and spam folder.
+                        </p>
+                      </div>
                       <div style={{ marginBottom: 20 }}>
-                        <label style={styles.label}>Enter 6-Digit OTP</label>
+                        <label style={styles.label}>Enter Recovery OTP</label>
                         <input
                           type="text"
                           value={otp}
-                          onChange={(e) => setOtp(e.target.value)}
-                          placeholder="000000"
-                          style={{ ...styles.input, letterSpacing: '4px', textAlign: 'center', fontSize: '20px' }}
-                          maxLength={6}
+                          onChange={(e) => { setOtp(e.target.value.replace(/\D/g, '').slice(0, 8)); setError(''); }}
+                          placeholder="••••••"
+                          style={{ ...styles.input, letterSpacing: '6px', textAlign: 'center', fontSize: '22px', fontWeight: 600 }}
+                          maxLength={8}
+                          autoFocus
                         />
                       </div>
                       {error && (
@@ -377,36 +418,101 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
                       <button
                         type="button"
                         onClick={handleVerifyOtp}
-                        disabled={loading}
-                        style={{ ...styles.submitBtn, background: activeRole.color, padding: '14px', fontSize: 16, opacity: loading ? 0.7 : 1 }}
+                        disabled={loading || otp.trim().length < 6}
+                        style={{ ...styles.submitBtn, background: activeRole.color, padding: '14px', fontSize: 16, opacity: (loading || otp.trim().length < 6) ? 0.6 : 1 }}
                       >
                         {loading ? 'Verifying...' : 'Verify OTP'}
                       </button>
+
+                      <div style={{ marginTop: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13 }}>
+                        <button
+                          type="button"
+                          onClick={() => { setOtpSent(false); setOtp(''); setError(''); }}
+                          style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+                        >
+                          Change Email
+                        </button>
+                        {resendCooldown > 0 ? (
+                          <span style={{ color: '#94a3b8' }}>Resend in {resendCooldown}s</span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={handleForgotPassword}
+                            disabled={loading}
+                            style={{ background: 'none', border: 'none', color: activeRole.color, cursor: 'pointer', fontWeight: 600, padding: 0 }}
+                          >
+                            Resend OTP
+                          </button>
+                        )}
+                      </div>
                     </>
                   ) : (
                     <>
-                      <div style={{ marginBottom: 20 }}>
-                        <label style={styles.label}>New Password</label>
-                        <input
-                          type="password"
-                          value={newPassword}
-                          onChange={(e) => setNewPassword(e.target.value)}
-                          placeholder="••••••••"
-                          style={styles.input}
-                        />
+                      <div style={{ marginBottom: 16, padding: '10px 14px', background: '#ecfdf5', borderRadius: 10, border: '1px solid #a7f3d0' }}>
+                        <p style={{ margin: 0, fontSize: 13, color: '#065f46', display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <CheckCircle2 size={16} color="#059669" /> OTP verified successfully. Enter your new password below.
+                        </p>
                       </div>
+
+                      <div style={{ marginBottom: 16 }}>
+                        <label style={styles.label}>New Password</label>
+                        <div style={{ position: 'relative' }}>
+                          <input
+                            type={showPass ? 'text' : 'password'}
+                            value={newPassword}
+                            onChange={(e) => { setNewPassword(e.target.value); setError(''); }}
+                            placeholder="Enter new password"
+                            style={styles.input}
+                            autoFocus
+                            required
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPass(!showPass)}
+                            style={styles.eyeBtn}
+                          >
+                            {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
+                        {showResetPasswordError && (
+                          <div style={{ color: '#b91c1c', fontSize: 12, marginTop: 6, display: 'flex', gap: 4, alignItems: 'center' }}>
+                            <AlertCircle size={14} /> Must be 8+ chars, 1 uppercase, 1 lowercase, 1 number, 1 special char.
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={{ marginBottom: 20 }}>
+                        <label style={styles.label}>Confirm New Password</label>
+                        <div style={{ position: 'relative' }}>
+                          <input
+                            type={showPass ? 'text' : 'password'}
+                            value={confirmPassword}
+                            onChange={(e) => { setConfirmPassword(e.target.value); setError(''); }}
+                            placeholder="Re-enter new password"
+                            style={styles.input}
+                            required
+                          />
+                        </div>
+                        {showMismatchError && (
+                          <div style={{ color: '#b91c1c', fontSize: 12, marginTop: 6, display: 'flex', gap: 4, alignItems: 'center' }}>
+                            <AlertCircle size={14} /> Passwords do not match.
+                          </div>
+                        )}
+                      </div>
+
                       {error && (
                         <div style={{ ...styles.errorBanner, display: 'flex', alignItems: 'center', gap: 8 }}>
                           <AlertCircle size={16} /> {error}
                         </div>
                       )}
+
                       <button
                         type="button"
                         onClick={handleResetPassword}
                         disabled={loading}
                         style={{ ...styles.submitBtn, background: activeRole.color, padding: '14px', fontSize: 16, opacity: loading ? 0.7 : 1 }}
                       >
-                        {loading ? 'Resetting...' : 'Reset Password'}
+                        {loading ? 'Updating Password...' : 'Reset Password & Return to Login'}
                       </button>
                     </>
                   )}

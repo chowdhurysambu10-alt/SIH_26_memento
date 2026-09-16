@@ -6,38 +6,32 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as nodemailer from 'nodemailer';
 import { SignupDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
 import { SettingsService } from '../settings/settings.service';
 import { Inject, forwardRef } from '@nestjs/common';
 
+interface VerifiedRecoverySession {
+  userId: string;
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+}
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
 
-  // In-memory OTP store (target -> { otp, expiresAt, contact, verified })
-  private otpStore = new Map<string, { otp: string; expiresAt: number; contact?: string; verified?: boolean }>();
+  // Store authenticated recovery sessions from Supabase verifyOtp (email -> session, TTL 15 minutes)
+  private recoverySessions = new Map<string, VerifiedRecoverySession>();
   
-  // Rate limiting for OTP requests per day
-  private dailyOtpRequests = new Map<string, { count: number; date: string }>();
-  
-  private transporter: nodemailer.Transporter;
+  // Rate limiting for OTP requests (email -> { count, lastRequested })
+  private otpRequestRateLimit = new Map<string, { count: number; lastRequested: number }>();
 
   constructor(
     private readonly supabaseService: SupabaseService,
     @Inject(forwardRef(() => SettingsService)) private readonly settingsService: SettingsService
-  ) {
-    this.transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    });
-  }
+  ) {}
 
   async signup(dto: SignupDto) {
     // Optional: Numverify Phone Verification
@@ -205,177 +199,181 @@ export class AuthService {
     };
   }
 
-  // --- OTP VERIFICATION LOGIC ---
-  
-  private async checkMobileRateLimit(): Promise<void> {
-    const filePath = path.join(process.cwd(), 'data', 'otp_limits.json');
-    const currentMonth = new Date().toISOString().slice(0, 7); // e.g., "2026-09"
-    
-    let limits = { month: currentMonth, count: 0 };
-    
-    try {
-      if (fs.existsSync(filePath)) {
-        const data = await fs.promises.readFile(filePath, 'utf-8');
-        const parsed = JSON.parse(data);
-        if (parsed.month === currentMonth) {
-          limits = parsed;
-        }
-      }
-    } catch (err) {
-      this.logger.error(`Error reading rate limits: ${err}`);
+  // --- REAL SUPABASE AUTH PASSWORD RECOVERY FLOW ---
+
+  async requestOtp(email: string) {
+    const normalizedEmail = email?.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!normalizedEmail || !emailRegex.test(normalizedEmail)) {
+      throw new BadRequestException('Please enter a valid email address.');
     }
 
-    if (limits.count >= 100) {
-      throw new BadRequestException('For this month your mobile verification feature is blocked. Try using a gmail account or wait till next month 1st day or contact support.');
-    }
-
-    limits.count += 1;
-    
-    try {
-      if (!fs.existsSync(path.dirname(filePath))) {
-        await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
-      }
-      await fs.promises.writeFile(filePath, JSON.stringify(limits, null, 2));
-    } catch (err) {
-      this.logger.error(`Error writing rate limits: ${err}`);
-    }
-  }
-
-  async requestOtp(email: string, contact?: string) {
     const admin = this.supabaseService.getAdminClient();
-    
-    const today = new Date().toISOString().slice(0, 10);
-    const requestStats = this.dailyOtpRequests.get(email.trim()) || { count: 0, date: today };
-    if (requestStats.date !== today) {
-      requestStats.count = 0;
-      requestStats.date = today;
-    }
-    if (requestStats.count >= 5) {
-      throw new BadRequestException('You have exceeded the maximum limit of 5 OTP requests per day.');
-    }
-    
-    // Check if user exists
+
+    // Verify user exists in the database
     const { data: user, error: userError } = await admin
       .from('users')
-      .select('id, email, contact')
-      .eq('email', email.trim())
+      .select('id, email')
+      .eq('email', normalizedEmail)
       .single();
-      
+
     if (userError || !user) {
       throw new BadRequestException('No account found with this email address.');
     }
-    
-    // If contact is provided for mobile verification, apply rate limit and verify
-    if (contact) {
-      if (user.contact && user.contact !== contact) {
-        throw new BadRequestException('Mobile number does not match the registered account. Please check the number or use email verification.');
+
+    // Rate limiting & cooldown enforcement
+    const now = Date.now();
+    const rateLimit = this.otpRequestRateLimit.get(normalizedEmail);
+    if (rateLimit) {
+      const elapsed = now - rateLimit.lastRequested;
+      if (elapsed < 60 * 1000) {
+        const remainingSeconds = Math.ceil((60 * 1000 - elapsed) / 1000);
+        throw new BadRequestException(`Please wait ${remainingSeconds} seconds before requesting another OTP.`);
       }
-      await this.checkMobileRateLimit();
+      if (elapsed < 10 * 60 * 1000 && rateLimit.count >= 10) {
+        throw new BadRequestException('Too many OTP requests. Please wait a few minutes before trying again.');
+      }
+      if (elapsed >= 10 * 60 * 1000) {
+        rateLimit.count = 0;
+      }
     }
 
-    // Generate a 6-digit random number
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    
-    // Store in memory for 10 minutes against the USER'S EMAIL
-    this.otpStore.set(email.trim(), {
-      otp,
-      expiresAt: Date.now() + 10 * 60 * 1000,
-      contact: contact || undefined,
-      verified: false,
+    // Invoke real Supabase Auth password recovery
+    const anonClient = this.supabaseService.getAnonClient();
+    const redirectUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+    const { error: resetError } = await anonClient.auth.resetPasswordForEmail(normalizedEmail, {
+      redirectTo: redirectUrl,
     });
-    
-    requestStats.count++;
-    this.dailyOtpRequests.set(email.trim(), requestStats);
 
-    if (!contact && process.env.SMTP_USER) {
-      const settings = await this.settingsService.getSettings();
-      if (!settings.enableEmailService) {
-        this.logger.log(`Skipped sending OTP email to ${email} (Email Service Disabled)`);
-        return { message: 'OTP flow is skipped because email service is disabled.' };
+    if (resetError) {
+      this.logger.error(`Supabase resetPasswordForEmail failed for ${normalizedEmail}: ${resetError.message} (status: ${resetError.status})`);
+      if (resetError.status === 429 || resetError.message?.toLowerCase().includes('rate limit')) {
+        throw new BadRequestException('Too many OTP requests. Please wait a few minutes before trying again.');
       }
-      // Send email via Nodemailer if no contact is provided (email flow)
-      try {
-        await this.transporter.sendMail({
-          from: `"Memento Support" <${process.env.SMTP_USER}>`,
-          to: email.trim(),
-          subject: 'Your Password Reset OTP',
-          html: `<p>Your Memento OTP for password reset is: <strong>${otp}</strong></p><p>This OTP is valid for 10 minutes.</p>`,
-        });
-        this.logger.log(`Sent OTP email to ${email}`);
-      } catch (err) {
-        this.logger.error(`Failed to send OTP email: ${err}`);
-        throw new BadRequestException('Failed to send OTP email.');
+      if (resetError.message?.toLowerCase().includes('smtp') || resetError.message?.toLowerCase().includes('email')) {
+        throw new BadRequestException(
+          'Email delivery failed on Supabase SMTP (535 BadCredentials). Google requires a 16-character App Password (generated at myaccount.google.com/apppasswords), not a standard password.'
+        );
       }
-    } else if (contact) {
-      // Logging the mobile OTP (pretend SMS delivery)
-      this.logger.log(`Generated OTP for mobile ${contact}: ${otp}`);
+      throw new BadRequestException(resetError.message || 'Failed to send recovery OTP.');
     }
 
-    return { success: true, message: `OTP generated for ${contact || email}` };
+    const currentCount = (rateLimit ? rateLimit.count : 0) + 1;
+    this.otpRequestRateLimit.set(normalizedEmail, { count: currentCount, lastRequested: now });
+
+    this.logger.log(`Password reset recovery OTP dispatched via Supabase Auth for ${normalizedEmail}`);
+    return {
+      success: true,
+      message: 'A recovery OTP has been sent to your email address.',
+    };
   }
 
   async verifyOtp(email: string, otp: string) {
-    const record = this.otpStore.get(email.trim());
-    
-    if (!record) {
-      throw new BadRequestException('No OTP request found for this account.');
+    const normalizedEmail = email?.trim().toLowerCase();
+    const normalizedOtp = otp?.trim();
+
+    if (!normalizedEmail || !normalizedOtp) {
+      throw new BadRequestException('Email and OTP are required.');
     }
-    
-    if (Date.now() > record.expiresAt) {
-      this.otpStore.delete(email.trim());
-      throw new BadRequestException('OTP has expired.');
+
+    if (!/^\d{6,8}$/.test(normalizedOtp)) {
+      throw new BadRequestException('OTP must be a 6 to 8 digit number.');
     }
-    
-    if (record.otp !== otp) {
-      throw new BadRequestException('Invalid OTP.');
+
+    const anonClient = this.supabaseService.getAnonClient();
+    const { data, error } = await anonClient.auth.verifyOtp({
+      email: normalizedEmail,
+      token: normalizedOtp,
+      type: 'recovery',
+    });
+
+    if (error || !data.user || !data.session) {
+      this.logger.warn(`Supabase verifyOtp failed for ${normalizedEmail}: ${error?.message || 'No session returned'}`);
+      if (error?.code === 'otp_expired' || error?.message?.toLowerCase().includes('expired')) {
+        throw new BadRequestException('The OTP has expired. Please request a new OTP.');
+      }
+      throw new BadRequestException('Invalid OTP. Please check the 6-digit code sent to your email.');
     }
-    
-    record.verified = true;
-    return { success: true, message: 'OTP verified successfully.' };
+
+    // Save authenticated recovery session with 15-minute expiration
+    this.recoverySessions.set(normalizedEmail, {
+      userId: data.user.id,
+      accessToken: data.session.access_token,
+      refreshToken: data.session.refresh_token,
+      expiresAt: Date.now() + 15 * 60 * 1000,
+    });
+
+    this.logger.log(`Recovery OTP verified successfully via Supabase Auth for ${normalizedEmail}`);
+    return {
+      success: true,
+      message: 'OTP verified successfully.',
+    };
   }
 
   async resetPassword(email: string, newPassword?: string) {
-    const record = this.otpStore.get(email.trim());
-    
-    if (!record || !record.verified) {
-      throw new BadRequestException('OTP not verified or request expired.');
-    }
-    
-    if (!newPassword || newPassword.length < 6) {
-      throw new BadRequestException('New password must be at least 6 characters.');
+    const normalizedEmail = email?.trim().toLowerCase();
+    if (!normalizedEmail) {
+      throw new BadRequestException('Email is required.');
     }
 
-    const admin = this.supabaseService.getAdminClient();
-
-    // Find the user ID from the users table first
-    const { data: user, error: userError } = await admin
-      .from('users')
-      .select('id, contact')
-      .eq('email', email.trim())
-      .single();
-
-    if (userError || !user) {
-      throw new BadRequestException('User not found.');
+    const passRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+    if (!newPassword || !passRegex.test(newPassword)) {
+      throw new BadRequestException(
+        'Password must be at least 8 characters and contain at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character.'
+      );
     }
 
-    // Force update the password in Supabase Auth
-    const { error: updateError } = await admin.auth.admin.updateUserById(user.id, {
-      password: newPassword,
-    });
+    const session = this.recoverySessions.get(normalizedEmail);
+    if (!session || Date.now() > session.expiresAt) {
+      this.recoverySessions.delete(normalizedEmail);
+      throw new BadRequestException('Your verification session has expired. Please verify your OTP again.');
+    }
 
-    if (updateError) {
-      this.logger.error(`Failed to update password for ${email}: ${updateError.message}`);
-      throw new BadRequestException('Failed to update password. Please try again.');
+    const anonClient = this.supabaseService.getAnonClient();
+    let updated = false;
+
+    try {
+      const { error: setSessionError } = await anonClient.auth.setSession({
+        access_token: session.accessToken,
+        refresh_token: session.refreshToken,
+      });
+
+      if (!setSessionError) {
+        const { error: updateError } = await anonClient.auth.updateUser({
+          password: newPassword,
+        });
+
+        if (!updateError) {
+          updated = true;
+        } else {
+          this.logger.warn(`anonClient.auth.updateUser error: ${updateError.message}. Attempting admin client fallback.`);
+        }
+      }
+    } catch (err: any) {
+      this.logger.warn(`Exception setting recovery session: ${err?.message}`);
     }
-    
-    // If the reset was done via mobile and it's a new number, store it
-    if (record.contact && !user.contact) {
-      await admin.from('users').update({ contact: record.contact }).eq('id', user.id);
+
+    // Fallback: Admin client update guarantees password is updated in Supabase Auth
+    if (!updated) {
+      const admin = this.supabaseService.getAdminClient();
+      const { error: adminError } = await admin.auth.admin.updateUserById(session.userId, {
+        password: newPassword,
+      });
+
+      if (adminError) {
+        this.logger.error(`Admin updateUserById failed for user ${session.userId}: ${adminError.message}`);
+        throw new BadRequestException('Failed to update password. Please try again.');
+      }
     }
-    
-    // Valid OTP and successful update - clean it up
-    this.otpStore.delete(email.trim());
-    
-    return { success: true, message: 'Password has been reset successfully.' };
+
+    // Clean up recovery session
+    this.recoverySessions.delete(normalizedEmail);
+
+    this.logger.log(`Password reset completed successfully in Supabase Auth for ${normalizedEmail}`);
+    return {
+      success: true,
+      message: 'Your password has been reset successfully. You can now log in.',
+    };
   }
 }

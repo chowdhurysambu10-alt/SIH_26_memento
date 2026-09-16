@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Plus } from 'lucide-react';
-import { DesktopModeWarning } from './components/DesktopModeWarning';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { UIProvider } from './context/UIContext';
 import { Header, NavTab } from './components/Header';
@@ -127,7 +126,6 @@ export function AppContent() {
 
   return (
     <div className="app-container" style={{ position: 'relative' }}>
-      <DesktopModeWarning />
       {platformSettings?.systemBannerText && (
         <div style={{ background: '#f59e0b', color: '#fff', padding: '12px', textAlign: 'center', fontWeight: 600, fontSize: '14px', position: 'sticky', top: 0, zIndex: 1000 }}>
           {platformSettings.systemBannerText}
