@@ -24,8 +24,8 @@ export class OverrideRoutingDto {
   @IsString()
   override_category_slug?: string;
 
-  @ApiProperty({ example: 'Re-routed to BIT Sindri due to specialized water filtration research lab.' })
+  @ApiPropertyOptional({ example: 'Re-routed to BIT Sindri due to specialized water filtration research lab.' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  override_reason: string;
+  override_reason?: string;
 }

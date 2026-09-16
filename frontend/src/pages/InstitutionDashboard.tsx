@@ -15,6 +15,8 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
   const { user } = useAuth();
   const { showAlert } = useUI();
   const [challenges, setChallenges] = useState<DashboardChallenge[]>([]);
+  const [institutions, setInstitutions] = useState<any[]>([]);
+  const [selectedOrgId, setSelectedOrgId] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [filterTab, setFilterTab] = useState<'all' | 'verified' | 'pending' | 'available' | 'proposals'>('all');
   const [selectedCategories, setSelectedCategories] = useState<string[]>(
@@ -23,8 +25,6 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
   const [summaryEnabled, setSummaryEnabled] = useState(localStorage.getItem('inst_summary') === 'true');
   const [emailNotifications, setEmailNotifications] = useState(localStorage.getItem('inst_email') !== 'false');
   const [inPlatformAlerts, setInPlatformAlerts] = useState(localStorage.getItem('inst_alerts') !== 'false');
-  const [institutions, setInstitutions] = useState<any[]>([]);
-  const [selectedOrgId, setSelectedOrgId] = useState<string>('');
   
   // Proposals state
   const [proposalModalOpen, setProposalModalOpen] = useState(false);
@@ -89,7 +89,6 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
   }, []);
 
   useAutoRefresh(refreshChallenges, 15000);
-
   const activeOrgId = user?.org_id || selectedOrgId;
   const currentInstitution = institutions.find(i => i.id === activeOrgId);
 
@@ -195,6 +194,7 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
     }
   };
 
+  // 1. OVERVIEW VIEW
   if (activeView === 'dashboard') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
@@ -272,7 +272,6 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
               <ArrowRight size={14} />
             </div>
           </div>
-
           {/* 2. Pending Verification (Bids) */}
           <div 
             onClick={() => { setFilterTab('proposals'); setActiveView?.('challenges'); }}
@@ -425,8 +424,8 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
     );
   }
 
-  // 2. SETTINGS
-  if (activeView === 'settings') {
+  // 2. SETTINGS & PROFILE
+  if (activeView === 'settings' || activeView === 'profile') {
     return (
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
@@ -576,7 +575,6 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
               </button>
             </div>
           </div>
-
         </div>
       </div>
     );
@@ -684,21 +682,119 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
   // 4. CHALLENGES VIEW (Assigned & Claimable Challenges)
   return (
     <div>
-      <div style={{ marginBottom: '24px' }}>
-        <h2 style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a', margin: '0 0 8px' }}>Assigned Challenges</h2>
-        <p style={{ fontSize: '15px', color: '#64748b', margin: 0 }}>Review and claim challenges routed to your institution.</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+        <div>
+          <h2 style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a', margin: '0 0 8px' }}>
+            Assigned & Claimable Challenges
+          </h2>
+          <p style={{ fontSize: '15px', color: '#64748b', margin: 0 }}>
+            Review, claim, and work on civic challenges. When claimed, the Memento Admin verifies and assigns the problem to your institution.
+          </p>
+        </div>
+        
+        {/* Active Institution Selector */}
+        {institutions.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fff', padding: '8px 14px', borderRadius: '10px', border: '1px solid #e2e8f0', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
+            <Building2 size={16} color="#4c1d95" />
+            <span style={{ fontSize: '13px', fontWeight: 600, color: '#475569' }}>Institution:</span>
+            <select
+              value={activeOrgId}
+              onChange={(e) => setSelectedOrgId(e.target.value)}
+              style={{ border: 'none', background: 'transparent', fontWeight: 700, color: '#0f172a', fontSize: '13px', cursor: 'pointer', outline: 'none' }}
+            >
+              {institutions.map(inst => (
+                <option key={inst.id} value={inst.id}>{inst.name} ({inst.district || inst.type})</option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
+      {/* Filter Tabs */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <button
+          type="button"
+          onClick={() => setFilterTab('all')}
+          style={{
+            padding: '8px 16px',
+            borderRadius: '24px',
+            border: '1px solid',
+            borderColor: filterTab === 'all' ? '#4c1d95' : '#cbd5e1',
+            background: filterTab === 'all' ? '#f5f3ff' : '#fff',
+            color: filterTab === 'all' ? '#4c1d95' : '#475569',
+            fontWeight: 700,
+            fontSize: '13px',
+            cursor: 'pointer'
+          }}
+        >
+          All Challenges ({challenges.length})
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setFilterTab('verified')}
+          style={{
+            padding: '8px 16px',
+            borderRadius: '24px',
+            border: '1px solid',
+            borderColor: filterTab === 'verified' ? '#10b981' : '#cbd5e1',
+            background: filterTab === 'verified' ? '#ecfdf5' : '#fff',
+            color: filterTab === 'verified' ? '#047857' : '#475569',
+            fontWeight: 700,
+            fontSize: '13px',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}
+        >
+          <CheckCircle size={14} /> Verified & Assigned to Us ({myVerifiedChallenges.length})
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setFilterTab('pending')}
+          style={{
+            padding: '8px 16px',
+            borderRadius: '24px',
+            border: '1px solid',
+            borderColor: filterTab === 'pending' ? '#f59e0b' : '#cbd5e1',
+            background: filterTab === 'pending' ? '#fef3c7' : '#fff',
+            color: filterTab === 'pending' ? '#b45309' : '#475569',
+            fontWeight: 700,
+            fontSize: '13px',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}
+        >
+          <Clock size={14} /> Pending Claims ({myPendingClaims.length})
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setFilterTab('available')}
+          style={{
+            padding: '8px 16px',
+            borderRadius: '24px',
+            border: '1px solid',
+            borderColor: filterTab === 'available' ? '#2563eb' : '#cbd5e1',
+            background: filterTab === 'available' ? '#eff6ff' : '#fff',
+            color: filterTab === 'available' ? '#1d4ed8' : '#475569',
+            fontWeight: 700,
+            fontSize: '13px',
+            cursor: 'pointer'
+          }}
+        >
+          Available to Claim ({availableChallenges.length})
+        </button>
       </div>
 
       {loading ? (
-        <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Loading...</div>
+        <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Loading challenges...</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {challenges.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '40px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', color: '#64748b' }}>
-              No challenges currently assigned to your institution.
-            </div>
-          )}
-
           {challenges.length === 0 && filterTab !== 'proposals' && (
             <div style={{ textAlign: 'center', padding: '40px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', color: '#64748b' }}>
               No challenges currently assigned to your institution.

@@ -67,8 +67,10 @@ export const adminApi = {
     });
   },
 
-  deleteChallenge: async (_challengeId: string): Promise<any> => {
-    return { success: true, message: 'Challenge removed' };
+  deleteChallenge: async (challengeId: string): Promise<any> => {
+    return apiClient<any>(`/challenges/${challengeId}`, {
+      method: 'DELETE',
+    });
   },
 
   updateChallengeStatus: async (challengeId: string, status: string, remark: string = 'Status updated by Admin'): Promise<any> => {
@@ -79,17 +81,36 @@ export const adminApi = {
   },
 
   getInstitutions: async (): Promise<any[]> => {
-    const users = await adminApi.getAllUsers('university_admin');
-    return users;
+    try {
+      const res = await apiClient<any>('/analytics/institutions');
+      return Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : []);
+    } catch (e) {
+      console.error('Failed to load registered institutions from database:', e);
+      return [];
+    }
   },
 
   allocateInstitution: async (challengeId: string, institutionId: string | null): Promise<any> => {
-    // We update the challenge details internally to set the institution ID
-    return { success: true, message: 'Institution allocated' };
+    return apiClient<any>(`/challenges/${challengeId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ assigned_institution_id: institutionId }),
+    });
   },
 
-  updateChallengeDetails: async (_challengeId: string, _title: string, _description: string, _assignedInstId: string | null = null): Promise<any> => {
-    return { success: true, message: 'Challenge details updated' };
+  updateChallengeDetails: async (
+    challengeId: string, 
+    title: string, 
+    description: string, 
+    assigned_institution_id?: string | null
+  ): Promise<any> => {
+    const payload: Record<string, any> = { title, description };
+    if (assigned_institution_id !== undefined) {
+      payload.assigned_institution_id = assigned_institution_id;
+    }
+    return apiClient<any>(`/challenges/${challengeId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
   },
 
   getSettings: async (): Promise<any> => {

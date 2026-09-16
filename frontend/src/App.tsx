@@ -54,8 +54,9 @@ export function AppContent() {
   const [platformSettings, setPlatformSettings] = useState<any>(null);
 
   useEffect(() => {
+    const apiBase = import.meta.env.VITE_API_BASE_URL || '/api/v1';
     const fetchSettings = () => {
-      fetch(`/api/v1/settings?t=${Date.now()}`)
+      fetch(`${apiBase}/settings?t=${Date.now()}`)
         .then(res => res.ok ? res.json() : null)
         .then(resData => { 
           if (resData) {

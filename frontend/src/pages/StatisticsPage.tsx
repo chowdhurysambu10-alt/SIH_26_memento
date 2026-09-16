@@ -221,16 +221,25 @@ export const StatisticsPage: React.FC<StatisticsPageProps> = ({ hideMyProblems =
 
   // For Admin (hideMyProblems = true), show global stats
   const totalChallenges = overview?.totals?.challenges ?? challenges.length;
-  const resolvedChallenges = (overview?.statusBreakdown?.completed || 0) + (overview?.statusBreakdown?.validated || 0);
-  const adminPendingReview = (overview?.statusBreakdown?.submitted || 0) + (overview?.statusBreakdown?.under_review || 0);
-  // Under Action = Total - Resolved - Pending Review
-  const adminUnderAction = Math.max(0, totalChallenges - resolvedChallenges - adminPendingReview);
+  const resolvedChallenges = overview?.statusBreakdown
+    ? (overview.statusBreakdown.completed || 0) + (overview.statusBreakdown.validated || 0)
+    : challenges.filter((c) => c.status === 'completed' || c.status === 'validated').length;
 
-  // For User, show local stats
-  const myTotal = myChallenges.length;
-  const myResolved = myChallenges.filter(c => ['completed', 'validated'].includes(c.status)).length;
-  const myPendingReview = myChallenges.filter(c => ['submitted', 'under_review'].includes(c.status)).length;
-  const myUnderAction = myChallenges.filter(c => ['routed', 'team_formed', 'in_progress'].includes(c.status)).length;
+  // Under Action: ONLY count problems actively allowed/approved by admin and being worked on
+  const underActionChallenges = overview?.statusBreakdown
+    ? (overview.statusBreakdown.under_review || 0) +
+      (overview.statusBreakdown.routed || 0) +
+      (overview.statusBreakdown.team_formed || 0) +
+      (overview.statusBreakdown.in_progress || 0) +
+      (overview.statusBreakdown.under_action || 0)
+    : challenges.filter((c) =>
+        ['under_review', 'routed', 'team_formed', 'in_progress', 'under_action'].includes(c.status)
+      ).length;
+
+  // Newly submitted challenges awaiting admin approval/action
+  const submittedChallenges = overview?.statusBreakdown
+    ? (overview.statusBreakdown.submitted || 0)
+    : challenges.filter((c) => c.status === 'submitted' || !c.status).length;
 
   // Trending problems sorted by support count (greater than 0)
   const trendingProblems = challenges
@@ -323,46 +332,27 @@ export const StatisticsPage: React.FC<StatisticsPageProps> = ({ hideMyProblems =
         <div className="statistics-dashboard">
           {/* Overview Stats */}
           <div className="stats-overview">
-            {hideMyProblems ? (
-              /* Global Admin Stats */
-              <>
-                <div className="stat-box">
-                  <h4>Total Challenges</h4>
-                  <p>{totalChallenges}</p>
-                </div>
-                <div className="stat-box">
-                  <h4>Pending Review</h4>
-                  <p style={{ color: '#f97316' }}>{adminPendingReview}</p>
-                </div>
-                <div className="stat-box">
-                  <h4>Under Action</h4>
-                  <p style={{ color: '#eab308' }}>{adminUnderAction}</p>
-                </div>
-                <div className="stat-box">
-                  <h4>Resolved</h4>
-                  <p style={{ color: '#16a34a' }}>{resolvedChallenges}</p>
-                </div>
-              </>
-            ) : (
-              /* Personal User Stats */
-              <>
-                <div className="stat-box" style={{ background: '#eff6ff', borderColor: '#bfdbfe' }}>
-                  <h4>My Total Posts</h4>
-                  <p style={{ color: '#2563eb' }}>{myTotal}</p>
-                </div>
-                <div className="stat-box">
-                  <h4>Pending Review</h4>
-                  <p style={{ color: '#f97316' }}>{myPendingReview}</p>
-                </div>
-                <div className="stat-box">
-                  <h4>Under Action</h4>
-                  <p style={{ color: '#eab308' }}>{myUnderAction}</p>
-                </div>
-                <div className="stat-box">
-                  <h4>Resolved</h4>
-                  <p style={{ color: '#16a34a' }}>{myResolved}</p>
-                </div>
-              </>
+            <div className="stat-box">
+              <h4>Total Challenges</h4>
+              <p>{totalChallenges}</p>
+            </div>
+            <div className="stat-box">
+              <h4>Submitted (Awaiting Action)</h4>
+              <p style={{ color: '#6366f1' }}>{submittedChallenges}</p>
+            </div>
+            <div className="stat-box">
+              <h4>Under Action</h4>
+              <p style={{ color: '#eab308' }}>{underActionChallenges}</p>
+            </div>
+            <div className="stat-box">
+              <h4>Resolved</h4>
+              <p style={{ color: '#16a34a' }}>{resolvedChallenges}</p>
+            </div>
+            {user && !hideMyProblems && (
+              <div className="stat-box" style={{ background: '#eff6ff', borderColor: '#bfdbfe' }}>
+                <h4>My Posts</h4>
+                <p style={{ color: '#2563eb' }}>{myChallenges.length}</p>
+              </div>
             )}
           </div>
 
@@ -449,7 +439,11 @@ export const StatisticsPage: React.FC<StatisticsPageProps> = ({ hideMyProblems =
             {myChallenges.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {myChallenges.map((c) => (
-                  <MyPostedProblemItem key={c.id} challenge={c} />
+                  <MyPostedProblemItem
+                    key={c.id}
+                    challenge={c}
+                    onDeleted={(delId) => setChallenges((prev) => prev.filter((item) => item.id !== delId))}
+                  />
                 ))}
               </div>
             ) : (
