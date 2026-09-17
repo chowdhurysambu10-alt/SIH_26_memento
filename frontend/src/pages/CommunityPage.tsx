@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import WidgetBot from '@widgetbot/react-embed';
 import { Joyride, Step } from 'react-joyride';
 import { HelpCircle } from 'lucide-react';
@@ -12,6 +12,14 @@ const DISCORD_CHANNEL_RULES = import.meta.env.VITE_DISCORD_CHANNEL_RULES || '154
 export const CommunityPage: React.FC<{ platformSettings?: any }> = ({ platformSettings }) => {
   const [activeChannel, setActiveChannel] = useState(DISCORD_CHANNEL_MAIN);
   const [runTour, setRunTour] = useState(false);
+  const [chatLoaded, setChatLoaded] = useState(false);
+
+  useEffect(() => {
+    setChatLoaded(false);
+    // Defer loading the heavy Discord widget to prevent blocking the main thread and database network requests
+    const timer = setTimeout(() => setChatLoaded(true), 1200);
+    return () => clearTimeout(timer);
+  }, [activeChannel]);
 
   if (platformSettings?.enableCommunityChat === false) {
     return (
@@ -133,11 +141,18 @@ export const CommunityPage: React.FC<{ platformSettings?: any }> = ({ platformSe
 
       <div className="tour-step-chat" style={{ flex: 1, minHeight: '80vh', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)', background: '#fff', position: 'relative' }}>
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
-          <WidgetBot
-            server={DISCORD_SERVER_ID}
-            channel={activeChannel}
-            style={{ width: '100%', height: '100%' }}
-          />
+          {!chatLoaded ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#64748b' }}>
+               <div className="animate-spin" style={{ marginRight: '10px', width: '24px', height: '24px', border: '3px solid #e2e8f0', borderTopColor: '#2563eb', borderRadius: '50%' }}></div>
+               Connecting to Community Server...
+            </div>
+          ) : (
+            <WidgetBot
+              server={DISCORD_SERVER_ID}
+              channel={activeChannel}
+              style={{ width: '100%', height: '100%' }}
+            />
+          )}
         </div>
       </div>
     </div>

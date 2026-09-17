@@ -362,8 +362,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
                         <label style={styles.label}>Enter 6-Digit OTP</label>
                         <input
                           type="text"
+                          inputMode="numeric"
                           value={otp}
-                          onChange={(e) => setOtp(e.target.value)}
+                          onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                           placeholder="000000"
                           style={{ ...styles.input, letterSpacing: '4px', textAlign: 'center', fontSize: '20px' }}
                           maxLength={6}
@@ -476,9 +477,22 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
                     <input
                       type="tel"
                       value={contact}
-                      onChange={(e) => setContact(e.target.value)}
+                      onChange={(e) => {
+                        // Only allow digits, spaces, hyphens and leading +
+                        const val = e.target.value.replace(/[^\d\s\-+]/g, '');
+                        setContact(val);
+                      }}
+                      onBlur={() => {
+                        const digits = contact.replace(/\D/g, '');
+                        if (contact && digits.length < 10) {
+                          setError('Phone number must be at least 10 digits.');
+                        } else {
+                          setError('');
+                        }
+                      }}
                       placeholder="+91 9876543210"
                       style={styles.input}
+                      maxLength={15}
                     />
                   </div>
                 )}

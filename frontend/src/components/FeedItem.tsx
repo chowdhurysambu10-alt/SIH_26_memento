@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Challenge, challengesApi } from '../api/challenges';
 import { useAuth } from '../context/AuthContext';
 import { useUI } from '../context/UIContext';
-import { MapPin, Building2, Tag, X, Trash2 } from 'lucide-react';
+import { MapPin, Building2, Tag, X, Trash2, ThumbsUp, Share2 } from 'lucide-react';
 
 interface FeedItemProps {
   challenge: Challenge;
@@ -275,7 +275,25 @@ export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, o
           disabled={isSyncing}
           style={{ opacity: isSyncing ? 0.7 : 1, cursor: isSyncing ? 'not-allowed' : 'pointer' }}
         >
+          <ThumbsUp size={16} fill={isSupported ? 'currentColor' : 'none'} />
           <span>{isSupported ? 'Supported' : 'Support'} ({supportCount})</span>
+        </button>
+        
+        <button
+          type="button"
+          className="interaction-btn"
+          onClick={(e) => {
+            e.preventDefault();
+            if (navigator.share) {
+              navigator.share({ title: challenge.title, url: window.location.href });
+            } else {
+              navigator.clipboard.writeText(window.location.href);
+              showAlert('Link copied to clipboard!', 'success');
+            }
+          }}
+        >
+          <Share2 size={16} />
+          <span>Share</span>
         </button>
       </div>
 

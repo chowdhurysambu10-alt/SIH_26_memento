@@ -95,9 +95,9 @@ export const dashboardsApi = {
       });
     }
 
-    // Sort: priority_score DESC
+    // Sort: support_count DESC
     return items.sort((a: any, b: any) => {
-      return (Number(b.priority_score) || 0) - (Number(a.priority_score) || 0);
+      return (Number(b.support_count) || 0) - (Number(a.support_count) || 0);
     });
   },
 

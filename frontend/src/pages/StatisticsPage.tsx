@@ -139,11 +139,7 @@ const MyPostedProblemItem: React.FC<{ challenge: Challenge; onDeleted?: (id: str
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: '12px' }}>
             <div>
-              {challenge.ai_summary && (
-                <div style={{ marginBottom: '8px', padding: '10px', background: '#ffffff', borderRadius: '6px', borderLeft: '3px solid #2563eb', fontSize: '13px', color: '#334155' }}>
-                  <strong>AI Analysis: </strong> {challenge.ai_summary}
-                </div>
-              )}
+
               {challenge.institutions?.name && challenge.assigned_institution_id && challenge.status !== 'submitted' && challenge.status !== 'under_review' && (
                 <div style={{ marginTop: '8px', fontSize: '12px', color: '#047857', background: '#d1fae5', padding: '4px 8px', borderRadius: '4px', display: 'inline-block' }}>
                   <strong>Assigned to: </strong> {challenge.institutions.name}
@@ -232,8 +228,26 @@ export const StatisticsPage: React.FC<StatisticsPageProps> = ({ hideMyProblems =
   const myPendingReview = myChallenges.filter(c => ['submitted', 'under_review'].includes(c.status)).length;
   const myUnderAction = myChallenges.filter(c => ['routed', 'team_formed', 'in_progress'].includes(c.status)).length;
 
+  const displayDistricts = hideMyProblems ? districts : (() => {
+    const counts: Record<string, number> = {};
+    myChallenges.forEach(c => {
+      const d = c.district || 'Unspecified';
+      counts[d] = (counts[d] || 0) + 1;
+    });
+    return Object.entries(counts).map(([district, total]) => ({ district, total })).sort((a,b) => b.total - a.total);
+  })();
+
+  const displayCategories = hideMyProblems ? categories : (() => {
+    const counts: Record<string, number> = {};
+    myChallenges.forEach(c => {
+      const name = c.categories?.name || 'General';
+      counts[name] = (counts[name] || 0) + 1;
+    });
+    return Object.entries(counts).map(([name, total]) => ({ name, total })).sort((a,b) => b.total - a.total);
+  })();
+
   // Trending problems sorted by support count (greater than 0)
-  const trendingProblems = challenges
+  const trendingProblems = (hideMyProblems ? challenges : myChallenges)
     .filter((c) => (c.support_count || 0) > 0)
     .sort((a, b) => (b.support_count || 0) - (a.support_count || 0))
     .slice(0, 5);
@@ -243,7 +257,9 @@ export const StatisticsPage: React.FC<StatisticsPageProps> = ({ hideMyProblems =
   const postedByMonth: Record<string, number> = {};
   const solvedByMonth: Record<string, number> = {};
 
-  challenges.forEach((c) => {
+  const chartChallenges = hideMyProblems ? challenges : myChallenges;
+
+  chartChallenges.forEach((c) => {
     const date = c.created_at ? new Date(c.created_at) : new Date();
     const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     postedByMonth[key] = (postedByMonth[key] || 0) + 1;
@@ -371,8 +387,8 @@ export const StatisticsPage: React.FC<StatisticsPageProps> = ({ hideMyProblems =
             <div className="stats-card">
               <h3>Challenges by District</h3>
               <div className="stats-card-content">
-                {districts.length > 0 ? (
-                  districts.map((d, i) => (
+                {displayDistricts.length > 0 ? (
+                  displayDistricts.map((d, i) => (
                     <div key={i} className="stat-row">
                       <span>{d.district || 'Unspecified'}</span>
                       <span style={{ fontWeight: 600 }}>{d.total ?? 0}</span>
@@ -387,8 +403,8 @@ export const StatisticsPage: React.FC<StatisticsPageProps> = ({ hideMyProblems =
             <div className="stats-card">
               <h3>Challenges by Category</h3>
               <div className="stats-card-content">
-                {categories.length > 0 ? (
-                  categories.map((c, i) => (
+                {displayCategories.length > 0 ? (
+                  displayCategories.map((c, i) => (
                     <div key={i} className="stat-row">
                       <span>{c.name || 'General'}</span>
                       <span style={{ fontWeight: 600 }}>{c.total ?? 0}</span>
