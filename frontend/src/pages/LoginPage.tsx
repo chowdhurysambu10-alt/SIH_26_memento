@@ -204,16 +204,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
 
   if (user) {
     return (
-      <div style={styles.pageWrapper}>
-        <div style={styles.brandPanel}>
+      <div className="login-page-wrapper" style={styles.pageWrapper}>
+        <div className="login-brand-panel" style={styles.brandPanel}>
           <div>
             <div style={{ marginBottom: 16 }}><Globe size={48} color="#fff" /></div>
             <h1 style={{ fontSize: 32, fontWeight: 700, color: '#fff', margin: '0 0 8px' }}>Memento</h1>
             <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.8)', margin: 0, lineHeight: 1.6 }}>Societal Innovation & Collaboration Platform</p>
           </div>
         </div>
-        <div style={styles.formPanel}>
-          <div style={styles.formInner}>
+        <div className="login-form-panel" style={styles.formPanel}>
+          <div className="login-form-inner" style={styles.formInner}>
             <div style={{ textAlign: 'center', marginBottom: 32 }}>
               <div style={{ marginBottom: 12 }}><CheckCircle2 size={48} color="#2563eb" style={{ margin: '0 auto' }} /></div>
               <h2 style={{ fontSize: 28, fontWeight: 700, color: '#0f172a', margin: '0 0 8px' }}>Welcome, {user.name || 'User'}!</h2>
@@ -231,8 +231,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
   }
 
   return (
-    <div style={styles.pageWrapper}>
-      <div style={{ ...styles.brandPanel, background: activeRole ? `linear-gradient(135deg, ${activeRole.color} 0%, #1e40af 100%)` : styles.brandPanel.background }}>
+    <div className="login-page-wrapper" style={styles.pageWrapper}>
+      <div className="login-brand-panel" style={{ ...styles.brandPanel, background: activeRole ? `linear-gradient(135deg, ${activeRole.color} 0%, #1e40af 100%)` : styles.brandPanel.background }}>
         <div style={{ transition: 'all 0.3s ease' }}>
           <div style={{ marginBottom: 16 }}><Globe size={48} color="#fff" /></div>
           <h1 style={{ fontSize: 32, fontWeight: 700, color: '#fff', margin: '0 0 8px' }}>Memento</h1>
@@ -240,7 +240,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 8 }}>by Team Memento · SIH26043</p>
           
           {activeRole && (
-            <div style={{ marginTop: 40, padding: '24px', background: 'rgba(255,255,255,0.1)', borderRadius: 16, backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.2)' }}>
+            <div className="login-role-summary-card" style={{ marginTop: 40, padding: '24px', background: 'rgba(255,255,255,0.1)', borderRadius: 16, backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.2)' }}>
               <activeRole.icon size={32} color="#fff" style={{ marginBottom: 12 }} />
               <h3 style={{ color: '#fff', margin: '0 0 8px', fontSize: '20px' }}>{activeRole.label}</h3>
               <p style={{ color: 'rgba(255,255,255,0.9)', fontSize: 14, margin: 0, lineHeight: 1.6 }}>
@@ -251,8 +251,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
         </div>
       </div>
 
-      <div style={styles.formPanel}>
-        <div style={styles.formInner}>
+      <div className="login-form-panel" style={styles.formPanel}>
+        <div className="login-form-inner" style={styles.formInner}>
           {!activeRole ? (
             // ROLE SELECTION STEP
             <div>
@@ -273,6 +273,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
                     <div 
                       key={r.id}
                       onClick={() => setActiveRole(r)}
+                      className="login-portal-card"
                       style={styles.portalCard}
                       onMouseEnter={(e) => { e.currentTarget.style.borderColor = r.color; e.currentTarget.style.transform = 'translateY(-2px)'; }}
                       onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.transform = 'translateY(0)'; }}
