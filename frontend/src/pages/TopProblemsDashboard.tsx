@@ -48,6 +48,14 @@ export const TopProblemsDashboard: React.FC = () => {
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'all'>('all');
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
+  const [isFilterExpanded, setIsFilterExpanded] = useState<boolean>(false);
+
+  const activeFilterCount =
+    (district !== 'All Districts' ? 1 : 0) +
+    (category !== 'All Categories' ? 1 : 0) +
+    (status !== 'all' ? 1 : 0) +
+    (timeRange !== 'all' ? 1 : 0);
+
   const fetchTopProblems = async () => {
     setLoading(true);
     try {
@@ -119,17 +127,78 @@ export const TopProblemsDashboard: React.FC = () => {
           </p>
         </div>
 
-        <button
-          className="btn btn-outline"
-          onClick={fetchTopProblems}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13.5px' }}
-        >
-          <RotateCw size={14} /> Refresh
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={fetchTopProblems}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              fontSize: '13.5px',
+              padding: '0 14px',
+              height: '38px',
+              lineHeight: 1,
+              borderRadius: '8px',
+              cursor: 'pointer',
+            }}
+          >
+            <RotateCw size={14} style={{ display: 'block', flexShrink: 0 }} />
+            <span style={{ lineHeight: 1 }}>Refresh</span>
+          </button>
+
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={() => setIsFilterExpanded(!isFilterExpanded)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              fontSize: '13.5px',
+              padding: '0 14px',
+              height: '38px',
+              lineHeight: 1,
+              borderRadius: '8px',
+              background: isFilterExpanded ? '#eff6ff' : '#ffffff',
+              borderColor: isFilterExpanded ? '#2563eb' : '#e2e8f0',
+              color: isFilterExpanded ? '#2563eb' : '#0f172a',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <Filter size={14} style={{ display: 'block', flexShrink: 0 }} color={isFilterExpanded ? '#2563eb' : '#475569'} />
+            <span style={{ lineHeight: 1 }}>Filter</span>
+            {activeFilterCount > 0 && (
+              <span
+                style={{
+                  background: '#2563eb',
+                  color: '#ffffff',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  padding: '2px 6px',
+                  borderRadius: '10px',
+                  lineHeight: 1,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginLeft: '2px',
+                }}
+              >
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Filter Bar */}
       <div
+        className={`top-problems-filter-bar ${isFilterExpanded ? 'expanded' : 'collapsed'}`}
         style={{
           background: '#ffffff',
           border: '1px solid #e2e8f0',
@@ -137,9 +206,6 @@ export const TopProblemsDashboard: React.FC = () => {
           padding: '18px 20px',
           marginBottom: '28px',
           boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '14px',
           alignItems: 'center',
         }}
       >

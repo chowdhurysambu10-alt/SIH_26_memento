@@ -47,6 +47,8 @@ function StudentPortal() {
   );
 }
 
+import { MobileBottomNav } from './components/MobileBottomNav';
+
 export function AppContent() {
   const [activeTab, setActiveTab] = useState<NavTab>('home');
   const { user, isAuthenticated } = useAuth();
@@ -117,10 +119,11 @@ export function AppContent() {
 
   if (['admin-dashboard', 'institution-dashboard', 'student-dashboard'].includes(activeTab)) {
     return (
-      <div>
+      <div className="app-portal-container">
         {activeTab === 'admin-dashboard' && <AdminPortal />}
         {activeTab === 'institution-dashboard' && <InstitutionPortal />}
         {activeTab === 'student-dashboard' && <StudentPortal />}
+        <MobileBottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
       </div>
     );
   }
@@ -136,31 +139,32 @@ export function AppContent() {
         <Header activeTab={activeTab} setActiveTab={setActiveTab} platformSettings={platformSettings} />
       )}
 
-      {activeTab === 'home' && <LandingPage onNavigate={(tab) => setActiveTab(tab)} />}
+      <main className="app-main-content">
+        {activeTab === 'home' && <LandingPage onNavigate={(tab) => setActiveTab(tab)} />}
 
-      {activeTab === 'feed' && <HomeFeedPage onNavigateLogin={() => setActiveTab('login')} onNavigateSubmit={() => setActiveTab('submit')} />}
+        {activeTab === 'feed' && <HomeFeedPage onNavigateLogin={() => setActiveTab('login')} onNavigateSubmit={() => setActiveTab('submit')} />}
 
-      {activeTab === 'top-problems' && <TopProblemsDashboard />}
+        {activeTab === 'top-problems' && <TopProblemsDashboard />}
 
-      {activeTab === 'submit' && (
-        <ProblemEntryDashboard onNavigateLogin={() => setActiveTab('login')} />
-      )}
+        {activeTab === 'submit' && (
+          <ProblemEntryDashboard onNavigateLogin={() => setActiveTab('login')} />
+        )}
 
+        {activeTab === 'statistics' && <StatisticsPage />}
 
+        {activeTab === 'community' && <CommunityPage platformSettings={platformSettings} />}
 
-      {activeTab === 'statistics' && <StatisticsPage />}
+        {activeTab === 'admin-dashboard' && <AdminPortal />}
+        {activeTab === 'institution-dashboard' && <InstitutionPortal />}
+        {activeTab === 'student-dashboard' && <StudentPortal />}
 
-      {activeTab === 'community' && <CommunityPage platformSettings={platformSettings} />}
+        {activeTab === 'about' && <AboutPage />}
+      </main>
 
-      {activeTab === 'admin-dashboard' && <AdminPortal />}
-      {activeTab === 'institution-dashboard' && <InstitutionPortal />}
-      {activeTab === 'student-dashboard' && <StudentPortal />}
-
-      {activeTab === 'about' && <AboutPage />}
-
-      {/* Floating Plus Button */}
+      {/* Floating Plus Button (Desktop Only) */}
       {(!isAuthenticated && activeTab !== 'about') || (isAuthenticated && ((user?.role === 'citizen' && activeTab !== 'about') || (user?.role !== 'citizen' && activeTab === 'feed'))) ? (
         <button
+          className="desktop-floating-fab"
           onClick={() => setActiveTab('submit')}
           style={{
             position: 'fixed',
@@ -192,6 +196,10 @@ export function AppContent() {
           <Plus size={28} strokeWidth={2.5} />
         </button>
       ) : null}
+
+      {!['admin-dashboard', 'institution-dashboard', 'student-dashboard', 'login'].includes(activeTab) && (
+        <MobileBottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
+      )}
     </div>
   );
 }
