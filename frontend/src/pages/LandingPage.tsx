@@ -65,9 +65,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
   const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const lang = e.target.value;
     setSelectedLang(lang);
-    
+
     document.cookie = `googtrans=/en/${lang}; path=/`;
-    
+
     const select = document.querySelector('.goog-te-combo') as HTMLSelectElement;
     if (select) {
       select.value = lang;
@@ -442,17 +442,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
               className="btn-primary-action"
               style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '12px 24px' }}
             >
-              <div 
-                onClick={() => onNavigate('feed')} 
+              <div
+                onClick={() => onNavigate('feed')}
                 style={{ cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' }}
               >
                 Explore Live Updates in
               </div>
-              
+
               <div style={{ position: 'relative', display: 'inline-flex', marginLeft: '4px' }}>
-                <div style={{ 
-                  background: 'rgba(255, 255, 255, 0.25)', 
-                  padding: '6px 12px', 
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.25)',
+                  padding: '6px 12px',
                   borderRadius: '20px',
                   display: 'flex',
                   alignItems: 'center',
@@ -463,12 +463,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
                   fontSize: '14px'
                 }}>
                   {selectedLangName}
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
                 </div>
-                
-                <select 
+
+                <select
                   className="notranslate"
-                  value={selectedLang} 
+                  value={selectedLang}
                   onChange={(e) => { e.stopPropagation(); handleLanguageChange(e); }}
                   onClick={(e) => e.stopPropagation()}
                   style={{
@@ -487,8 +487,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
                 </select>
               </div>
 
-              <div 
-                onClick={() => onNavigate('feed')} 
+              <div
+                onClick={() => onNavigate('feed')}
                 style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', marginLeft: '4px' }}
               >
                 <ArrowRight size={18} />
@@ -610,7 +610,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
           </div>
           <div className="stat-card">
             <div className="stat-number">{loading ? '...' : totalChallenges}</div>
-            <div className="stat-label">Challenges in Database</div>
+            <div className="stat-label">Public Reports</div>
           </div>
           <div className="stat-card">
             <div className="stat-number">{loading ? '...' : totalInstitutions}</div>
