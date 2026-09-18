@@ -195,10 +195,6 @@ export function AppContent() {
 
           {activeTab === 'community' && <CommunityPage platformSettings={platformSettings} />}
 
-          {activeTab === 'admin-dashboard' && <AdminPortal />}
-          {activeTab === 'institution-dashboard' && <InstitutionPortal />}
-          {activeTab === 'student-dashboard' && <StudentPortal />}
-
           {activeTab === 'about' && <AboutPage />}
         </Suspense>
       </main>
@@ -243,10 +239,6 @@ export function AppContent() {
           <Plus size={28} strokeWidth={2.5} />
         </button>
       ) : null}
-
-      {!['admin-dashboard', 'institution-dashboard', 'student-dashboard', 'login'].includes(activeTab) && (
-        <MobileBottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
-      )}
     </div>
   );
 }
