@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Challenge, challengesApi } from '../api/challenges';
 import { useAuth } from '../context/AuthContext';
 import { useUI } from '../context/UIContext';
-import { MapPin, Building2, Tag, X, Trash2, ThumbsUp, Share2 } from 'lucide-react';
+import { MapPin, Building2, Tag, X, Trash2, ThumbsUp, Share2, Eye } from 'lucide-react';
 
 interface FeedItemProps {
   challenge: Challenge;
@@ -20,6 +20,24 @@ export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, o
   const [supportCount, setSupportCount] = useState<number>(Number(challenge.support_count || 0));
   const [isReadMoreOpen, setIsReadMoreOpen] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+
+  const savedWatchlist = JSON.parse(localStorage.getItem('civic_watchlist') || '[]');
+  const [isWatched, setIsWatched] = useState<boolean>(savedWatchlist.includes(challenge.id));
+
+  const handleWatchToggle = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const currentList = JSON.parse(localStorage.getItem('civic_watchlist') || '[]');
+    let newList;
+    if (isWatched) {
+      newList = currentList.filter((id: string) => id !== challenge.id);
+      showAlert('Removed from watchlist', 'info');
+    } else {
+      newList = [...currentList, challenge.id];
+      showAlert('Added to watchlist. Track it in your Overview tab!', 'success');
+    }
+    localStorage.setItem('civic_watchlist', JSON.stringify(newList));
+    setIsWatched(!isWatched);
+  };
 
   // Keep local state in sync with parent props
   React.useEffect(() => {
@@ -266,25 +284,25 @@ export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, o
               <h3 style={{ margin: '0 0 8px', fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>
                 {challenge.title || 'Untitled Challenge'}
               </h3>
-              <p style={{ whiteSpace: 'pre-wrap', margin: 0, color: '#475569', fontSize: '14.5px', lineHeight: 1.6 }}>
-                {displayDescription}
-                {isLongDescription && (
+              <div style={{ whiteSpace: 'pre-wrap', margin: 0, color: '#475569', fontSize: '14.5px', lineHeight: 1.6 }}>
+                <span>{displayDescription}</span>
+                {isLongDescription && !isReadMoreOpen && (
                   <button 
-                    onClick={() => setIsReadMoreOpen(!isReadMoreOpen)}
-                    style={{ 
-                      background: 'none', 
-                      border: 'none', 
-                      color: '#2563eb', 
-                      cursor: 'pointer', 
-                      fontWeight: 600, 
-                      marginLeft: '4px',
-                      padding: 0 
-                    }}
+                    onClick={(e) => { e.preventDefault(); setIsReadMoreOpen(true); }}
+                    style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontWeight: 600, marginLeft: '4px', padding: 0 }}
                   >
-                    {isReadMoreOpen ? 'Show less' : 'Read more...'}
+                    <span>Read more...</span>
                   </button>
                 )}
-              </p>
+                {isLongDescription && isReadMoreOpen && (
+                  <button 
+                    onClick={(e) => { e.preventDefault(); setIsReadMoreOpen(false); }}
+                    style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontWeight: 600, marginLeft: '4px', padding: 0 }}
+                  >
+                    <span>Show less</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Right Side: Smaller Photo */}
@@ -406,6 +424,15 @@ export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, o
           >
             <Share2 size={16} />
             <span>Share</span>
+          </button>
+
+          <button
+            type="button"
+            className={`interaction-btn ${isWatched ? 'support-btn active' : ''}`}
+            onClick={handleWatchToggle}
+          >
+            <Eye size={16} fill={isWatched ? 'currentColor' : 'none'} />
+            <span>{isWatched ? 'Watching' : 'Watchlist'}</span>
           </button>
 
           {canDelete && (

@@ -59,7 +59,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, platfor
               className={`nav-link ${activeTab === 'feed' ? 'active' : ''}`}
               onClick={() => setActiveTab('feed')}
             >
-              Feed
+              Updates
             </button>
             <button
               className={`nav-link ${activeTab === 'top-problems' ? 'active' : ''}`}

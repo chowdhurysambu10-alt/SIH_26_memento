@@ -25,7 +25,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ activeTab, set
         onClick={() => setActiveTab('feed')}
       >
         <Globe size={22} />
-        <span>Feed</span>
+        <span>Updates</span>
       </button>
 
       <button

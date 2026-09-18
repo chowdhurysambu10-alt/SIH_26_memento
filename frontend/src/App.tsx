@@ -8,6 +8,7 @@ import { InstitutionLayout } from './layouts/InstitutionLayout';
 import { StudentLayout } from './layouts/StudentLayout';
 import { NetworkStatusUI } from './components/NetworkStatusUI';
 import { MobileBottomNav } from './components/MobileBottomNav';
+import { SplashScreen } from './components/SplashScreen';
 
 const HomeFeedPage = lazy(() => import('./pages/HomeFeedPage').then(m => ({ default: m.HomeFeedPage })));
 const StatisticsPage = lazy(() => import('./pages/StatisticsPage').then(m => ({ default: m.StatisticsPage })));
@@ -245,11 +246,19 @@ export function AppContent() {
 }
 
 export default function App() {
+  const [showSplash, setShowSplash] = useState(true);
+
   return (
     <UIProvider>
       <AuthProvider>
-        <NetworkStatusUI />
-        <AppContent />
+        {showSplash ? (
+          <SplashScreen onComplete={() => setShowSplash(false)} />
+        ) : (
+          <>
+            <NetworkStatusUI />
+            <AppContent />
+          </>
+        )}
       </AuthProvider>
     </UIProvider>
   );
