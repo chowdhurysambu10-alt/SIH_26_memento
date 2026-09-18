@@ -173,25 +173,25 @@ export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, o
               <h3 style={{ margin: '0 0 8px', fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>
                 {challenge.title || 'Untitled Challenge'}
               </h3>
-              <p style={{ whiteSpace: 'pre-wrap', margin: 0, color: '#475569', fontSize: '14.5px', lineHeight: 1.6 }}>
-                {displayDescription}
-                {isLongDescription && (
+              <div style={{ whiteSpace: 'pre-wrap', margin: 0, color: '#475569', fontSize: '14.5px', lineHeight: 1.6 }}>
+                <span>{displayDescription}</span>
+                {isLongDescription && !isReadMoreOpen && (
                   <button 
-                    onClick={() => setIsReadMoreOpen(!isReadMoreOpen)}
-                    style={{ 
-                      background: 'none', 
-                      border: 'none', 
-                      color: '#2563eb', 
-                      cursor: 'pointer', 
-                      fontWeight: 600, 
-                      marginLeft: '4px',
-                      padding: 0 
-                    }}
+                    onClick={(e) => { e.preventDefault(); setIsReadMoreOpen(true); }}
+                    style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontWeight: 600, marginLeft: '4px', padding: 0 }}
                   >
-                    {isReadMoreOpen ? 'Show less' : 'Read more...'}
+                    <span>Read more...</span>
                   </button>
                 )}
-              </p>
+                {isLongDescription && isReadMoreOpen && (
+                  <button 
+                    onClick={(e) => { e.preventDefault(); setIsReadMoreOpen(false); }}
+                    style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontWeight: 600, marginLeft: '4px', padding: 0 }}
+                  >
+                    <span>Show less</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Right Side: Smaller Photo */}
