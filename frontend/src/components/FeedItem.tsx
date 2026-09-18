@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Challenge, challengesApi } from '../api/challenges';
 import { useAuth } from '../context/AuthContext';
 import { useUI } from '../context/UIContext';
-import { MapPin, Building2, Tag, X, Trash2, ThumbsUp, Share2 } from 'lucide-react';
+import { MapPin, Building2, Tag, X, Trash2, ThumbsUp, Share2, Eye } from 'lucide-react';
 
 interface FeedItemProps {
   challenge: Challenge;
@@ -20,6 +20,24 @@ export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, o
   const [supportCount, setSupportCount] = useState<number>(Number(challenge.support_count || 0));
   const [isReadMoreOpen, setIsReadMoreOpen] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+
+  const savedWatchlist = JSON.parse(localStorage.getItem('civic_watchlist') || '[]');
+  const [isWatched, setIsWatched] = useState<boolean>(savedWatchlist.includes(challenge.id));
+
+  const handleWatchToggle = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const currentList = JSON.parse(localStorage.getItem('civic_watchlist') || '[]');
+    let newList;
+    if (isWatched) {
+      newList = currentList.filter((id: string) => id !== challenge.id);
+      showAlert('Removed from watchlist', 'info');
+    } else {
+      newList = [...currentList, challenge.id];
+      showAlert('Added to watchlist. Track it in your Overview tab!', 'success');
+    }
+    localStorage.setItem('civic_watchlist', JSON.stringify(newList));
+    setIsWatched(!isWatched);
+  };
 
   // Keep local state in sync with parent props
   React.useEffect(() => {
@@ -295,6 +313,15 @@ export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, o
         >
           <Share2 size={16} />
           <span>Share</span>
+        </button>
+
+        <button
+          type="button"
+          className={`interaction-btn ${isWatched ? 'support-btn active' : ''}`}
+          onClick={handleWatchToggle}
+        >
+          <Eye size={16} fill={isWatched ? 'currentColor' : 'none'} />
+          <span>{isWatched ? 'Watching' : 'Watchlist'}</span>
         </button>
       </div>
 

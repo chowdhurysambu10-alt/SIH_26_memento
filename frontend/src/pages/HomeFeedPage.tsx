@@ -144,7 +144,7 @@ export const HomeFeedPage: React.FC<{ onNavigateLogin: () => void; onNavigateSub
 
       <main className="main-layout">
         <div className="feed-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
-          <h2>Societal Challenges Feed</h2>
+          <h2>Societal Challenges Updates</h2>
 
           {/* Sorting Tabs */}
           <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '4px', borderRadius: '10px' }}>
@@ -264,7 +264,7 @@ export const HomeFeedPage: React.FC<{ onNavigateLogin: () => void; onNavigateSub
               )}
               {!hasMore && challenges.length > 0 && (
                 <div style={{ padding: '20px', color: '#94a3b8', fontSize: '14px', fontStyle: 'italic' }}>
-                  You've reached the end of the feed.
+                  You've reached the end of the updates.
                 </div>
               )}
             </div>

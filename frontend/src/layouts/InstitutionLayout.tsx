@@ -94,7 +94,7 @@ export const InstitutionLayout: React.FC<InstitutionLayoutProps> = ({ children, 
               }}
             >
               <Home size={20} />
-              {isSidebarOpen && <span style={{ fontSize: '15px', fontWeight: 600 }}>Public Feed</span>}
+              {isSidebarOpen && <span style={{ fontSize: '15px', fontWeight: 600 }}>Public Updates</span>}
             </button>
 
             <button
@@ -184,7 +184,7 @@ export const InstitutionLayout: React.FC<InstitutionLayoutProps> = ({ children, 
             }}
           >
             <Home size={22} />
-            <span style={{ fontSize: '10px', fontWeight: 500 }}>Feed</span>
+            <span style={{ fontSize: '10px', fontWeight: 500 }}>Updates</span>
           </button>
         </nav>
       )}

@@ -8,10 +8,45 @@ import {
   Clock,
   ThumbsUp,
   Lightbulb,
+  Users,
+  FileText,
+  Globe,
+  Menu,
+  X,
+  ArrowUpRight,
+  TrendingUp,
+  Filter,
+  MessageSquare,
 } from 'lucide-react';
 import { NavTab } from '../components/Header';
 import { analyticsApi, OverviewAnalytics } from '../api/analytics';
 import { challengesApi, Challenge } from '../api/challenges';
+
+const SCHEDULED_LANGUAGES = [
+  { code: 'en', name: 'English' },
+  { code: 'as', name: 'অসমীয়া' },
+  { code: 'bn', name: 'বাংলা' },
+  { code: 'brx', name: 'बड़ो' },
+  { code: 'doi', name: 'डोगरी' },
+  { code: 'gu', name: 'ગુજરાતી' },
+  { code: 'hi', name: 'हिन्दी' },
+  { code: 'kn', name: 'ಕನ್ನಡ' },
+  { code: 'ks', name: 'कॉशुर' },
+  { code: 'gom', name: 'कोंकणी' },
+  { code: 'mai', name: 'मैथिली' },
+  { code: 'ml', name: 'മലയാളം' },
+  { code: 'mni', name: 'মৈতৈলোন্' },
+  { code: 'mr', name: 'मराठी' },
+  { code: 'ne', name: 'नेपाली' },
+  { code: 'or', name: 'ଓଡ଼ିଆ' },
+  { code: 'pa', name: 'ਪੰਜਾਬੀ' },
+  { code: 'sa', name: 'संस्कृतम्' },
+  { code: 'sat', name: 'ᱥᱟᱱᱛᱟᱲᱤ' },
+  { code: 'sd', name: 'सिन्धी' },
+  { code: 'ta', name: 'தமிழ்' },
+  { code: 'te', name: 'తెలుగు' },
+  { code: 'ur', name: 'اردو' }
+];
 
 interface LandingPageProps {
   onNavigate: (tab: NavTab) => void;
@@ -20,6 +55,29 @@ interface LandingPageProps {
 export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
   const [stats, setStats] = useState<OverviewAnalytics | null>(null);
   const [featuredChallenge, setFeaturedChallenge] = useState<Challenge | null>(null);
+
+  const getInitialLang = () => {
+    const match = document.cookie.match(/googtrans=\/en\/([a-z]+)/);
+    return match ? match[1] : 'en';
+  };
+  const [selectedLang, setSelectedLang] = useState(getInitialLang());
+
+  const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const lang = e.target.value;
+    setSelectedLang(lang);
+    
+    document.cookie = `googtrans=/en/${lang}; path=/`;
+    
+    const select = document.querySelector('.goog-te-combo') as HTMLSelectElement;
+    if (select) {
+      select.value = lang;
+      select.dispatchEvent(new Event('change'));
+    } else {
+      window.location.reload();
+    }
+  };
+
+  const selectedLangName = SCHEDULED_LANGUAGES.find(l => l.code === selectedLang)?.name || 'English';
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -379,13 +437,63 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
             {/* A collaborative platform connecting citizens, universities, and industry partners to solve real-world community challenges. */}
           </p>
 
-          <div>
-            <button
+          <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div
               className="btn-primary-action"
-              onClick={() => onNavigate('feed')}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '12px 24px' }}
             >
-              Explore Live Feed <ArrowRight size={18} />
-            </button>
+              <div 
+                onClick={() => onNavigate('feed')} 
+                style={{ cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' }}
+              >
+                Explore Live Updates in
+              </div>
+              
+              <div style={{ position: 'relative', display: 'inline-flex', marginLeft: '4px' }}>
+                <div style={{ 
+                  background: 'rgba(255, 255, 255, 0.25)', 
+                  padding: '6px 12px', 
+                  borderRadius: '20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  whiteSpace: 'nowrap',
+                  fontSize: '14px'
+                }}>
+                  {selectedLangName}
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                </div>
+                
+                <select 
+                  className="notranslate"
+                  value={selectedLang} 
+                  onChange={(e) => { e.stopPropagation(); handleLanguageChange(e); }}
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    opacity: 0,
+                    cursor: 'pointer'
+                  }}
+                >
+                  {SCHEDULED_LANGUAGES.map(lang => (
+                    <option key={lang.code} value={lang.code} style={{ color: '#000', fontSize: '14px' }}>{lang.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div 
+                onClick={() => onNavigate('feed')} 
+                style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', marginLeft: '4px' }}
+              >
+                <ArrowRight size={18} />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -464,7 +572,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
                     style={{ color: '#2563eb', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}
                     onClick={() => onNavigate('feed')}
                   >
-                    View in Feed <ChevronRight size={13} />
+                    View in Updates <ChevronRight size={13} />
                   </span>
                 </div>
               </div>
@@ -552,7 +660,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
             Societal Innovation & Problem Crowdsourcing Platform
           </div>
           <div style={{ display: 'flex', gap: '16px', color: '#64748b' }}>
-            <span style={{ cursor: 'pointer' }} onClick={() => onNavigate('feed')}>Feed</span>
+            <span style={{ cursor: 'pointer' }} onClick={() => onNavigate('feed')}>Updates</span>
             <span style={{ cursor: 'pointer' }} onClick={() => onNavigate('statistics')}>Statistics</span>
             <span style={{ cursor: 'pointer' }} onClick={() => onNavigate('community')}>Community</span>
           </div>
