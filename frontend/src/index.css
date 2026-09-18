@@ -1233,4 +1233,63 @@ label, .form-label {
   margin: 0;
 }
 
+/* --- SPLASH SCREEN ANIMATIONS --- */
+.splash-screen {
+  font-family: 'Inter', sans-serif;
+}
+
+.splash-logo-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.splash-title {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 80px;
+  font-weight: 900;
+  color: #0f172a;
+  letter-spacing: -3px; /* Tight tracking is the hallmark of modern tech */
+  margin: 0;
+  display: flex;
+  align-items: center;
+}
+
+.splash-title span {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(20px);
+  animation: tech-reveal 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.splash-title .accent-dot {
+  color: #2563eb;
+}
+
+/* Staggered quick tech reveal */
+.splash-title span:nth-child(1) { animation-delay: 0.1s; }
+.splash-title span:nth-child(2) { animation-delay: 0.15s; }
+.splash-title span:nth-child(3) { animation-delay: 0.2s; }
+.splash-title span:nth-child(4) { animation-delay: 0.25s; }
+.splash-title span:nth-child(5) { animation-delay: 0.3s; }
+.splash-title span:nth-child(6) { animation-delay: 0.35s; }
+.splash-title span:nth-child(7) { animation-delay: 0.4s; }
+.splash-title span:nth-child(8) { animation-delay: 0.5s; } /* The blue dot */
+
+.splash-subtitle {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace; /* Developer vibe */
+  font-size: 14px;
+  color: #3b82f6;
+  margin-top: 8px;
+  letter-spacing: 0px;
+  font-weight: 600;
+  opacity: 0;
+  animation: tech-reveal 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.8s forwards;
+}
+
+@keyframes tech-reveal {
+  0% { transform: translateY(20px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
 
