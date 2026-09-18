@@ -26,6 +26,10 @@ export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, o
 
   const handleWatchToggle = (e: React.MouseEvent) => {
     e.preventDefault();
+    if (!isAuthenticated) {
+      showAlert('Please sign in to use the watchlist.', 'error');
+      return;
+    }
     const currentList = JSON.parse(localStorage.getItem('civic_watchlist') || '[]');
     let newList;
     if (isWatched) {
@@ -39,10 +43,22 @@ export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, o
     setIsWatched(!isWatched);
   };
 
-  // Keep local state in sync with parent props
+  // Keep local state in sync with parent props and Auth state
   React.useEffect(() => {
     setSupportCount(Number(challenge.support_count || 0));
   }, [challenge.support_count]);
+
+  React.useEffect(() => {
+    if (!isAuthenticated) {
+      setIsSupported(false);
+      setIsWatched(false);
+    } else {
+      const savedSupports = JSON.parse(localStorage.getItem('supported_challenges') || '{}');
+      setIsSupported(!!savedSupports[challenge.id]);
+      const savedWatchlist = JSON.parse(localStorage.getItem('civic_watchlist') || '[]');
+      setIsWatched(savedWatchlist.includes(challenge.id));
+    }
+  }, [isAuthenticated, challenge.id]);
 
   const maxDescriptionLength = 150;
   const isLongDescription = challenge.description && challenge.description.length > maxDescriptionLength;
