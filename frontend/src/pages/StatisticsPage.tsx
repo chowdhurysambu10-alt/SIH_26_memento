@@ -321,23 +321,25 @@ export const StatisticsPage: React.FC<StatisticsPageProps> = ({ hideMyProblems =
             {/* Tracker Timeline - purely tracking like Flipkart */}
             {renderTimeline(selectedChallenge)}
 
-            <div style={{ display: 'flex', gap: '16px', marginTop: '32px' }}>
-              <button 
-                className="light-action-btn" 
-                style={{ flex: 1, background: '#ffffff', border: '1px solid #3b82f6', color: '#3b82f6', boxShadow: 'none' }}
-                onClick={() => showAlert('Edit functionality coming soon!', 'info')}
-              >
-                <Edit size={18} /> Edit Issue
-              </button>
-              
-              <button 
-                className="light-action-btn" 
-                style={{ flex: 1, background: '#ffffff', border: '1px solid #ef4444', color: '#ef4444', boxShadow: 'none' }}
-                onClick={() => handleDelete(selectedChallenge.id)}
-              >
-                <Trash2 size={18} /> Withdraw
-              </button>
-            </div>
+            {user?.id === selectedChallenge.submitted_by && (
+              <div style={{ display: 'flex', gap: '16px', marginTop: '32px' }}>
+                <button 
+                  className="light-action-btn" 
+                  style={{ flex: 1, background: '#ffffff', border: '1px solid #3b82f6', color: '#3b82f6', boxShadow: 'none' }}
+                  onClick={() => showAlert('Edit functionality coming soon!', 'info')}
+                >
+                  <Edit size={18} /> Edit Issue
+                </button>
+                
+                <button 
+                  className="light-action-btn" 
+                  style={{ flex: 1, background: '#ffffff', border: '1px solid #ef4444', color: '#ef4444', boxShadow: 'none' }}
+                  onClick={() => handleDelete(selectedChallenge.id)}
+                >
+                  <Trash2 size={18} /> Withdraw
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="light-detail-pane" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '400px' }}>
