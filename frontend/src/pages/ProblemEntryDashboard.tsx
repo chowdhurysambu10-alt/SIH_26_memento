@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { dashboardsApi } from '../api/dashboards';
+import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useUI } from '../context/UIContext';
 import { CameraModal } from '../components/CameraModal';
@@ -14,8 +15,127 @@ import {
   Image as ImageIcon,
   MapPin,
 } from 'lucide-react';
+import exifr from 'exifr';
 
 import { WEST_BENGAL_DISTRICTS, JHARKHAND_DISTRICTS } from '../constants/districts';
+
+const validateImageSecurity = async (file: File): Promise<{ valid: boolean; error?: string }> => {
+  if (!file.type.startsWith('image/')) return { valid: true };
+
+  try {
+    const exifData = await exifr.parse(file, ['Make', 'Model', 'FNumber', 'ExposureTime', 'ISO', 'Software']);
+
+    if (exifData?.Software && (exifData.Software.toLowerCase().includes('midjourney') || exifData.Software.toLowerCase().includes('dall-e') || exifData.Software.toLowerCase().includes('stable diffusion'))) {
+       return { valid: false, error: 'AI generation software signature detected in image metadata.' };
+    }
+
+    const hasHardwareMetrics = exifData && (exifData.FNumber || exifData.ExposureTime || exifData.ISO);
+
+    if (!hasHardwareMetrics) {
+      return {
+        valid: false,
+        error: 'PRIVATE_SHARE_ERROR',
+      };
+    }
+
+    return { valid: true };
+  } catch (err) {
+    console.error('EXIF validation error:', err);
+    return {
+      valid: false,
+      error: 'PRIVATE_SHARE_ERROR',
+    };
+  }
+};
+
+
+const PRIVATE_SHARE_STEPS = [
+  {
+    brand: 'Android Gallery (options name may vary)',
+    color: '#1428a0',
+    bg: '#e8eaf6',
+    steps: [
+      'Open your Android Gallery app.',
+      'Tap the photo you want to share.',
+      'Tap the ⋮ (three-dot menu) or settings icon.',
+      'Tap "Details" → Look for "Remove location data" — make sure it is OFF.',
+      'Look for "Private Share" or "Remove Metadata" options and toggle them OFF.',
+      'Now re-select the photo and upload it again.',
+    ],
+  },
+  {
+    brand: 'Google Photos',
+    color: '#1a73e8',
+    bg: '#e8f0fe',
+    steps: [
+      'Open Google Photos.',
+      'Tap the photo you want to upload.',
+      'Tap ⋮ (three dots) at top-right.',
+      'Tap "Download" to save a full copy to your device.',
+      'Upload that downloaded photo — it retains EXIF metadata.',
+    ],
+  },
+  {
+    brand: 'iPhone (iOS)',
+    color: '#555',
+    bg: '#f1f5f9',
+    steps: [
+      'Open the Photos app and select your photo.',
+      'Tap the Share icon (square with arrow pointing up).',
+      'In the share sheet, look for "Options" at the very top.',
+      'Tap "Options" → toggle "Include Location" and "All Photos Data" to ON.',
+      'Now export/share the photo — full EXIF data will be preserved.',
+    ],
+  },
+];
+
+const PrivateShareGuide: React.FC<{ onDismiss: () => void }> = ({ onDismiss }) => {
+  const [openBrand, setOpenBrand] = React.useState<number | null>(null);
+  return (
+    <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <AlertCircle size={20} color="#b45309" />
+          <div>
+            <p style={{ margin: 0, fontWeight: 700, fontSize: '15px', color: '#92400e' }}>Missing Camera Metadata</p>
+            <p style={{ margin: '2px 0 0', fontSize: '13px', color: '#78350f' }}>This photo has no ISO / Shutter Speed data. We can't verify it's a real photo.</p>
+          </div>
+        </div>
+        <button onClick={onDismiss} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#92400e', flexShrink: 0 }}><X size={18} /></button>
+      </div>
+
+      <p style={{ fontSize: '13.5px', color: '#78350f', marginBottom: '14px', lineHeight: 1.6 }}>
+        📌 <strong>If this is a real photo taken on your phone</strong>, your gallery's <strong>"Private Share"</strong> or <strong>"Remove Metadata"</strong> setting is stripping the camera info. Tap your phone below for a step-by-step fix:
+      </p>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {PRIVATE_SHARE_STEPS.map((brand, i) => (
+          <div key={i} style={{ borderRadius: '8px', border: `1px solid ${brand.color}30`, overflow: 'hidden' }}>
+            <button
+              type="button"
+              onClick={() => setOpenBrand(openBrand === i ? null : i)}
+              style={{ width: '100%', padding: '12px 16px', background: brand.bg, border: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, fontSize: '14px', color: brand.color, textAlign: 'left' }}
+            >
+              {brand.brand}
+              <span style={{ fontSize: '18px', display: 'inline-block', transform: openBrand === i ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>›</span>
+            </button>
+            {openBrand === i && (
+              <ol style={{ margin: 0, padding: '12px 16px 12px 36px', background: '#fff', fontSize: '13.5px', color: '#374151', lineHeight: 1.8 }}>
+                {brand.steps.map((step, j) => (
+                  <li key={j}>{step}</li>
+                ))}
+              </ol>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <p style={{ fontSize: '12.5px', color: '#92400e', marginTop: '12px', marginBottom: 0 }}>
+        💡 <strong>Tip:</strong> The easiest fix is to use the <strong>"Take a Photo"</strong> option in this form — live camera photos always include full metadata and are accepted instantly.
+      </p>
+    </div>
+  );
+};
 
 const CATEGORIES = [
   'Let AI Automatically Classify',
@@ -63,7 +183,9 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
   }, [files]);
   const [submitSuccess, setSubmitSuccess] = useState<any>(null);
   const [error, setError] = useState('');
+  const [showPrivateShareGuide, setShowPrivateShareGuide] = useState(false);
   const [showMediaOptions, setShowMediaOptions] = useState(false);
+
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileInputCameraRef = useRef<HTMLInputElement>(null);
@@ -157,7 +279,7 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
             </p>
           </div>
 
-          {error && (
+          {error && !showPrivateShareGuide && (
             <div style={{ background: '#fee2e2', color: '#b91c1c', padding: '12px 16px', borderRadius: '8px', fontSize: '14px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <AlertCircle size={16} /> {error}
             </div>
@@ -272,6 +394,11 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
 
             <div className="form-group" style={{ marginBottom: '24px' }}>
               <label className="form-label">Evidence Media (Photo/Video)</label>
+              {showPrivateShareGuide && (
+                <div style={{ marginTop: '8px' }}>
+                  <PrivateShareGuide onDismiss={() => { setShowPrivateShareGuide(false); setError(''); }} />
+                </div>
+              )}
               {files.length > 0 && (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '12px', marginBottom: '14px' }}>
                   {filePreviews.map((preview, index) => (
@@ -299,6 +426,7 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                         />
                       )}
+                      {/* AI Check status badge */}
                       <button
                         type="button"
                         onClick={() => {
@@ -435,11 +563,30 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
                 accept="image/*,video/*"
                 multiple
                 style={{ display: 'none' }}
-                onChange={(e) => {
+                onChange={async (e) => {
                   if (e.target.files && e.target.files.length > 0) {
                     const newFiles = Array.from(e.target.files);
-                    setFiles((prev) => [...prev, ...newFiles]);
+                    const validFiles: File[] = [];
+                    for (const f of newFiles) {
+                      const result = await validateImageSecurity(f);
+                      if (result.valid) {
+                        validFiles.push(f);
+
+                      } else if (result.error === 'PRIVATE_SHARE_ERROR') {
+                        setShowPrivateShareGuide(true);
+                        showAlert('Camera metadata missing. See the guide above the upload button.', 'error');
+                        setError('');
+                      } else {
+                        setError(result.error!);
+                        showAlert(result.error!, 'error');
+                      }
+                    }
+                    if (validFiles.length > 0) {
+                      setFiles((prev) => [...prev, ...validFiles]);
+                    }
                   }
+                  // Reset input value so same file can be selected again if needed
+                  if (fileInputRef.current) fileInputRef.current.value = '';
                 }}
               />
               <input
@@ -448,11 +595,22 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
                 accept="image/*,video/*"
                 capture="environment"
                 style={{ display: 'none' }}
-                onChange={(e) => {
+                onChange={async (e) => {
                   if (e.target.files && e.target.files[0]) {
                     const snapped = e.target.files[0];
-                    setFiles((prev) => [...prev, snapped]);
+                    const result = await validateImageSecurity(snapped);
+                    if (result.valid) {
+                      setFiles((prev) => [...prev, snapped]);
+                    } else if (result.error === 'PRIVATE_SHARE_ERROR') {
+                      setShowPrivateShareGuide(true);
+                      showAlert('Camera metadata missing. See the guide above the upload button.', 'error');
+                      setError('');
+                    } else {
+                      setError(result.error!);
+                      showAlert(result.error!, 'error');
+                    }
                   }
+                  if (fileInputCameraRef.current) fileInputCameraRef.current.value = '';
                 }}
               />
             </div>

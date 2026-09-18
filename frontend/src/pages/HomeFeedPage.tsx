@@ -17,8 +17,29 @@ export const HomeFeedPage: React.FC<{ onNavigateLogin: () => void; onNavigateSub
   const [hasMore, setHasMore] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
+  const [sharedProblem, setSharedProblem] = useState<Challenge | null>(null);
+  const [sharedProblemLoading, setSharedProblemLoading] = useState<boolean>(false);
+
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const observer = useRef<IntersectionObserver | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const pid = params.get('problemId');
+    if (pid) {
+      setSharedProblemLoading(true);
+      challengesApi.getChallengeById(pid).then((data) => {
+        setSharedProblem(data);
+      }).catch((err) => {
+        console.error('Failed to fetch shared problem:', err);
+      }).finally(() => {
+        setSharedProblemLoading(false);
+        // Clean URL
+        const newUrl = window.location.origin + window.location.pathname + window.location.hash;
+        window.history.replaceState(window.history.state, '', newUrl);
+      });
+    }
+  }, []);
 
   const cacheKey = `feed_${sortBy}_${searchQuery}`;
   
@@ -163,6 +184,38 @@ export const HomeFeedPage: React.FC<{ onNavigateLogin: () => void; onNavigateSub
             </button>
           </div>
         </div>
+
+        {sharedProblemLoading && (
+          <div className="challenge-list" style={{ marginBottom: '24px' }}>
+            <h3 style={{ color: '#0f172a', marginBottom: '12px' }}>Shared Challenge</h3>
+            <FeedItemSkeleton />
+          </div>
+        )}
+
+        {sharedProblem && !sharedProblemLoading && (
+          <div className="challenge-list" style={{ marginBottom: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <h3 style={{ color: '#0f172a', margin: 0 }}>Shared Challenge</h3>
+              <button 
+                onClick={() => setSharedProblem(null)}
+                style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontWeight: 600 }}
+              >
+                Clear
+              </button>
+            </div>
+            <div style={{ contentVisibility: 'auto', containIntrinsicSize: '0 300px', border: '2px solid #3b82f6', borderRadius: '14px', padding: '2px', background: '#eff6ff' }}>
+              <FeedItem
+                challenge={sharedProblem}
+                onOpenLightbox={(src) => setLightboxSrc(src)}
+                onSupported={handleChallengeSupported}
+                onDeleted={(id) => {
+                  setSharedProblem(null);
+                  handleChallengeDeleted(id);
+                }}
+              />
+            </div>
+          </div>
+        )}
 
         {isLoading && challenges.length === 0 && (
           <div className="challenge-list">

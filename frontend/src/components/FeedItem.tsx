@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Challenge, challengesApi } from '../api/challenges';
 import { useAuth } from '../context/AuthContext';
 import { useUI } from '../context/UIContext';
-import { MapPin, Building2, Tag, X, Trash2 } from 'lucide-react';
+import { MapPin, Building2, Tag, X, Trash2, ThumbsUp, Share2 } from 'lucide-react';
 
 interface FeedItemProps {
   challenge: Challenge;
@@ -386,36 +386,56 @@ export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, o
           disabled={isSyncing}
           style={{ opacity: isSyncing ? 0.7 : 1, cursor: isSyncing ? 'not-allowed' : 'pointer' }}
         >
+          <ThumbsUp size={16} fill={isSupported ? 'currentColor' : 'none'} />
           <span>{isSupported ? 'Supported' : 'Support'} ({supportCount})</span>
         </button>
-
-        {canDelete && (
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <button
             type="button"
             className="interaction-btn"
-            onClick={handleDelete}
-            disabled={isDeleting}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              background: '#fef2f2',
-              color: '#ef4444',
-              border: '1px solid #fecaca',
-              padding: '6px 14px',
-              borderRadius: '8px',
-              fontSize: '13px',
-              fontWeight: 600,
-              cursor: isDeleting ? 'not-allowed' : 'pointer',
-              opacity: isDeleting ? 0.6 : 1,
-              transition: 'all 0.2s ease',
+            onClick={(e) => {
+              e.preventDefault();
+              const shareUrl = `${window.location.origin}/?problemId=${challenge.id}#feed`;
+              if (navigator.share) {
+                navigator.share({ title: challenge.title, url: shareUrl });
+              } else {
+                navigator.clipboard.writeText(shareUrl);
+                showAlert('Link copied to clipboard!', 'success');
+              }
             }}
-            title="Delete this complaint"
           >
-            <Trash2 size={14} />
-            <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
+            <Share2 size={16} />
+            <span>Share</span>
           </button>
-        )}
+
+          {canDelete && (
+            <button
+              type="button"
+              className="interaction-btn"
+              onClick={handleDelete}
+              disabled={isDeleting}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: '#fef2f2',
+                color: '#ef4444',
+                border: '1px solid #fecaca',
+                padding: '6px 14px',
+                borderRadius: '8px',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: isDeleting ? 'not-allowed' : 'pointer',
+                opacity: isDeleting ? 0.6 : 1,
+                transition: 'all 0.2s ease',
+              }}
+              title="Delete this complaint"
+            >
+              <Trash2 size={14} />
+              <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
+            </button>
+          )}
+        </div>
       </div>
 
 

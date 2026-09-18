@@ -677,7 +677,9 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
               <input 
                 type="number" 
                 value={platformSettings.dataRetentionDays}
-                onChange={e => setPlatformSettings({...platformSettings, dataRetentionDays: parseInt(e.target.value) || 0})}
+                min={1}
+                max={3650}
+                onChange={e => setPlatformSettings({...platformSettings, dataRetentionDays: Math.max(1, parseInt(e.target.value) || 30)})}
                 style={{ padding: '10px 14px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '15px', width: '100%' }}
               />
             </div>
@@ -686,7 +688,9 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
               <input 
                 type="number" 
                 value={platformSettings.maxAttachmentSizeMB}
-                onChange={e => setPlatformSettings({...platformSettings, maxAttachmentSizeMB: parseInt(e.target.value) || 10})}
+                min={1}
+                max={100}
+                onChange={e => setPlatformSettings({...platformSettings, maxAttachmentSizeMB: Math.max(1, parseInt(e.target.value) || 10)})}
                 style={{ padding: '10px 14px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '15px', width: '100%' }}
               />
             </div>

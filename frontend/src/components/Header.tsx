@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { ChevronDown, LogOut, User as UserIcon, Bell, ShieldAlert, Headset } from 'lucide-react';
+import { ChevronDown, LogOut, User as UserIcon, Bell, ShieldAlert, Headset, Menu, Users, Info } from 'lucide-react';
 import { NotificationsModal } from './NotificationsModal';
 import { VerificationRequestModal } from './VerificationRequestModal';
 import { ProfileModal } from './ProfileModal';
@@ -20,7 +20,9 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, platfor
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   const { notifications } = useNotifications();
   const unreadCount = notifications.filter(n => !n.isRead).length;
@@ -29,6 +31,9 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, platfor
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setDropdownOpen(false);
+      }
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target as Node)) {
+        setMobileMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -236,6 +241,58 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, platfor
                 Sign In
               </button>
             )}
+            {/* Mobile Menu Dropdown for sections not in bottom nav */}
+            <div className="mobile-only-menu" style={{ position: 'relative' }} ref={mobileMenuRef}>
+              <style>
+                {`
+                  .mobile-only-menu { display: none; }
+                  @media (max-width: 768px) {
+                    .mobile-only-menu { display: block; margin-left: 8px; }
+                  }
+                `}
+              </style>
+              <button
+                className="btn btn-outline"
+                style={{ padding: '6px 10px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                aria-label="More options"
+              >
+                <Menu size={20} />
+              </button>
+
+              {mobileMenuOpen && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    right: 0,
+                    top: '100%',
+                    marginTop: '8px',
+                    background: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '10px',
+                    boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)',
+                    width: '180px',
+                    zIndex: 1000,
+                    padding: '8px',
+                  }}
+                >
+                  <button
+                    className="btn btn-outline w-100"
+                    style={{ marginBottom: '8px', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '10px', border: 'none', justifyContent: 'flex-start', color: '#0f172a' }}
+                    onClick={() => { setActiveTab('community'); setMobileMenuOpen(false); }}
+                  >
+                    <Users size={16} color="#2563eb" /> Community
+                  </button>
+                  <button
+                    className="btn btn-outline w-100"
+                    style={{ fontSize: '14px', display: 'flex', alignItems: 'center', gap: '10px', border: 'none', justifyContent: 'flex-start', color: '#0f172a' }}
+                    onClick={() => { setActiveTab('about'); setMobileMenuOpen(false); }}
+                  >
+                    <Info size={16} color="#2563eb" /> About
+                  </button>
+                </div>
+              )}
+            </div>
           </nav>
         </div>
       </header>
