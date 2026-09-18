@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { ClassificationService } from '../ai/classification.service';
+import { ImageValidationService } from '../ai/image-validation.service';
 import { SettingsService } from '../settings/settings.service';
 import { CreateChallengeDto } from './dto/create-challenge.dto';
 import { CompressionUtil } from '../../utils/compression.util';
@@ -28,6 +29,7 @@ export class ChallengesService implements OnModuleInit {
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly classificationService: ClassificationService,
+    private readonly imageValidationService: ImageValidationService,
     private readonly settingsService: SettingsService,
   ) {}
 
@@ -90,6 +92,25 @@ export class ChallengesService implements OnModuleInit {
       let uploadBuffer = file.buffer;
       let originalName = file.originalname;
       let mimeType = file.mimetype;
+
+      // Validate image authenticity using Gemini API (detects screenshots and AI-generated imagery)
+      if (mimeType && mimeType.startsWith('image/')) {
+        const validation = await this.imageValidationService.validateImage(
+          uploadBuffer,
+          mimeType,
+          originalName,
+        );
+
+        if (!validation.isValid) {
+          this.logger.warn(
+            `Upload rejected for image "${originalName}": ${validation.rejectionReason} (Details: ${validation.details})`,
+          );
+          throw new BadRequestException(
+            validation.rejectionReason ||
+              'Upload rejected: The image appears to be a screenshot or AI-generated. Please upload an authentic real-world photograph.',
+          );
+        }
+      }
 
       try {
         if (mimeType.startsWith('image/')) {
@@ -675,10 +696,10 @@ export class ChallengesService implements OnModuleInit {
   async deleteChallenge(id: string, user: AuthenticatedUser) {
     const admin = this.supabaseService.getAdminClient();
 
-    // 1. Fetch existing challenge
+    // 1. Fetch existing challenge along with media_urls
     const { data: challenge, error: findError } = await admin
       .from('challenges')
-      .select('id, submitted_by, user_id, title')
+      .select('id, submitted_by, user_id, title, media_urls')
       .eq('id', id)
       .maybeSingle();
 
@@ -693,31 +714,81 @@ export class ChallengesService implements OnModuleInit {
 
     // 2. Authorization check
     const isAuthor =
-      challenge.submitted_by === user.id ||
-      challenge.user_id === user.id;
+      String(challenge.submitted_by) === String(user.id) ||
+      String(challenge.user_id) === String(user.id);
     const isAdmin =
       user.role === UserRole.SUPER_ADMIN ||
       user.role === UserRole.GOVT_VIEWER ||
-      (user.role as any) === 'admin';
+      (user.role as any) === 'admin' ||
+      (user.role as any) === 'super_admin';
 
     if (!isAuthor && !isAdmin) {
       throw new ForbiddenException('You are only authorized to delete your own submitted problems.');
     }
 
-    // 3. Clean up related records (challenge_supports, project_teams, etc.)
+    // 3. Clean up related foreign-key records across database tables
+    // 3a. Clear duplicate references from other challenges
+    try {
+      await admin
+        .from('challenges')
+        .update({ duplicate_of: null })
+        .eq('duplicate_of', id);
+    } catch (e: any) {
+      this.logger.warn(`Notice clearing duplicate_of for ${id}: ${e.message}`);
+    }
+
+    // 3b. Delete challenge supports (upvotes)
     try {
       await admin.from('challenge_supports').delete().eq('challenge_id', id);
     } catch (e: any) {
       this.logger.warn(`Notice deleting challenge_supports for ${id}: ${e.message}`);
     }
 
+    // 3c. Delete proposals (tender/bids)
     try {
-      await admin.from('project_teams').delete().eq('challenge_id', id);
+      await admin.from('proposals').delete().eq('challenge_id', id);
     } catch (e: any) {
-      this.logger.warn(`Notice deleting project_teams for ${id}: ${e.message}`);
+      this.logger.warn(`Notice deleting proposals for ${id}: ${e.message}`);
     }
 
-    // 4. Delete the challenge
+    // 3d. Delete industry engagements
+    try {
+      await admin.from('industry_engagements').delete().eq('challenge_id', id);
+    } catch (e: any) {
+      this.logger.warn(`Notice deleting industry_engagements for ${id}: ${e.message}`);
+    }
+
+    // 3e. Delete challenge assignments
+    try {
+      await admin.from('challenge_assignments').delete().eq('challenge_id', id);
+    } catch (e: any) {
+      this.logger.warn(`Notice deleting challenge_assignments for ${id}: ${e.message}`);
+    }
+
+    // 3f. Delete AI analysis log
+    try {
+      await admin.from('ai_analysis_log').delete().eq('challenge_id', id);
+    } catch (e: any) {
+      this.logger.warn(`Notice deleting ai_analysis_log for ${id}: ${e.message}`);
+    }
+
+    // 3g. Delete project teams and their milestones
+    try {
+      const { data: teams } = await admin
+        .from('project_teams')
+        .select('id')
+        .eq('challenge_id', id);
+
+      if (teams && teams.length > 0) {
+        const teamIds = teams.map((t) => t.id);
+        await admin.from('milestones').delete().in('project_id', teamIds);
+        await admin.from('project_teams').delete().eq('challenge_id', id);
+      }
+    } catch (e: any) {
+      this.logger.warn(`Notice deleting project_teams/milestones for ${id}: ${e.message}`);
+    }
+
+    // 4. Delete the challenge from challenges table
     const { error: deleteError } = await admin
       .from('challenges')
       .delete()
@@ -728,11 +799,32 @@ export class ChallengesService implements OnModuleInit {
       throw new BadRequestException(`Failed to delete challenge: ${deleteError.message}`);
     }
 
-    this.logger.log(`Challenge ${id} ("${challenge.title}") deleted by user ${user.id} (${user.role})`);
+    // 5. Delete associated image files from Supabase Storage bucket
+    if (
+      challenge.media_urls &&
+      Array.isArray(challenge.media_urls) &&
+      challenge.media_urls.length > 0
+    ) {
+      try {
+        await this.supabaseService.deleteFilesByUrls(challenge.media_urls);
+      } catch (storageErr: any) {
+        this.logger.warn(
+          `Notice deleting storage images for challenge ${id}: ${storageErr.message}`,
+        );
+      }
+    }
+
+    // 6. Invalidate in-memory top problem cache if deleted problem was cached
+    if (this.cachedTopProblem?.id === id) {
+      this.cachedTopProblem = null;
+      await this.updateTopProblemCache();
+    }
+
+    this.logger.log(`Challenge ${id} ("${challenge.title}") and all associated files deleted by user ${user.id} (${user.role})`);
 
     return {
       success: true,
-      message: `Challenge '${challenge.title || id}' successfully deleted.`,
+      message: `Challenge '${challenge.title || id}' and associated files successfully deleted.`,
     };
   }
 
@@ -1093,17 +1185,105 @@ export class ChallengesService implements OnModuleInit {
     if (!challengeIds || challengeIds.length === 0) {
       return { success: true, count: 0 };
     }
-    
+
     const admin = this.supabaseService.getAdminClient();
-    
-    // Delete them from active database
+
+    // 1. Fetch media_urls for all target challenges to clean up storage
+    const allMediaUrls: string[] = [];
+    try {
+      const { data: challengesToPurge } = await admin
+        .from('challenges')
+        .select('id, media_urls')
+        .in('id', challengeIds);
+
+      if (challengesToPurge) {
+        for (const c of challengesToPurge) {
+          if (c.media_urls && Array.isArray(c.media_urls)) {
+            allMediaUrls.push(...c.media_urls);
+          }
+        }
+      }
+    } catch (e: any) {
+      this.logger.warn(`Notice fetching media_urls for purge: ${e.message}`);
+    }
+
+    // 2. Clean up foreign keys
+    try {
+      await admin.from('challenges').update({ duplicate_of: null }).in('duplicate_of', challengeIds);
+    } catch (e: any) {
+      this.logger.warn(`Notice unlinking duplicate_of for purge: ${e.message}`);
+    }
+
+    try {
+      await admin.from('challenge_supports').delete().in('challenge_id', challengeIds);
+    } catch (e: any) {
+      this.logger.warn(`Notice deleting supports for purge: ${e.message}`);
+    }
+
+    try {
+      await admin.from('proposals').delete().in('challenge_id', challengeIds);
+    } catch (e: any) {
+      this.logger.warn(`Notice deleting proposals for purge: ${e.message}`);
+    }
+
+    try {
+      await admin.from('industry_engagements').delete().in('challenge_id', challengeIds);
+    } catch (e: any) {
+      this.logger.warn(`Notice deleting engagements for purge: ${e.message}`);
+    }
+
+    try {
+      await admin.from('challenge_assignments').delete().in('challenge_id', challengeIds);
+    } catch (e: any) {
+      this.logger.warn(`Notice deleting assignments for purge: ${e.message}`);
+    }
+
+    try {
+      await admin.from('ai_analysis_log').delete().in('challenge_id', challengeIds);
+    } catch (e: any) {
+      this.logger.warn(`Notice deleting ai logs for purge: ${e.message}`);
+    }
+
+    try {
+      const { data: teams } = await admin
+        .from('project_teams')
+        .select('id')
+        .in('challenge_id', challengeIds);
+      if (teams && teams.length > 0) {
+        const teamIds = teams.map((t) => t.id);
+        await admin.from('milestones').delete().in('project_id', teamIds);
+        await admin.from('project_teams').delete().in('challenge_id', challengeIds);
+      }
+    } catch (e: any) {
+      this.logger.warn(`Notice deleting teams/milestones for purge: ${e.message}`);
+    }
+
+    // 3. Delete from active database
     const { error: delErr } = await admin
       .from('challenges')
       .delete()
       .in('id', challengeIds);
-      
-    if (delErr) throw new BadRequestException('Failed to purge challenges from database');
-    
+
+    if (delErr) {
+      this.logger.error(`Failed to purge challenges from database: ${delErr.message}`);
+      throw new BadRequestException(`Failed to purge challenges from database: ${delErr.message}`);
+    }
+
+    // 4. Delete images from Supabase Storage bucket
+    if (allMediaUrls.length > 0) {
+      try {
+        await this.supabaseService.deleteFilesByUrls(allMediaUrls);
+      } catch (storageErr: any) {
+        this.logger.warn(`Notice cleaning storage files during purge: ${storageErr.message}`);
+      }
+    }
+
+    // 5. Invalidate cachedTopProblem if it was purged
+    if (this.cachedTopProblem && challengeIds.includes(this.cachedTopProblem.id)) {
+      this.cachedTopProblem = null;
+      await this.updateTopProblemCache();
+    }
+
     return { success: true, count: challengeIds.length };
   }
 
@@ -1147,4 +1327,30 @@ export class ChallengesService implements OnModuleInit {
     const score = Math.round(hierarchicalBase * 0.6) + aiContribution + supportBoost;
     return Math.min(100, Math.max(1, score));
   }
+
+  /**
+   * Standalone image validation method for upload verification.
+   * Analyzes an image using the Gemini API to detect screenshots or AI generation.
+   * Throws BadRequestException if invalid, or returns the validation result.
+   */
+  async validateUploadedImage(file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('No image file provided for validation.');
+    }
+    const validation = await this.imageValidationService.validateImage(
+      file.buffer,
+      file.mimetype,
+      file.originalname,
+    );
+
+    if (!validation.isValid) {
+      throw new BadRequestException(
+        validation.rejectionReason ||
+          'Upload rejected: The image appears to be a screenshot or AI-generated. Please upload an authentic camera photograph.',
+      );
+    }
+
+    return validation;
+  }
 }
+

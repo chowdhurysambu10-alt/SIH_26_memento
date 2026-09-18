@@ -54,6 +54,17 @@ export class ChallengesController {
     return this.challengesService.createChallenge(dto, user, files);
   }
 
+  @Post('validate-image')
+  @Public()
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Validate an image to detect screenshots or AI-generated imagery using Gemini API',
+  })
+  async validateImage(@UploadedFile() file: Express.Multer.File) {
+    return this.challengesService.validateUploadedImage(file);
+  }
+
   @Get()
   @Public()
   @ApiOperation({

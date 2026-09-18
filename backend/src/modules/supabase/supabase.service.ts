@@ -116,4 +116,73 @@ export class SupabaseService implements OnModuleInit {
       path: filePath,
     };
   }
+
+  /**
+   * Extracts the bucket-relative file path from a storage URL or raw path.
+   */
+  extractStoragePath(urlOrPath: string): string | null {
+    if (!urlOrPath || typeof urlOrPath !== 'string') return null;
+    if (urlOrPath.startsWith('data:')) return null; // Base64 data URI
+
+    // Case 1: Full Supabase Storage URL
+    // e.g. https://<project>.supabase.co/storage/v1/object/public/challenge-media/challenges/123_photo.webp
+    const marker = `/${this.storageBucket}/`;
+    const idx = urlOrPath.indexOf(marker);
+    if (idx !== -1) {
+      const rawPath = urlOrPath.substring(idx + marker.length).split('?')[0];
+      return decodeURIComponent(rawPath);
+    }
+
+    // Case 2: Relative path starting with "challenges/"
+    if (urlOrPath.startsWith('challenges/')) {
+      return decodeURIComponent(urlOrPath.split('?')[0]);
+    }
+
+    // Case 3: Path starting with bucket name e.g. "challenge-media/challenges/..."
+    if (urlOrPath.startsWith(`${this.storageBucket}/`)) {
+      return decodeURIComponent(
+        urlOrPath.substring(this.storageBucket.length + 1).split('?')[0],
+      );
+    }
+
+    return null;
+  }
+
+  /**
+   * Delete one or more files from Supabase Storage bucket by their storage paths.
+   */
+  async deleteFiles(filePaths: string[]): Promise<number> {
+    if (!filePaths || filePaths.length === 0) return 0;
+    try {
+      const { data, error } = await this.supabaseAdmin.storage
+        .from(this.storageBucket)
+        .remove(filePaths);
+
+      if (error) {
+        this.logger.error(`Failed to delete files from Supabase Storage: ${error.message}`);
+        return 0;
+      }
+
+      this.logger.log(
+        `Successfully deleted ${filePaths.length} file(s) from Supabase Storage: ${filePaths.join(', ')}`,
+      );
+      return filePaths.length;
+    } catch (err: any) {
+      this.logger.warn(`Storage file removal notice: ${err.message}`);
+      return 0;
+    }
+  }
+
+  /**
+   * Delete files from Supabase Storage bucket given their public URLs.
+   */
+  async deleteFilesByUrls(urls: string[]): Promise<number> {
+    if (!urls || urls.length === 0) return 0;
+    const paths = urls
+      .map((u) => this.extractStoragePath(u))
+      .filter((p): p is string => Boolean(p));
+
+    if (paths.length === 0) return 0;
+    return this.deleteFiles(paths);
+  }
 }
