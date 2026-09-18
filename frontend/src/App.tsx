@@ -179,27 +179,29 @@ export function AppContent() {
         <Header activeTab={activeTab} setActiveTab={setActiveTab} platformSettings={platformSettings} />
       )}
 
-      <Suspense fallback={<PageFallback />}>
-        {activeTab === 'home' && <LandingPage onNavigate={(tab) => setActiveTab(tab)} />}
+      <main className="app-main-content">
+        <Suspense fallback={<PageFallback />}>
+          {activeTab === 'home' && <LandingPage onNavigate={(tab) => setActiveTab(tab)} />}
 
-        {activeTab === 'feed' && <HomeFeedPage onNavigateLogin={() => setActiveTab('login')} onNavigateSubmit={() => setActiveTab('submit')} />}
+          {activeTab === 'feed' && <HomeFeedPage onNavigateLogin={() => setActiveTab('login')} onNavigateSubmit={() => setActiveTab('submit')} />}
 
-        {activeTab === 'top-problems' && <TopProblemsDashboard />}
+          {activeTab === 'top-problems' && <TopProblemsDashboard />}
 
-        {activeTab === 'submit' && (
-          <ProblemEntryDashboard onNavigateLogin={() => setActiveTab('login')} />
-        )}
+          {activeTab === 'submit' && (
+            <ProblemEntryDashboard onNavigateLogin={() => setActiveTab('login')} />
+          )}
 
-        {activeTab === 'statistics' && <StatisticsPage />}
+          {activeTab === 'statistics' && <StatisticsPage />}
 
-        {activeTab === 'community' && <CommunityPage platformSettings={platformSettings} />}
+          {activeTab === 'community' && <CommunityPage platformSettings={platformSettings} />}
 
-        {activeTab === 'admin-dashboard' && <AdminPortal />}
-        {activeTab === 'institution-dashboard' && <InstitutionPortal />}
-        {activeTab === 'student-dashboard' && <StudentPortal />}
+          {activeTab === 'admin-dashboard' && <AdminPortal />}
+          {activeTab === 'institution-dashboard' && <InstitutionPortal />}
+          {activeTab === 'student-dashboard' && <StudentPortal />}
 
-        {activeTab === 'about' && <AboutPage />}
-      </Suspense>
+          {activeTab === 'about' && <AboutPage />}
+        </Suspense>
+      </main>
 
       {/* Mobile Bottom Nav (visible on mobile, hidden on desktop via CSS) */}
       {!['admin-dashboard', 'institution-dashboard', 'student-dashboard', 'login'].includes(activeTab) && (
@@ -241,6 +243,10 @@ export function AppContent() {
           <Plus size={28} strokeWidth={2.5} />
         </button>
       ) : null}
+
+      {!['admin-dashboard', 'institution-dashboard', 'student-dashboard', 'login'].includes(activeTab) && (
+        <MobileBottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
+      )}
     </div>
   );
 }
