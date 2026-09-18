@@ -23,31 +23,6 @@ const validateImageSecurity = async (file: File): Promise<{ valid: boolean; erro
   if (!file.type.startsWith('image/')) return { valid: true };
 
   try {
-    const img = new Image();
-    const objectUrl = URL.createObjectURL(file);
-    await new Promise((resolve, reject) => {
-      img.onload = resolve;
-      img.onerror = reject;
-      img.src = objectUrl;
-    });
-    URL.revokeObjectURL(objectUrl);
-
-    const width = img.naturalWidth;
-    const height = img.naturalHeight;
-
-    const aiResolutions = [
-      { w: 1024, h: 1024 },
-      { w: 1536, h: 1024 },
-      { w: 1344, h: 896 },
-      { w: 512, h: 512 },
-      { w: 2048, h: 2048 },
-    ];
-    const isAiRes = aiResolutions.some((res) => (res.w === width && res.h === height) || (res.w === height && res.h === width));
-
-    if (isAiRes) {
-      return { valid: false, error: 'AI-generated synthetic resolution detected. We only accept real photographs.' };
-    }
-
     const exifData = await exifr.parse(file, ['Make', 'Model', 'FNumber', 'ExposureTime', 'ISO', 'Software']);
 
     if (exifData?.Software && (exifData.Software.toLowerCase().includes('midjourney') || exifData.Software.toLowerCase().includes('dall-e') || exifData.Software.toLowerCase().includes('stable diffusion'))) {
