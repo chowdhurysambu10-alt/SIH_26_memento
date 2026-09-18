@@ -36,11 +36,16 @@ export async function apiClient<T = any>(
   const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
 
   dispatchNetworkStart();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout to prevent stuck requests
+
   try {
     const res = await fetch(url, {
       ...options,
       headers,
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
 
     const resData = await res.json().catch(() => null);
 
@@ -78,7 +83,11 @@ export async function apiClient<T = any>(
     return resData as T;
   } catch (error: any) {
     // If it's a TypeError from fetch, it means network failed completely (e.g., offline or server down)
-    if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+    if (error.name === 'AbortError') {
+      if (!options.suppressGlobalError) {
+        dispatchNetworkError('Request timed out. Please try again.');
+      }
+    } else if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
       if (!options.suppressGlobalError) {
         dispatchNetworkError('Network error. Please check your internet connection.');
       }

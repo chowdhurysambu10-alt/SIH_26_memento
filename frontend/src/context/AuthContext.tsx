@@ -33,6 +33,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.removeItem('user_data');
         localStorage.removeItem('supabase_access_token');
       }
+    } else {
+      // Clean up any orphaned local civic data if the user is not authenticated
+      localStorage.removeItem('civic_watchlist');
+      localStorage.removeItem('supported_challenges');
     }
     setLoading(false);
   }, []);
@@ -82,6 +86,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('supabase_access_token');
     localStorage.removeItem('supabase_refresh_token');
     localStorage.removeItem('user_data');
+    
+    // Clear localized civic data upon logout to maintain privacy
+    localStorage.removeItem('civic_watchlist');
+    localStorage.removeItem('supported_challenges');
+    
     setToken(null);
     setUser(null);
   };

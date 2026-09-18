@@ -90,7 +90,7 @@ export const InstitutionLayout: React.FC<InstitutionLayoutProps> = ({ children, 
               }}
             >
               <Home size={20} />
-              {isSidebarOpen && <span style={{ fontSize: '15px', fontWeight: 600 }}>Public Feed</span>}
+              {isSidebarOpen && <span style={{ fontSize: '15px', fontWeight: 600 }}>Public Updates</span>}
             </button>
 
             <button
@@ -136,8 +136,6 @@ export const InstitutionLayout: React.FC<InstitutionLayoutProps> = ({ children, 
           {children}
         </div>
       </main>
-
-
 
       <NotificationsModal isOpen={isNotificationsOpen} onClose={() => setNotificationsOpen(false)} />
 

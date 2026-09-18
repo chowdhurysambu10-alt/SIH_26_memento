@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Compass, Plus, Flame, BarChart2 } from 'lucide-react';
+import { Home, Globe, Plus, TrendingUp, Activity } from 'lucide-react';
 import { NavTab } from './Header';
 
 interface MobileBottomNavProps {
@@ -24,8 +24,8 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ activeTab, set
         className={`mobile-nav-item ${activeTab === 'feed' ? 'active' : ''}`}
         onClick={() => setActiveTab('feed')}
       >
-        <Compass size={22} />
-        <span>Feed</span>
+        <Globe size={22} />
+        <span>Updates</span>
       </button>
 
       <button
@@ -45,7 +45,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ activeTab, set
         className={`mobile-nav-item ${activeTab === 'top-problems' ? 'active' : ''}`}
         onClick={() => setActiveTab('top-problems')}
       >
-        <Flame size={22} />
+        <TrendingUp size={22} />
         <span>Top</span>
       </button>
 
@@ -54,7 +54,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ activeTab, set
         className={`mobile-nav-item ${activeTab === 'statistics' ? 'active' : ''}`}
         onClick={() => setActiveTab('statistics')}
       >
-        <BarChart2 size={22} />
+        <Activity size={22} />
         <span>Stats</span>
       </button>
     </nav>
