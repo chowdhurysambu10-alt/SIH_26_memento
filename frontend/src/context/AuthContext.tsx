@@ -33,6 +33,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.removeItem('user_data');
         localStorage.removeItem('supabase_access_token');
       }
+    } else {
+      // Clean up any orphaned local civic data if the user is not authenticated
+      localStorage.removeItem('civic_watchlist');
+      localStorage.removeItem('supported_challenges');
     }
     setLoading(false);
   }, []);
