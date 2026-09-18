@@ -284,10 +284,11 @@ export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, o
           className="interaction-btn"
           onClick={(e) => {
             e.preventDefault();
+            const shareUrl = `${window.location.origin}/?problemId=${challenge.id}#feed`;
             if (navigator.share) {
-              navigator.share({ title: challenge.title, url: window.location.href });
+              navigator.share({ title: challenge.title, url: shareUrl });
             } else {
-              navigator.clipboard.writeText(window.location.href);
+              navigator.clipboard.writeText(shareUrl);
               showAlert('Link copied to clipboard!', 'success');
             }
           }}
