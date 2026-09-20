@@ -82,6 +82,7 @@ describe('ChallengesService - Image Validation in Upload Workflow', () => {
     title: 'Pothole on Main Road',
     description: 'Deep pothole causing accidents at the main junction.',
     district: 'Ranchi',
+    location_text: 'Main Road Ranchi',
   };
 
   it('should reject the upload if the image is identified as a screenshot', async () => {

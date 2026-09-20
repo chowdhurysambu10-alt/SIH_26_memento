@@ -25,10 +25,10 @@ export class CreateChallengeDto {
   @IsNotEmpty()
   district: string;
 
-  @ApiPropertyOptional({ example: 'Village Kathikund, Near Panchayat Bhavan' })
-  @IsOptional()
+  @ApiProperty({ example: 'Village Kathikund, Near Panchayat Bhavan' })
   @IsString()
-  location_text?: string;
+  @IsNotEmpty({ message: 'Exact Location is required' })
+  location_text: string;
 
   @ApiPropertyOptional({ example: 24.2694, description: 'GPS Latitude' })
   @IsOptional()

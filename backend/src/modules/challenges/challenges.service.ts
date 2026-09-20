@@ -79,8 +79,8 @@ export class ChallengesService implements OnModuleInit {
       throw new ForbiddenException('The platform is currently in maintenance mode. New submissions are disabled temporarily.');
     }
 
-    if (settings.enforceGeolocation && (!dto.latitude || !dto.longitude)) {
-      throw new BadRequestException('Geolocation is strictly enforced. Please provide latitude and longitude coordinates.');
+    if ((!dto.latitude || !dto.longitude) && !dto.location_text) {
+      throw new BadRequestException('Exact Location is strictly required. Please provide a valid location link or village name.');
     }
 
     // 1. Process uploaded file(s)
@@ -961,8 +961,8 @@ export class ChallengesService implements OnModuleInit {
 
     // Check challenge status
     const existing = await this.getChallengeById(id, user);
-    if (existing.status !== ChallengeStatus.ROUTED) {
-      throw new BadRequestException('Challenge is not open for proposals. It must be routed to institutions first.');
+    if (existing.status !== ChallengeStatus.ROUTED && existing.status !== ChallengeStatus.SUBMITTED) {
+      throw new BadRequestException('Challenge is not open for proposals.');
     }
 
     if (!dto.proposal_text || !dto.budget_estimate || !dto.timeline_estimate || !(dto.contact_phone || user.contact)) {
