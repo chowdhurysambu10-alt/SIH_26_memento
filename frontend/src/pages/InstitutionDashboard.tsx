@@ -50,8 +50,18 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
       setInstitutions(data);
       if (user?.org_id) {
         setSelectedOrgId(user.org_id);
-      } else if (data.length > 0 && !selectedOrgId) {
-        setSelectedOrgId(data[0].id);
+      } else {
+        const myInst = data.find(i => 
+          user?.name && i.name && (
+            i.name.toLowerCase().includes(user.name.toLowerCase()) ||
+            user.name.toLowerCase().includes(i.name.toLowerCase())
+          )
+        );
+        if (myInst) {
+          setSelectedOrgId(myInst.id);
+        } else if (data.length > 0 && !selectedOrgId) {
+          setSelectedOrgId(data[0].id);
+        }
       }
     } catch (e) {
       console.error('Failed to fetch institutions:', e);
@@ -89,8 +99,16 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
   }, []);
 
   useAutoRefresh(refreshChallenges, 15000);
+  const isSuperAdmin = user?.role === 'super_admin' || (user?.role as any) === 'admin' || user?.role === 'govt_viewer';
   const activeOrgId = user?.org_id || selectedOrgId;
-  const currentInstitution = institutions.find(i => i.id === activeOrgId);
+  const currentInstitution = institutions.find(i => 
+    (activeOrgId && i.id === activeOrgId) ||
+    (user?.org_id && i.id === user.org_id) ||
+    (user?.name && i.name && (
+      i.name.toLowerCase().includes(user.name.toLowerCase()) ||
+      user.name.toLowerCase().includes(i.name.toLowerCase())
+    ))
+  );
 
   // Helper to test if a challenge is associated with this institution
   const isMine = (c: DashboardChallenge): boolean => {
@@ -198,33 +216,14 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
   if (activeView === 'dashboard') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-        {/* Header with Institution Selector */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
-          <div>
-            <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0f172a', margin: '0 0 6px' }}>
-              Institution Portal Overview
-            </h2>
-            <p style={{ color: '#64748b', margin: 0, fontSize: '15px' }}>
-              Logged in as <strong style={{ color: '#0f172a' }}>{currentInstitution?.name || user?.name || 'Authorized Institution'}</strong>
-            </p>
-          </div>
-
-          {/* Institution Switcher (for testing or multi-campus admins) */}
-          {institutions.length > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fff', padding: '8px 14px', borderRadius: '10px', border: '1px solid #e2e8f0', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
-              <Building2 size={16} color="#4c1d95" />
-              <span style={{ fontSize: '13px', fontWeight: 600, color: '#475569' }}>Institution:</span>
-              <select
-                value={activeOrgId}
-                onChange={(e) => setSelectedOrgId(e.target.value)}
-                style={{ border: 'none', background: 'transparent', fontWeight: 700, color: '#0f172a', fontSize: '13px', cursor: 'pointer', outline: 'none' }}
-              >
-                {institutions.map(inst => (
-                  <option key={inst.id} value={inst.id}>{inst.name} ({inst.district || inst.type})</option>
-                ))}
-              </select>
-            </div>
-          )}
+        {/* Header */}
+        <div>
+          <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0f172a', margin: '0 0 6px' }}>
+            Institution Portal Overview
+          </h2>
+          <p style={{ color: '#64748b', margin: 0, fontSize: '15px' }}>
+            Logged in as <strong style={{ color: '#0f172a' }}>{currentInstitution?.name || user?.name || 'Authorized Institution'}</strong>
+          </p>
         </div>
 
         {/* Pending Claim Notice if any */}
@@ -692,20 +691,26 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
           </p>
         </div>
         
-        {/* Active Institution Selector */}
-        {institutions.length > 0 && (
+        {/* Active Institution Badge */}
+        {(currentInstitution || user?.name) && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fff', padding: '8px 14px', borderRadius: '10px', border: '1px solid #e2e8f0', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
             <Building2 size={16} color="#4c1d95" />
             <span style={{ fontSize: '13px', fontWeight: 600, color: '#475569' }}>Institution:</span>
-            <select
-              value={activeOrgId}
-              onChange={(e) => setSelectedOrgId(e.target.value)}
-              style={{ border: 'none', background: 'transparent', fontWeight: 700, color: '#0f172a', fontSize: '13px', cursor: 'pointer', outline: 'none' }}
-            >
-              {institutions.map(inst => (
-                <option key={inst.id} value={inst.id}>{inst.name} ({inst.district || inst.type})</option>
-              ))}
-            </select>
+            {isSuperAdmin && institutions.length > 1 ? (
+              <select
+                value={activeOrgId}
+                onChange={(e) => setSelectedOrgId(e.target.value)}
+                style={{ border: 'none', background: 'transparent', fontWeight: 700, color: '#0f172a', fontSize: '13px', cursor: 'pointer', outline: 'none' }}
+              >
+                {institutions.map(inst => (
+                  <option key={inst.id} value={inst.id}>{inst.name} ({inst.district || inst.type})</option>
+                ))}
+              </select>
+            ) : (
+              <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '13px' }}>
+                {currentInstitution ? `${currentInstitution.name}${currentInstitution.district ? ` (${currentInstitution.district})` : ''}` : (user?.name || 'My Institution')}
+              </span>
+            )}
           </div>
         )}
       </div>
