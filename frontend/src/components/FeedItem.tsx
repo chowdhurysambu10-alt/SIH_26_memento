@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Challenge, challengesApi } from '../api/challenges';
 import { useAuth } from '../context/AuthContext';
 import { useUI } from '../context/UIContext';
-import { MapPin, Building2, Tag, X, Trash2 } from 'lucide-react';
+import { MapPin, Building2, Tag, X, Trash2, ThumbsUp, Share2, Eye } from 'lucide-react';
 
 interface FeedItemProps {
   challenge: Challenge;
@@ -21,10 +21,44 @@ export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, o
   const [isReadMoreOpen, setIsReadMoreOpen] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
-  // Keep local state in sync with parent props
+  const savedWatchlist = JSON.parse(localStorage.getItem('civic_watchlist') || '[]');
+  const [isWatched, setIsWatched] = useState<boolean>(savedWatchlist.includes(challenge.id));
+
+  const handleWatchToggle = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!isAuthenticated) {
+      showAlert('Please sign in to use the watchlist.', 'error');
+      return;
+    }
+    const currentList = JSON.parse(localStorage.getItem('civic_watchlist') || '[]');
+    let newList;
+    if (isWatched) {
+      newList = currentList.filter((id: string) => id !== challenge.id);
+      showAlert('Removed from watchlist', 'info');
+    } else {
+      newList = [...currentList, challenge.id];
+      showAlert('Added to watchlist. Track it in your Overview tab!', 'success');
+    }
+    localStorage.setItem('civic_watchlist', JSON.stringify(newList));
+    setIsWatched(!isWatched);
+  };
+
+  // Keep local state in sync with parent props and Auth state
   React.useEffect(() => {
     setSupportCount(Number(challenge.support_count || 0));
   }, [challenge.support_count]);
+
+  React.useEffect(() => {
+    if (!isAuthenticated) {
+      setIsSupported(false);
+      setIsWatched(false);
+    } else {
+      const savedSupports = JSON.parse(localStorage.getItem('supported_challenges') || '{}');
+      setIsSupported(!!savedSupports[challenge.id]);
+      const savedWatchlist = JSON.parse(localStorage.getItem('civic_watchlist') || '[]');
+      setIsWatched(savedWatchlist.includes(challenge.id));
+    }
+  }, [isAuthenticated, challenge.id]);
 
   const maxDescriptionLength = 150;
   const isLongDescription = challenge.description && challenge.description.length > maxDescriptionLength;
@@ -266,25 +300,25 @@ export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, o
               <h3 style={{ margin: '0 0 8px', fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>
                 {challenge.title || 'Untitled Challenge'}
               </h3>
-              <p style={{ whiteSpace: 'pre-wrap', margin: 0, color: '#475569', fontSize: '14.5px', lineHeight: 1.6 }}>
-                {displayDescription}
-                {isLongDescription && (
+              <div style={{ whiteSpace: 'pre-wrap', margin: 0, color: '#475569', fontSize: '14.5px', lineHeight: 1.6 }}>
+                <span>{displayDescription}</span>
+                {isLongDescription && !isReadMoreOpen && (
                   <button 
-                    onClick={() => setIsReadMoreOpen(!isReadMoreOpen)}
-                    style={{ 
-                      background: 'none', 
-                      border: 'none', 
-                      color: '#2563eb', 
-                      cursor: 'pointer', 
-                      fontWeight: 600, 
-                      marginLeft: '4px',
-                      padding: 0 
-                    }}
+                    onClick={(e) => { e.preventDefault(); setIsReadMoreOpen(true); }}
+                    style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontWeight: 600, marginLeft: '4px', padding: 0 }}
                   >
-                    {isReadMoreOpen ? 'Show less' : 'Read more...'}
+                    <span>Read more...</span>
                   </button>
                 )}
-              </p>
+                {isLongDescription && isReadMoreOpen && (
+                  <button 
+                    onClick={(e) => { e.preventDefault(); setIsReadMoreOpen(false); }}
+                    style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontWeight: 600, marginLeft: '4px', padding: 0 }}
+                  >
+                    <span>Show less</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Right Side: Smaller Photo */}
@@ -386,36 +420,65 @@ export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, o
           disabled={isSyncing}
           style={{ opacity: isSyncing ? 0.7 : 1, cursor: isSyncing ? 'not-allowed' : 'pointer' }}
         >
+          <ThumbsUp size={16} fill={isSupported ? 'currentColor' : 'none'} />
           <span>{isSupported ? 'Supported' : 'Support'} ({supportCount})</span>
         </button>
-
-        {canDelete && (
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <button
             type="button"
             className="interaction-btn"
-            onClick={handleDelete}
-            disabled={isDeleting}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              background: '#fef2f2',
-              color: '#ef4444',
-              border: '1px solid #fecaca',
-              padding: '6px 14px',
-              borderRadius: '8px',
-              fontSize: '13px',
-              fontWeight: 600,
-              cursor: isDeleting ? 'not-allowed' : 'pointer',
-              opacity: isDeleting ? 0.6 : 1,
-              transition: 'all 0.2s ease',
+            onClick={(e) => {
+              e.preventDefault();
+              const shareUrl = `${window.location.origin}/?problemId=${challenge.id}#feed`;
+              if (navigator.share) {
+                navigator.share({ title: challenge.title, url: shareUrl });
+              } else {
+                navigator.clipboard.writeText(shareUrl);
+                showAlert('Link copied to clipboard!', 'success');
+              }
             }}
-            title="Delete this complaint"
           >
-            <Trash2 size={14} />
-            <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
+            <Share2 size={16} />
+            <span>Share</span>
           </button>
-        )}
+
+          <button
+            type="button"
+            className={`interaction-btn ${isWatched ? 'support-btn active' : ''}`}
+            onClick={handleWatchToggle}
+          >
+            <Eye size={16} fill={isWatched ? 'currentColor' : 'none'} />
+            <span>{isWatched ? 'Watching' : 'Watchlist'}</span>
+          </button>
+
+          {canDelete && (
+            <button
+              type="button"
+              className="interaction-btn"
+              onClick={handleDelete}
+              disabled={isDeleting}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: '#fef2f2',
+                color: '#ef4444',
+                border: '1px solid #fecaca',
+                padding: '6px 14px',
+                borderRadius: '8px',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: isDeleting ? 'not-allowed' : 'pointer',
+                opacity: isDeleting ? 0.6 : 1,
+                transition: 'all 0.2s ease',
+              }}
+              title="Delete this complaint"
+            >
+              <Trash2 size={14} />
+              <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
+            </button>
+          )}
+        </div>
       </div>
 
 

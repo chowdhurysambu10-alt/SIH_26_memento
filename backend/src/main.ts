@@ -68,5 +68,16 @@ async function bootstrap() {
   await app.listen(port);
   logger.log(`Application successfully started on: http://localhost:${port}`);
   logger.log(`Swagger OpenAPI Documentation: http://localhost:${port}/api/docs`);
+
+  // Auto-ping mechanism to prevent Render from sleeping on free tier
+  const renderUrl = process.env.RENDER_EXTERNAL_URL;
+  if (renderUrl) {
+    logger.log(`Auto-ping initialized for Render external URL: ${renderUrl}`);
+    setInterval(() => {
+      fetch(`${renderUrl}/api/v1/settings`)
+        .then(() => logger.log('Sent auto-ping to keep Render instance awake'))
+        .catch((err) => logger.error(`Render auto-ping failed: ${err.message}`));
+    }, 12 * 60 * 1000); // 12 minutes
+  }
 }
 bootstrap();

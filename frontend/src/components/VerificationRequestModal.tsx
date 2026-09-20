@@ -109,7 +109,20 @@ export const VerificationRequestModal: React.FC<VerificationRequestModalProps> =
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#475569', marginBottom: '4px' }}>Mobile Number *</label>
-                  <input required type="tel" value={mobile} onChange={e => setMobile(e.target.value)} style={inputStyle} />
+                  <input
+                    required
+                    type="tel"
+                    value={mobile}
+                    onChange={e => setMobile(e.target.value.replace(/[^\d\s\-+]/g, ''))}
+                    onBlur={() => {
+                      const digits = mobile.replace(/\D/g, '');
+                      if (mobile && digits.length < 10) setError('Mobile number must be at least 10 digits.');
+                      else setError('');
+                    }}
+                    maxLength={15}
+                    placeholder="+91 9876543210"
+                    style={inputStyle}
+                  />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#475569', marginBottom: '4px' }}>Principal Name *</label>
@@ -126,11 +139,27 @@ export const VerificationRequestModal: React.FC<VerificationRequestModalProps> =
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#475569', marginBottom: '4px' }}>APAAR ID *</label>
-                  <input required type="text" value={apaarId} onChange={e => setApaarId(e.target.value)} style={inputStyle} />
+                  <input
+                    required
+                    type="text"
+                    inputMode="numeric"
+                    value={apaarId}
+                    onChange={e => setApaarId(e.target.value.replace(/\D/g, ''))}
+                    maxLength={12}
+                    placeholder="12-digit APAAR ID"
+                    style={inputStyle}
+                  />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#475569', marginBottom: '4px' }}>Student ID *</label>
-                  <input required type="text" value={studentId} onChange={e => setStudentId(e.target.value)} style={inputStyle} />
+                  <input
+                    required
+                    type="text"
+                    value={studentId}
+                    onChange={e => setStudentId(e.target.value.replace(/[^a-zA-Z0-9\-\/]/g, '').toUpperCase())}
+                    placeholder="e.g. 2024CS001"
+                    style={inputStyle}
+                  />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#475569', marginBottom: '4px' }}>College Name *</label>
