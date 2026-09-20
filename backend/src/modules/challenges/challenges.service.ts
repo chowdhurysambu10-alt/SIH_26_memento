@@ -77,8 +77,8 @@ export class ChallengesService implements OnModuleInit {
       throw new ForbiddenException('The platform is currently in maintenance mode. New submissions are disabled temporarily.');
     }
 
-    if (settings.enforceGeolocation && (!dto.latitude || !dto.longitude)) {
-      throw new BadRequestException('Geolocation is strictly enforced. Please provide latitude and longitude coordinates.');
+    if ((!dto.latitude || !dto.longitude) && !dto.location_text) {
+      throw new BadRequestException('Exact Location is strictly required. Please provide a valid location link or village name.');
     }
 
     // 1. Process uploaded file(s)
@@ -285,22 +285,7 @@ export class ChallengesService implements OnModuleInit {
       );
 
     if (filter.status) {
-      const statusValue = String(filter.status);
-      if (statusValue === 'under_action') {
-        query = query.in('status', [
-          ChallengeStatus.UNDER_REVIEW,
-          ChallengeStatus.ROUTED,
-          ChallengeStatus.TEAM_FORMED,
-          ChallengeStatus.IN_PROGRESS,
-        ]);
-      } else if (statusValue === 'resolved') {
-        query = query.in('status', [
-          ChallengeStatus.COMPLETED,
-          ChallengeStatus.VALIDATED,
-        ]);
-      } else {
-        query = query.eq('status', statusValue);
-      }
+      query = query.eq('status', filter.status);
     }
     if (filter.district) {
       query = query.eq('district', filter.district);
@@ -352,7 +337,7 @@ export class ChallengesService implements OnModuleInit {
       this.logger.warn(`Primary query notice: ${result.error.message}. Executing direct column select...`);
       let fallback = client
         .from('challenges')
-        .select('id, title, description, district, location_text, category, status, priority_score, support_count, media_urls, created_at, submitted_by, category_id, assigned_institution_id, categories(id, name, slug), institutions(id, name, type, district)');
+        .select('id, title, description, district, location_text, category, status, priority_score, support_count, media_urls, created_at, submitted_by, category_id, assigned_institution_id');
       
       if (filter.sort_by === 'priority') {
         fallback = fallback
@@ -522,13 +507,7 @@ export class ChallengesService implements OnModuleInit {
     dto: OverrideRoutingDto,
     user: AuthenticatedUser,
   ) {
-    const isAdmin =
-      user.role === UserRole.SUPER_ADMIN ||
-      user.role === UserRole.GOVT_VIEWER ||
-      (user.role as any) === 'admin' ||
-      (user.role as any) === 'super_admin';
-
-    if (!isAdmin) {
+    if (user.role !== UserRole.SUPER_ADMIN && user.role !== UserRole.GOVT_VIEWER) {
       throw new ForbiddenException({
         statusCode: 403,
         message: 'Only Super Admins or Government Viewers can override routing',
@@ -546,7 +525,7 @@ export class ChallengesService implements OnModuleInit {
         ...existing.ai_classification,
         adminOverride: {
           overriddenBy: user.id,
-          reason: dto.override_reason || 'Manual Admin allocation',
+          reason: dto.override_reason,
           at: new Date().toISOString(),
         },
       },
@@ -557,20 +536,18 @@ export class ChallengesService implements OnModuleInit {
       const { data: cat } = await admin.from('categories').select('id').eq('slug', dto.override_category_slug).maybeSingle();
       if (cat) updatePayload.category_id = cat.id;
     }
-    if (dto.assigned_institution_id !== undefined) {
-      updatePayload.assigned_institution_id = dto.assigned_institution_id || null;
-    }
+    if (dto.assigned_institution_id) updatePayload.assigned_institution_id = dto.assigned_institution_id;
     if (dto.priority_score) updatePayload.priority_score = dto.priority_score;
 
-    if (dto.assigned_institution_id && (existing.status === ChallengeStatus.SUBMITTED || existing.status === ChallengeStatus.UNDER_REVIEW)) {
-      updatePayload.status = ChallengeStatus.IN_PROGRESS;
+    if (dto.assigned_institution_id && existing.status === ChallengeStatus.SUBMITTED) {
+      updatePayload.status = ChallengeStatus.ROUTED;
     }
 
     const { data, error } = await admin
       .from('challenges')
       .update(updatePayload)
       .eq('id', id)
-      .select('*, categories(name), institutions(id, name, type, district)')
+      .select('*, categories(name), institutions(name)')
       .single();
 
     if (error) {
@@ -598,63 +575,16 @@ export class ChallengesService implements OnModuleInit {
     const currentStatus = existing.status as ChallengeStatus;
     const targetStatus = dto.status;
 
-    // Validate transition via state machine if changing status
-    if (currentStatus !== targetStatus) {
-      ChallengeStateMachine.assertValidTransition(currentStatus, targetStatus, user.role);
-    }
-
-    const updatePayload: Record<string, any> = {
-      status: targetStatus,
-    };
-
-    // If assigned_institution_id is explicitly passed, save it
-    let institutionIdToAssign = dto.assigned_institution_id || user.org_id;
-
-    if (!institutionIdToAssign && (
-      user.role === UserRole.UNIVERSITY_ADMIN ||
-      user.role === UserRole.FACULTY ||
-      (user.role as any) === 'institution'
-    )) {
-      try {
-        const { data: insts } = await admin.from('institutions').select('id, name');
-        if (insts && insts.length > 0) {
-          const matched = insts.find(i => 
-            (user.name && i.name && (
-              i.name.toLowerCase().includes(user.name.toLowerCase()) || 
-              user.name.toLowerCase().includes(i.name.toLowerCase())
-            ))
-          );
-          if (matched) {
-            institutionIdToAssign = matched.id;
-          } else {
-            const instName = user.name || 'Brainware University';
-            const { data: newInst } = await admin.from('institutions').insert({
-              name: instName,
-              type: 'university',
-              district: user.district || 'Kolkata',
-              domain_expertise: ['technology', 'engineering', 'urban_infrastructure']
-            }).select('id').maybeSingle();
-            if (newInst) {
-              institutionIdToAssign = newInst.id;
-            } else {
-              institutionIdToAssign = insts[0]?.id;
-            }
-          }
-        }
-      } catch (e) {
-        // fallback
-      }
-    }
-
-    if (institutionIdToAssign) {
-      updatePayload.assigned_institution_id = institutionIdToAssign;
-    }
+    // Validate transition via state machine
+    ChallengeStateMachine.assertValidTransition(currentStatus, targetStatus, user.role);
 
     const { data, error } = await admin
       .from('challenges')
-      .update(updatePayload)
+      .update({
+        status: targetStatus,
+      })
       .eq('id', id)
-      .select('*, categories(name), institutions(id, name, type, district)')
+      .select()
       .single();
 
     if (error) {
@@ -663,143 +593,6 @@ export class ChallengesService implements OnModuleInit {
         message: error.message,
         errorCode: 'STATUS_UPDATE_FAILED',
       });
-    }
-
-    return data;
-  }
-
-  /**
-   * Delete a challenge.
-   * Allowed if user is the author (submitted_by or user_id) or is an admin (SUPER_ADMIN, GOVT_VIEWER).
-   */
-  async deleteChallenge(id: string, user: AuthenticatedUser) {
-    const admin = this.supabaseService.getAdminClient();
-
-    // 1. Fetch existing challenge
-    const { data: challenge, error: findError } = await admin
-      .from('challenges')
-      .select('id, submitted_by, user_id, title')
-      .eq('id', id)
-      .maybeSingle();
-
-    if (findError) {
-      this.logger.error(`Error querying challenge ${id} for deletion: ${findError.message}`);
-      throw new BadRequestException(findError.message);
-    }
-
-    if (!challenge) {
-      throw new NotFoundException(`Challenge with ID ${id} not found.`);
-    }
-
-    // 2. Authorization check
-    const isAuthor =
-      challenge.submitted_by === user.id ||
-      challenge.user_id === user.id;
-    const isAdmin =
-      user.role === UserRole.SUPER_ADMIN ||
-      user.role === UserRole.GOVT_VIEWER ||
-      (user.role as any) === 'admin';
-
-    if (!isAuthor && !isAdmin) {
-      throw new ForbiddenException('You are only authorized to delete your own submitted problems.');
-    }
-
-    // 3. Clean up related records (challenge_supports, project_teams, etc.)
-    try {
-      await admin.from('challenge_supports').delete().eq('challenge_id', id);
-    } catch (e: any) {
-      this.logger.warn(`Notice deleting challenge_supports for ${id}: ${e.message}`);
-    }
-
-    try {
-      await admin.from('project_teams').delete().eq('challenge_id', id);
-    } catch (e: any) {
-      this.logger.warn(`Notice deleting project_teams for ${id}: ${e.message}`);
-    }
-
-    // 4. Delete the challenge
-    const { error: deleteError } = await admin
-      .from('challenges')
-      .delete()
-      .eq('id', id);
-
-    if (deleteError) {
-      this.logger.error(`Failed to delete challenge ${id}: ${deleteError.message}`);
-      throw new BadRequestException(`Failed to delete challenge: ${deleteError.message}`);
-    }
-
-    this.logger.log(`Challenge ${id} ("${challenge.title}") deleted by user ${user.id} (${user.role})`);
-
-    return {
-      success: true,
-      message: `Challenge '${challenge.title || id}' successfully deleted.`,
-    };
-  }
-
-  /**
-   * Update challenge title & description.
-   * Allowed if user is author or admin.
-   */
-  async updateChallenge(
-    id: string,
-    dto: {
-      title?: string;
-      description?: string;
-      assigned_institution_id?: string | null;
-      category_id?: string;
-      status?: ChallengeStatus;
-    },
-    user: AuthenticatedUser,
-  ) {
-    const admin = this.supabaseService.getAdminClient();
-
-    const { data: challenge, error: findError } = await admin
-      .from('challenges')
-      .select('id, submitted_by, user_id, status')
-      .eq('id', id)
-      .maybeSingle();
-
-    if (findError || !challenge) {
-      throw new NotFoundException(`Challenge with ID ${id} not found.`);
-    }
-
-    const isAuthor =
-      challenge.submitted_by === user.id ||
-      challenge.user_id === user.id;
-    const isAdmin =
-      user.role === UserRole.SUPER_ADMIN ||
-      user.role === UserRole.GOVT_VIEWER ||
-      (user.role as any) === 'admin' ||
-      (user.role as any) === 'super_admin';
-
-    if (!isAuthor && !isAdmin) {
-      throw new ForbiddenException('You are only authorized to update your own submitted problems.');
-    }
-
-    const updates: Record<string, any> = { updated_at: new Date().toISOString() };
-    if (dto.title !== undefined && dto.title.trim()) updates.title = dto.title.trim();
-    if (dto.description !== undefined && dto.description.trim()) updates.description = dto.description.trim();
-
-    if (isAdmin) {
-      if (dto.assigned_institution_id !== undefined) {
-        updates.assigned_institution_id = dto.assigned_institution_id || null;
-        if (dto.assigned_institution_id && (challenge.status === ChallengeStatus.SUBMITTED || challenge.status === ChallengeStatus.UNDER_REVIEW)) {
-          updates.status = ChallengeStatus.IN_PROGRESS;
-        }
-      }
-      if (dto.category_id) updates.category_id = dto.category_id;
-      if (dto.status) updates.status = dto.status;
-    }
-
-    const { data, error } = await admin
-      .from('challenges')
-      .update(updates)
-      .eq('id', id)
-      .select('*, categories(id, name, slug), institutions(id, name, type, district)')
-      .single();
-
-    if (error) {
-      throw new BadRequestException(`Failed to update challenge: ${error.message}`);
     }
 
     return data;
@@ -869,8 +662,8 @@ export class ChallengesService implements OnModuleInit {
 
     // Check challenge status
     const existing = await this.getChallengeById(id, user);
-    if (existing.status !== ChallengeStatus.ROUTED) {
-      throw new BadRequestException('Challenge is not open for proposals. It must be routed to institutions first.');
+    if (existing.status !== ChallengeStatus.ROUTED && existing.status !== ChallengeStatus.SUBMITTED) {
+      throw new BadRequestException('Challenge is not open for proposals.');
     }
 
     if (!dto.proposal_text || !dto.budget_estimate || !dto.timeline_estimate || !(dto.contact_phone || user.contact)) {
@@ -1146,5 +939,50 @@ export class ChallengesService implements OnModuleInit {
     const supportBoost = Math.min(10, Math.round(Math.log2(1 + supportCount) * 3));
     const score = Math.round(hierarchicalBase * 0.6) + aiContribution + supportBoost;
     return Math.min(100, Math.max(1, score));
+  }
+
+  /**
+   * Update an existing challenge
+   */
+  async updateChallenge(id: string, dto: any, user: AuthenticatedUser) {
+    const admin = this.supabaseService.getAdminClient();
+    const { data, error } = await admin
+      .from('challenges')
+      .update(dto)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      throw new BadRequestException(`Failed to update challenge: ${error.message}`);
+    }
+    return data;
+  }
+
+  /**
+   * Delete a challenge
+   */
+  async deleteChallenge(id: string, user: AuthenticatedUser) {
+    const admin = this.supabaseService.getAdminClient();
+    const { data, error } = await admin
+      .from('challenges')
+      .delete()
+      .eq('id', id)
+      .select();
+
+    if (error) {
+      throw new BadRequestException(`Failed to delete challenge: ${error.message}`);
+    }
+    return { success: true, deleted: true };
+  }
+
+  /**
+   * Validate uploaded image
+   */
+  async validateUploadedImage(file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('No file provided for validation');
+    }
+    return { valid: true, filename: file.originalname };
   }
 }

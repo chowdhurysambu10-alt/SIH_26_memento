@@ -76,9 +76,9 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
       return;
     }
 
-    if (!title.trim() || !description.trim()) {
-      setError('Please provide a challenge title and description.');
-      showAlert('Please provide a challenge title and description.', 'error');
+    if (!title.trim() || !description.trim() || !locationText.trim()) {
+      setError('Please provide a title, description, and exact location.');
+      showAlert('Please provide a title, description, and exact location.', 'error');
       return;
     }
 
@@ -233,7 +233,7 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
             </div>
 
             <div className="input-group" style={{ marginBottom: '24px' }}>
-              <label htmlFor="p-location">Exact Location (Optional)</label>
+              <label htmlFor="p-location">Exact Location *</label>
               <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                 <input
                   id="p-location"
@@ -243,6 +243,7 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
                   value={locationText}
                   onChange={(e) => setLocationText(e.target.value)}
                   style={{ flex: '1 1 200px', minWidth: '200px' }}
+                  required
                 />
                 <button
                   type="button"
