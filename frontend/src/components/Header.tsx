@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { ChevronDown, LogOut, User as UserIcon, Bell, ShieldAlert, Headset, Menu, Users, Info } from 'lucide-react';
+import { ChevronDown, LogOut, User as UserIcon, Bell, ShieldAlert, Headset, Menu, Users, Info, Plus } from 'lucide-react';
 import { NotificationsModal } from './NotificationsModal';
 import { VerificationRequestModal } from './VerificationRequestModal';
 import { ProfileModal } from './ProfileModal';
@@ -61,6 +61,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, platfor
             >
               Updates
             </button>
+
             <button
               className={`nav-link ${activeTab === 'top-problems' ? 'active' : ''}`}
               onClick={() => setActiveTab('top-problems')}

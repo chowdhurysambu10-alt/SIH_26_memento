@@ -4,6 +4,7 @@ import { GemmaApiProvider } from './providers/gemma-api.provider';
 import { ImageValidationService } from './image-validation.service';
 
 @Module({
+  controllers: [],
   providers: [ClassificationService, GemmaApiProvider, ImageValidationService],
   exports: [ClassificationService, ImageValidationService],
 })

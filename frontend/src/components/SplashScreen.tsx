@@ -18,7 +18,8 @@ export const SplashScreen: React.FC<{ onComplete: () => void }> = ({ onComplete 
 
   return (
     <div 
-      className={`splash-screen ${isFading ? 'fade-out' : ''}`}
+      className={`splash-screen notranslate ${isFading ? 'fade-out' : ''}`}
+      translate="no"
       style={{
         position: 'fixed',
         top: 0,

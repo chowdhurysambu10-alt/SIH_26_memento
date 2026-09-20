@@ -9,6 +9,7 @@ import { StudentLayout } from './layouts/StudentLayout';
 import { NetworkStatusUI } from './components/NetworkStatusUI';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { SplashScreen } from './components/SplashScreen';
+import { OptionSupportBot } from './components/OptionSupportBot';
 
 const HomeFeedPage = lazy(() => import('./pages/HomeFeedPage').then(m => ({ default: m.HomeFeedPage })));
 const StatisticsPage = lazy(() => import('./pages/StatisticsPage').then(m => ({ default: m.StatisticsPage })));
@@ -205,13 +206,13 @@ export function AppContent() {
       )}
 
       {/* Floating Plus Button - desktop only (.desktop-floating-fab) */}
-      {(!isAuthenticated && activeTab !== 'about') || (isAuthenticated && ((user?.role === 'citizen' && activeTab !== 'about') || (user?.role !== 'citizen' && activeTab === 'feed'))) ? (
+      {(isAuthenticated && ((user?.role === 'citizen' && activeTab !== 'about') || (user?.role !== 'citizen' && activeTab === 'feed'))) ? (
         <button
           className="desktop-floating-fab"
           onClick={() => setActiveTab('submit')}
           style={{
             position: 'fixed',
-            bottom: '24px',
+            bottom: '100px',
             right: '24px',
             width: '60px',
             height: '60px',
@@ -255,6 +256,7 @@ export default function App() {
           <>
             <NetworkStatusUI />
             <AppContent />
+            <OptionSupportBot />
           </>
         )}
       </AuthProvider>

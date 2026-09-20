@@ -1,6 +1,7 @@
 import React from 'react';
 import { Home, Globe, Plus, TrendingUp, Activity } from 'lucide-react';
 import { NavTab } from './Header';
+import { useAuth } from '../context/AuthContext';
 
 interface MobileBottomNavProps {
   activeTab: NavTab;
@@ -8,6 +9,8 @@ interface MobileBottomNavProps {
 }
 
 export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ activeTab, setActiveTab }) => {
+  const { isAuthenticated } = useAuth();
+
   return (
     <nav className="mobile-bottom-nav">
       <button
@@ -31,7 +34,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ activeTab, set
       <button
         type="button"
         className={`mobile-nav-item mobile-nav-submit-wrapper ${activeTab === 'submit' ? 'active' : ''}`}
-        onClick={() => setActiveTab('submit')}
+        onClick={() => isAuthenticated ? setActiveTab('submit') : setActiveTab('login')}
         aria-label="Submit"
       >
         <div className="mobile-nav-submit-btn">

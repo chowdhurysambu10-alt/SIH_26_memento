@@ -204,6 +204,18 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
       return;
     }
 
+    if (!locationText.trim()) {
+      setError('Please provide a precise GPS location URL.');
+      showAlert('Please provide a precise GPS location URL.', 'error');
+      return;
+    }
+
+    if (files.length === 0) {
+      setError('Please upload at least one authentic photo of the issue.');
+      showAlert('Please upload at least one authentic photo of the issue.', 'error');
+      return;
+    }
+
     setSubmitting(true);
     setGlobalLoading(true);
     setError('');

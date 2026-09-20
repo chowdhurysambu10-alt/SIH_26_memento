@@ -136,7 +136,7 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
   );
 
   const availableChallenges = challenges.filter(c => 
-    !c.assigned_institution_id && (c.status === 'submitted' || !c.status)
+    !c.assigned_institution_id && c.status === 'routed'
   );
 
   const displayedChallenges = challenges.filter(c => {
@@ -147,7 +147,7 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
       return isMine(c) && c.status === 'under_review';
     }
     if (filterTab === 'available') {
-      return !c.assigned_institution_id && (c.status === 'submitted' || !c.status);
+      return !c.assigned_institution_id && c.status === 'routed';
     }
     return true;
   });
@@ -1044,7 +1044,7 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
                         cursor: 'not-allowed'
                       }}
                     >
-                      <AlertCircle size={16} /> Bidding Not Open
+                      <Building2 size={16} /> Submit Proposal
                     </button>
                   ) : (
                     <button 
