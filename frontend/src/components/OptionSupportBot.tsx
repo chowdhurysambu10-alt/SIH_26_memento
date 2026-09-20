@@ -111,8 +111,7 @@ export const OptionSupportBot: React.FC = () => {
             .support-bot-window {
               bottom: 80px;
               right: 16px;
-              left: 16px;
-              width: auto;
+              width: 320px;
               height: 50vh;
               max-height: 400px;
             }
