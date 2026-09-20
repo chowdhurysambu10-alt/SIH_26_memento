@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -30,6 +31,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { UserRole } from '../../common/constants/roles.enum';
+import { ChallengeStatus } from '../../common/constants/challenge-status.enum';
 
 @ApiTags('Challenges')
 @ApiBearerAuth()
@@ -50,6 +52,17 @@ export class ChallengesController {
     @UploadedFiles() files?: Express.Multer.File[],
   ) {
     return this.challengesService.createChallenge(dto, user, files);
+  }
+
+  @Post('validate-image')
+  @Public()
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Validate an image to detect screenshots or AI-generated imagery using Gemini API',
+  })
+  async validateImage(@UploadedFile() file: Express.Multer.File) {
+    return this.challengesService.validateUploadedImage(file);
   }
 
   @Get()
@@ -223,5 +236,24 @@ export class ChallengesController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.challengesService.purgeArchivedChallenges(challengeIds, user);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update challenge title, description, or allocated institution (Author or Admin)' })
+  async updateChallenge(
+    @Param('id') id: string,
+    @Body() dto: { title?: string; description?: string; assigned_institution_id?: string | null; category_id?: string; status?: ChallengeStatus },
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.challengesService.updateChallenge(id, dto, user);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete a challenge permanently (Author or Admin)' })
+  async deleteChallenge(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.challengesService.deleteChallenge(id, user);
   }
 }

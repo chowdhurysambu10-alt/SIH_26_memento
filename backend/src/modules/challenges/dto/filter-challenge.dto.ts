@@ -24,10 +24,10 @@ export class FilterChallengeDto {
   @Max(100)
   limit?: number = 10;
 
-  @ApiPropertyOptional({ enum: ChallengeStatus })
+  @ApiPropertyOptional({ description: 'Filter by exact status or group (under_action, resolved)' })
   @IsOptional()
-  @IsEnum(ChallengeStatus)
-  status?: ChallengeStatus;
+  @IsString()
+  status?: ChallengeStatus | string;
 
   @ApiPropertyOptional({ example: 'water' })
   @IsOptional()

@@ -111,6 +111,33 @@ export class AnalyticsService {
 
   async getInstitutionLeaderboard() {
     const admin = this.supabaseService.getAdminClient();
+
+    // Dynamically sync registered university_admin users into institutions table
+    try {
+      const { data: registeredOrgUsers } = await admin
+        .from('users')
+        .select('id, name, email, role, district')
+        .eq('role', 'university_admin');
+
+      if (registeredOrgUsers && registeredOrgUsers.length > 0) {
+        for (const orgUser of registeredOrgUsers) {
+          await admin.from('institutions').upsert(
+            {
+              id: orgUser.id,
+              name: orgUser.name,
+              type: 'university',
+              location: orgUser.district ? `${orgUser.district}, West Bengal` : 'West Bengal',
+              district: orgUser.district || 'West Bengal',
+              contact_email: orgUser.email,
+            },
+            { onConflict: 'id', ignoreDuplicates: true },
+          );
+        }
+      }
+    } catch (e) {
+      // Ignore if sync error
+    }
+
     const { data: institutions } = await admin
       .from('institutions')
       .select('id, name, type, district, domain_expertise');

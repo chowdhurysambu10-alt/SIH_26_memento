@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { ClassificationService } from '../ai/classification.service';
+import { ImageValidationService } from '../ai/image-validation.service';
 import { SettingsService } from '../settings/settings.service';
 import { CreateChallengeDto } from './dto/create-challenge.dto';
 import { CompressionUtil } from '../../utils/compression.util';
@@ -28,6 +29,7 @@ export class ChallengesService implements OnModuleInit {
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly classificationService: ClassificationService,
+    private readonly imageValidationService: ImageValidationService,
     private readonly settingsService: SettingsService,
   ) {}
 
@@ -77,8 +79,8 @@ export class ChallengesService implements OnModuleInit {
       throw new ForbiddenException('The platform is currently in maintenance mode. New submissions are disabled temporarily.');
     }
 
-    if (settings.enforceGeolocation && (!dto.latitude || !dto.longitude) && !dto.location_text) {
-      throw new BadRequestException('Geolocation is strictly enforced. Please provide latitude and longitude coordinates, or a valid location link.');
+    if ((!dto.latitude || !dto.longitude) && !dto.location_text) {
+      throw new BadRequestException('Exact Location is strictly required. Please provide a valid location link or village name.');
     }
 
     // 1. Process uploaded file(s)
@@ -90,6 +92,25 @@ export class ChallengesService implements OnModuleInit {
       let uploadBuffer = file.buffer;
       let originalName = file.originalname;
       let mimeType = file.mimetype;
+
+      // Validate image authenticity using Gemini API (detects screenshots and AI-generated imagery)
+      if (mimeType && mimeType.startsWith('image/')) {
+        const validation = await this.imageValidationService.validateImage(
+          uploadBuffer,
+          mimeType,
+          originalName,
+        );
+
+        if (!validation.isValid) {
+          this.logger.warn(
+            `Upload rejected for image "${originalName}": ${validation.rejectionReason} (Details: ${validation.details})`,
+          );
+          throw new BadRequestException(
+            validation.rejectionReason ||
+              'Upload rejected: The image appears to be a screenshot or AI-generated. Please upload an authentic real-world photograph.',
+          );
+        }
+      }
 
       try {
         if (mimeType.startsWith('image/')) {
@@ -285,7 +306,22 @@ export class ChallengesService implements OnModuleInit {
       );
 
     if (filter.status) {
-      query = query.eq('status', filter.status);
+      const statusValue = String(filter.status);
+      if (statusValue === 'under_action') {
+        query = query.in('status', [
+          ChallengeStatus.UNDER_REVIEW,
+          ChallengeStatus.ROUTED,
+          ChallengeStatus.TEAM_FORMED,
+          ChallengeStatus.IN_PROGRESS,
+        ]);
+      } else if (statusValue === 'resolved') {
+        query = query.in('status', [
+          ChallengeStatus.COMPLETED,
+          ChallengeStatus.VALIDATED,
+        ]);
+      } else {
+        query = query.eq('status', statusValue);
+      }
     }
     if (filter.district) {
       query = query.eq('district', filter.district);
@@ -337,7 +373,7 @@ export class ChallengesService implements OnModuleInit {
       this.logger.warn(`Primary query notice: ${result.error.message}. Executing direct column select...`);
       let fallback = client
         .from('challenges')
-        .select('id, title, description, district, location_text, category, status, priority_score, support_count, media_urls, created_at, submitted_by, category_id, assigned_institution_id');
+        .select('id, title, description, district, location_text, category, status, priority_score, support_count, media_urls, created_at, submitted_by, category_id, assigned_institution_id, categories(id, name, slug), institutions(id, name, type, district)');
       
       if (filter.sort_by === 'priority') {
         fallback = fallback
@@ -507,7 +543,13 @@ export class ChallengesService implements OnModuleInit {
     dto: OverrideRoutingDto,
     user: AuthenticatedUser,
   ) {
-    if (user.role !== UserRole.SUPER_ADMIN && user.role !== UserRole.GOVT_VIEWER) {
+    const isAdmin =
+      user.role === UserRole.SUPER_ADMIN ||
+      user.role === UserRole.GOVT_VIEWER ||
+      (user.role as any) === 'admin' ||
+      (user.role as any) === 'super_admin';
+
+    if (!isAdmin) {
       throw new ForbiddenException({
         statusCode: 403,
         message: 'Only Super Admins or Government Viewers can override routing',
@@ -525,7 +567,7 @@ export class ChallengesService implements OnModuleInit {
         ...existing.ai_classification,
         adminOverride: {
           overriddenBy: user.id,
-          reason: dto.override_reason,
+          reason: dto.override_reason || 'Manual Admin allocation',
           at: new Date().toISOString(),
         },
       },
@@ -536,18 +578,20 @@ export class ChallengesService implements OnModuleInit {
       const { data: cat } = await admin.from('categories').select('id').eq('slug', dto.override_category_slug).maybeSingle();
       if (cat) updatePayload.category_id = cat.id;
     }
-    if (dto.assigned_institution_id) updatePayload.assigned_institution_id = dto.assigned_institution_id;
+    if (dto.assigned_institution_id !== undefined) {
+      updatePayload.assigned_institution_id = dto.assigned_institution_id || null;
+    }
     if (dto.priority_score) updatePayload.priority_score = dto.priority_score;
 
-    if (dto.assigned_institution_id && existing.status === ChallengeStatus.SUBMITTED) {
-      updatePayload.status = ChallengeStatus.ROUTED;
+    if (dto.assigned_institution_id && (existing.status === ChallengeStatus.SUBMITTED || existing.status === ChallengeStatus.UNDER_REVIEW)) {
+      updatePayload.status = ChallengeStatus.IN_PROGRESS;
     }
 
     const { data, error } = await admin
       .from('challenges')
       .update(updatePayload)
       .eq('id', id)
-      .select('*, categories(name), institutions(name)')
+      .select('*, categories(name), institutions(id, name, type, district)')
       .single();
 
     if (error) {
@@ -575,16 +619,63 @@ export class ChallengesService implements OnModuleInit {
     const currentStatus = existing.status as ChallengeStatus;
     const targetStatus = dto.status;
 
-    // Validate transition via state machine
-    ChallengeStateMachine.assertValidTransition(currentStatus, targetStatus, user.role);
+    // Validate transition via state machine if changing status
+    if (currentStatus !== targetStatus) {
+      ChallengeStateMachine.assertValidTransition(currentStatus, targetStatus, user.role);
+    }
+
+    const updatePayload: Record<string, any> = {
+      status: targetStatus,
+    };
+
+    // If assigned_institution_id is explicitly passed, save it
+    let institutionIdToAssign = dto.assigned_institution_id || user.org_id;
+
+    if (!institutionIdToAssign && (
+      user.role === UserRole.UNIVERSITY_ADMIN ||
+      user.role === UserRole.FACULTY ||
+      (user.role as any) === 'institution'
+    )) {
+      try {
+        const { data: insts } = await admin.from('institutions').select('id, name');
+        if (insts && insts.length > 0) {
+          const matched = insts.find(i => 
+            (user.name && i.name && (
+              i.name.toLowerCase().includes(user.name.toLowerCase()) || 
+              user.name.toLowerCase().includes(i.name.toLowerCase())
+            ))
+          );
+          if (matched) {
+            institutionIdToAssign = matched.id;
+          } else {
+            const instName = user.name || 'Brainware University';
+            const { data: newInst } = await admin.from('institutions').insert({
+              name: instName,
+              type: 'university',
+              district: user.district || 'Kolkata',
+              domain_expertise: ['technology', 'engineering', 'urban_infrastructure']
+            }).select('id').maybeSingle();
+            if (newInst) {
+              institutionIdToAssign = newInst.id;
+            } else {
+              institutionIdToAssign = insts[0]?.id;
+            }
+          }
+        }
+      } catch (e) {
+        // fallback
+      }
+    }
+
+    if (institutionIdToAssign) {
+      updatePayload.assigned_institution_id = institutionIdToAssign;
+    }
 
     const { data, error } = await admin
       .from('challenges')
-      .update({
-        status: targetStatus,
-      })
+      .update(updatePayload)
       .eq('id', id)
-      .select()
+      .select('*, categories(name), institutions(id, name, type, district)')
       .single();
 
     if (error) {
@@ -593,6 +684,214 @@ export class ChallengesService implements OnModuleInit {
         message: error.message,
         errorCode: 'STATUS_UPDATE_FAILED',
       });
+    }
+
+    return data;
+  }
+
+  /**
+   * Delete a challenge.
+   * Allowed if user is the author (submitted_by or user_id) or is an admin (SUPER_ADMIN, GOVT_VIEWER).
+   */
+  async deleteChallenge(id: string, user: AuthenticatedUser) {
+    const admin = this.supabaseService.getAdminClient();
+
+    // 1. Fetch existing challenge along with media_urls
+    const { data: challenge, error: findError } = await admin
+      .from('challenges')
+      .select('id, submitted_by, user_id, title, media_urls')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (findError) {
+      this.logger.error(`Error querying challenge ${id} for deletion: ${findError.message}`);
+      throw new BadRequestException(findError.message);
+    }
+
+    if (!challenge) {
+      throw new NotFoundException(`Challenge with ID ${id} not found.`);
+    }
+
+    // 2. Authorization check
+    const isAuthor =
+      String(challenge.submitted_by) === String(user.id) ||
+      String(challenge.user_id) === String(user.id);
+    const isAdmin =
+      user.role === UserRole.SUPER_ADMIN ||
+      user.role === UserRole.GOVT_VIEWER ||
+      (user.role as any) === 'admin' ||
+      (user.role as any) === 'super_admin';
+
+    if (!isAuthor && !isAdmin) {
+      throw new ForbiddenException('You are only authorized to delete your own submitted problems.');
+    }
+
+    // 3. Clean up related foreign-key records across database tables
+    // 3a. Clear duplicate references from other challenges
+    try {
+      await admin
+        .from('challenges')
+        .update({ duplicate_of: null })
+        .eq('duplicate_of', id);
+    } catch (e: any) {
+      this.logger.warn(`Notice clearing duplicate_of for ${id}: ${e.message}`);
+    }
+
+    // 3b. Delete challenge supports (upvotes)
+    try {
+      await admin.from('challenge_supports').delete().eq('challenge_id', id);
+    } catch (e: any) {
+      this.logger.warn(`Notice deleting challenge_supports for ${id}: ${e.message}`);
+    }
+
+    // 3c. Delete proposals (tender/bids)
+    try {
+      await admin.from('proposals').delete().eq('challenge_id', id);
+    } catch (e: any) {
+      this.logger.warn(`Notice deleting proposals for ${id}: ${e.message}`);
+    }
+
+    // 3d. Delete industry engagements
+    try {
+      await admin.from('industry_engagements').delete().eq('challenge_id', id);
+    } catch (e: any) {
+      this.logger.warn(`Notice deleting industry_engagements for ${id}: ${e.message}`);
+    }
+
+    // 3e. Delete challenge assignments
+    try {
+      await admin.from('challenge_assignments').delete().eq('challenge_id', id);
+    } catch (e: any) {
+      this.logger.warn(`Notice deleting challenge_assignments for ${id}: ${e.message}`);
+    }
+
+    // 3f. Delete AI analysis log
+    try {
+      await admin.from('ai_analysis_log').delete().eq('challenge_id', id);
+    } catch (e: any) {
+      this.logger.warn(`Notice deleting ai_analysis_log for ${id}: ${e.message}`);
+    }
+
+    // 3g. Delete project teams and their milestones
+    try {
+      const { data: teams } = await admin
+        .from('project_teams')
+        .select('id')
+        .eq('challenge_id', id);
+
+      if (teams && teams.length > 0) {
+        const teamIds = teams.map((t) => t.id);
+        await admin.from('milestones').delete().in('project_id', teamIds);
+        await admin.from('project_teams').delete().eq('challenge_id', id);
+      }
+    } catch (e: any) {
+      this.logger.warn(`Notice deleting project_teams/milestones for ${id}: ${e.message}`);
+    }
+
+    // 4. Delete the challenge from challenges table
+    const { error: deleteError } = await admin
+      .from('challenges')
+      .delete()
+      .eq('id', id);
+
+    if (deleteError) {
+      this.logger.error(`Failed to delete challenge ${id}: ${deleteError.message}`);
+      throw new BadRequestException(`Failed to delete challenge: ${deleteError.message}`);
+    }
+
+    // 5. Delete associated image files from Supabase Storage bucket
+    if (
+      challenge.media_urls &&
+      Array.isArray(challenge.media_urls) &&
+      challenge.media_urls.length > 0
+    ) {
+      try {
+        await this.supabaseService.deleteFilesByUrls(challenge.media_urls);
+      } catch (storageErr: any) {
+        this.logger.warn(
+          `Notice deleting storage images for challenge ${id}: ${storageErr.message}`,
+        );
+      }
+    }
+
+    // 6. Invalidate in-memory top problem cache if deleted problem was cached
+    if (this.cachedTopProblem?.id === id) {
+      this.cachedTopProblem = null;
+      await this.updateTopProblemCache();
+    }
+
+    this.logger.log(`Challenge ${id} ("${challenge.title}") and all associated files deleted by user ${user.id} (${user.role})`);
+
+    return {
+      success: true,
+      message: `Challenge '${challenge.title || id}' and associated files successfully deleted.`,
+    };
+  }
+
+  /**
+   * Update challenge title & description.
+   * Allowed if user is author or admin.
+   */
+  async updateChallenge(
+    id: string,
+    dto: {
+      title?: string;
+      description?: string;
+      assigned_institution_id?: string | null;
+      category_id?: string;
+      status?: ChallengeStatus;
+    },
+    user: AuthenticatedUser,
+  ) {
+    const admin = this.supabaseService.getAdminClient();
+
+    const { data: challenge, error: findError } = await admin
+      .from('challenges')
+      .select('id, submitted_by, user_id, status')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (findError || !challenge) {
+      throw new NotFoundException(`Challenge with ID ${id} not found.`);
+    }
+
+    const isAuthor =
+      challenge.submitted_by === user.id ||
+      challenge.user_id === user.id;
+    const isAdmin =
+      user.role === UserRole.SUPER_ADMIN ||
+      user.role === UserRole.GOVT_VIEWER ||
+      (user.role as any) === 'admin' ||
+      (user.role as any) === 'super_admin';
+
+    if (!isAuthor && !isAdmin) {
+      throw new ForbiddenException('You are only authorized to update your own submitted problems.');
+    }
+
+    const updates: Record<string, any> = { updated_at: new Date().toISOString() };
+    if (dto.title !== undefined && dto.title.trim()) updates.title = dto.title.trim();
+    if (dto.description !== undefined && dto.description.trim()) updates.description = dto.description.trim();
+
+    if (isAdmin) {
+      if (dto.assigned_institution_id !== undefined) {
+        updates.assigned_institution_id = dto.assigned_institution_id || null;
+        if (dto.assigned_institution_id && (challenge.status === ChallengeStatus.SUBMITTED || challenge.status === ChallengeStatus.UNDER_REVIEW)) {
+          updates.status = ChallengeStatus.IN_PROGRESS;
+        }
+      }
+      if (dto.category_id) updates.category_id = dto.category_id;
+      if (dto.status) updates.status = dto.status;
+    }
+
+    const { data, error } = await admin
+      .from('challenges')
+      .update(updates)
+      .eq('id', id)
+      .select('*, categories(id, name, slug), institutions(id, name, type, district)')
+      .single();
+
+    if (error) {
+      throw new BadRequestException(`Failed to update challenge: ${error.message}`);
     }
 
     return data;
@@ -662,8 +961,8 @@ export class ChallengesService implements OnModuleInit {
 
     // Check challenge status
     const existing = await this.getChallengeById(id, user);
-    if (existing.status !== ChallengeStatus.ROUTED) {
-      throw new BadRequestException('Challenge is not open for proposals. It must be routed to institutions first.');
+    if (existing.status !== ChallengeStatus.ROUTED && existing.status !== ChallengeStatus.SUBMITTED) {
+      throw new BadRequestException('Challenge is not open for proposals.');
     }
 
     if (!dto.proposal_text || !dto.budget_estimate || !dto.timeline_estimate || !(dto.contact_phone || user.contact)) {
@@ -886,17 +1185,105 @@ export class ChallengesService implements OnModuleInit {
     if (!challengeIds || challengeIds.length === 0) {
       return { success: true, count: 0 };
     }
-    
+
     const admin = this.supabaseService.getAdminClient();
-    
-    // Delete them from active database
+
+    // 1. Fetch media_urls for all target challenges to clean up storage
+    const allMediaUrls: string[] = [];
+    try {
+      const { data: challengesToPurge } = await admin
+        .from('challenges')
+        .select('id, media_urls')
+        .in('id', challengeIds);
+
+      if (challengesToPurge) {
+        for (const c of challengesToPurge) {
+          if (c.media_urls && Array.isArray(c.media_urls)) {
+            allMediaUrls.push(...c.media_urls);
+          }
+        }
+      }
+    } catch (e: any) {
+      this.logger.warn(`Notice fetching media_urls for purge: ${e.message}`);
+    }
+
+    // 2. Clean up foreign keys
+    try {
+      await admin.from('challenges').update({ duplicate_of: null }).in('duplicate_of', challengeIds);
+    } catch (e: any) {
+      this.logger.warn(`Notice unlinking duplicate_of for purge: ${e.message}`);
+    }
+
+    try {
+      await admin.from('challenge_supports').delete().in('challenge_id', challengeIds);
+    } catch (e: any) {
+      this.logger.warn(`Notice deleting supports for purge: ${e.message}`);
+    }
+
+    try {
+      await admin.from('proposals').delete().in('challenge_id', challengeIds);
+    } catch (e: any) {
+      this.logger.warn(`Notice deleting proposals for purge: ${e.message}`);
+    }
+
+    try {
+      await admin.from('industry_engagements').delete().in('challenge_id', challengeIds);
+    } catch (e: any) {
+      this.logger.warn(`Notice deleting engagements for purge: ${e.message}`);
+    }
+
+    try {
+      await admin.from('challenge_assignments').delete().in('challenge_id', challengeIds);
+    } catch (e: any) {
+      this.logger.warn(`Notice deleting assignments for purge: ${e.message}`);
+    }
+
+    try {
+      await admin.from('ai_analysis_log').delete().in('challenge_id', challengeIds);
+    } catch (e: any) {
+      this.logger.warn(`Notice deleting ai logs for purge: ${e.message}`);
+    }
+
+    try {
+      const { data: teams } = await admin
+        .from('project_teams')
+        .select('id')
+        .in('challenge_id', challengeIds);
+      if (teams && teams.length > 0) {
+        const teamIds = teams.map((t) => t.id);
+        await admin.from('milestones').delete().in('project_id', teamIds);
+        await admin.from('project_teams').delete().in('challenge_id', challengeIds);
+      }
+    } catch (e: any) {
+      this.logger.warn(`Notice deleting teams/milestones for purge: ${e.message}`);
+    }
+
+    // 3. Delete from active database
     const { error: delErr } = await admin
       .from('challenges')
       .delete()
       .in('id', challengeIds);
-      
-    if (delErr) throw new BadRequestException('Failed to purge challenges from database');
-    
+
+    if (delErr) {
+      this.logger.error(`Failed to purge challenges from database: ${delErr.message}`);
+      throw new BadRequestException(`Failed to purge challenges from database: ${delErr.message}`);
+    }
+
+    // 4. Delete images from Supabase Storage bucket
+    if (allMediaUrls.length > 0) {
+      try {
+        await this.supabaseService.deleteFilesByUrls(allMediaUrls);
+      } catch (storageErr: any) {
+        this.logger.warn(`Notice cleaning storage files during purge: ${storageErr.message}`);
+      }
+    }
+
+    // 5. Invalidate cachedTopProblem if it was purged
+    if (this.cachedTopProblem && challengeIds.includes(this.cachedTopProblem.id)) {
+      this.cachedTopProblem = null;
+      await this.updateTopProblemCache();
+    }
+
     return { success: true, count: challengeIds.length };
   }
 
@@ -940,4 +1327,30 @@ export class ChallengesService implements OnModuleInit {
     const score = Math.round(hierarchicalBase * 0.6) + aiContribution + supportBoost;
     return Math.min(100, Math.max(1, score));
   }
+
+  /**
+   * Standalone image validation method for upload verification.
+   * Analyzes an image using the Gemini API to detect screenshots or AI generation.
+   * Throws BadRequestException if invalid, or returns the validation result.
+   */
+  async validateUploadedImage(file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('No image file provided for validation.');
+    }
+    const validation = await this.imageValidationService.validateImage(
+      file.buffer,
+      file.mimetype,
+      file.originalname,
+    );
+
+    if (!validation.isValid) {
+      throw new BadRequestException(
+        validation.rejectionReason ||
+          'Upload rejected: The image appears to be a screenshot or AI-generated. Please upload an authentic camera photograph.',
+      );
+    }
+
+    return validation;
+  }
 }
+

@@ -112,7 +112,14 @@ export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, o
 
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
-  const canDelete = false; // Feature disabled as requested
+  const canDelete =
+    isAuthenticated &&
+    user &&
+    (user.id === challenge.submitted_by ||
+      (challenge as any).user_id === user.id ||
+      user.role === 'super_admin' ||
+      user.role === 'govt_viewer' ||
+      (user.role as any) === 'admin');
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -167,9 +174,113 @@ export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, o
           </span>
         )}
 
-        <span className="status">
-          {(challenge.status || 'SUBMITTED').replace('_', ' ').toUpperCase()}
-        </span>
+        {(() => {
+          const st = (challenge.status || 'SUBMITTED').toLowerCase();
+          const isCompleted = st === 'completed' || st === 'validated' || st === 'resolved';
+          const isInProgress = ['in_progress', 'team_formed', 'under_action', 'routed'].includes(st);
+          const isUnderReview = st === 'under_review';
+
+          if (isCompleted) {
+            return (
+              <span
+                style={{
+                  marginLeft: 'auto',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '4px 12px',
+                  borderRadius: '20px',
+                  fontSize: '11.5px',
+                  fontWeight: 800,
+                  background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
+                  color: '#065f46',
+                  border: '1px solid #6ee7b7',
+                  boxShadow: '0 2px 5px rgba(16, 185, 129, 0.2)',
+                  letterSpacing: '0.6px',
+                  textTransform: 'uppercase',
+                }}
+              >
+                <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 4px #10b981' }} />
+                COMPLETED
+              </span>
+            );
+          }
+
+          if (isInProgress) {
+            return (
+              <span
+                style={{
+                  marginLeft: 'auto',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '4px 12px',
+                  borderRadius: '20px',
+                  fontSize: '11.5px',
+                  fontWeight: 800,
+                  background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+                  color: '#1d4ed8',
+                  border: '1px solid #93c5fd',
+                  boxShadow: '0 2px 5px rgba(37, 99, 235, 0.15)',
+                  letterSpacing: '0.6px',
+                  textTransform: 'uppercase',
+                }}
+              >
+                <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#2563eb', boxShadow: '0 0 4px #2563eb' }} />
+                {st === 'in_progress' ? 'IN PROGRESS' : st.replace('_', ' ').toUpperCase()}
+              </span>
+            );
+          }
+
+          if (isUnderReview) {
+            return (
+              <span
+                style={{
+                  marginLeft: 'auto',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '4px 12px',
+                  borderRadius: '20px',
+                  fontSize: '11.5px',
+                  fontWeight: 800,
+                  background: 'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)',
+                  color: '#854d0e',
+                  border: '1px solid #fde047',
+                  boxShadow: '0 2px 5px rgba(202, 138, 4, 0.15)',
+                  letterSpacing: '0.6px',
+                  textTransform: 'uppercase',
+                }}
+              >
+                <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#eab308' }} />
+                UNDER REVIEW
+              </span>
+            );
+          }
+
+          return (
+            <span
+              style={{
+                marginLeft: 'auto',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 12px',
+                borderRadius: '20px',
+                fontSize: '11.5px',
+                fontWeight: 700,
+                background: '#f8fafc',
+                color: '#475569',
+                border: '1px solid #cbd5e1',
+                letterSpacing: '0.5px',
+                textTransform: 'uppercase',
+              }}
+            >
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#94a3b8' }} />
+              SUBMITTED
+            </span>
+          );
+        })()}
       </div>
 
       {(() => {
@@ -301,7 +412,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, o
         );
       })()}
 
-      <div className="interaction-row">
+      <div className="interaction-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <button
           type="button"
           className={`interaction-btn ${isSupported ? 'support-btn active' : ''}`}
@@ -312,33 +423,62 @@ export const FeedItem: React.FC<FeedItemProps> = ({ challenge, onOpenLightbox, o
           <ThumbsUp size={16} fill={isSupported ? 'currentColor' : 'none'} />
           <span>{isSupported ? 'Supported' : 'Support'} ({supportCount})</span>
         </button>
-        
-        <button
-          type="button"
-          className="interaction-btn"
-          onClick={(e) => {
-            e.preventDefault();
-            const shareUrl = `${window.location.origin}/?problemId=${challenge.id}#feed`;
-            if (navigator.share) {
-              navigator.share({ title: challenge.title, url: shareUrl });
-            } else {
-              navigator.clipboard.writeText(shareUrl);
-              showAlert('Link copied to clipboard!', 'success');
-            }
-          }}
-        >
-          <Share2 size={16} />
-          <span>Share</span>
-        </button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button
+            type="button"
+            className="interaction-btn"
+            onClick={(e) => {
+              e.preventDefault();
+              const shareUrl = `${window.location.origin}/?problemId=${challenge.id}#feed`;
+              if (navigator.share) {
+                navigator.share({ title: challenge.title, url: shareUrl });
+              } else {
+                navigator.clipboard.writeText(shareUrl);
+                showAlert('Link copied to clipboard!', 'success');
+              }
+            }}
+          >
+            <Share2 size={16} />
+            <span>Share</span>
+          </button>
 
-        <button
-          type="button"
-          className={`interaction-btn ${isWatched ? 'support-btn active' : ''}`}
-          onClick={handleWatchToggle}
-        >
-          <Eye size={16} fill={isWatched ? 'currentColor' : 'none'} />
-          <span>{isWatched ? 'Watching' : 'Watchlist'}</span>
-        </button>
+          <button
+            type="button"
+            className={`interaction-btn ${isWatched ? 'support-btn active' : ''}`}
+            onClick={handleWatchToggle}
+          >
+            <Eye size={16} fill={isWatched ? 'currentColor' : 'none'} />
+            <span>{isWatched ? 'Watching' : 'Watchlist'}</span>
+          </button>
+
+          {canDelete && (
+            <button
+              type="button"
+              className="interaction-btn"
+              onClick={handleDelete}
+              disabled={isDeleting}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: '#fef2f2',
+                color: '#ef4444',
+                border: '1px solid #fecaca',
+                padding: '6px 14px',
+                borderRadius: '8px',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: isDeleting ? 'not-allowed' : 'pointer',
+                opacity: isDeleting ? 0.6 : 1,
+                transition: 'all 0.2s ease',
+              }}
+              title="Delete this complaint"
+            >
+              <Trash2 size={14} />
+              <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
+            </button>
+          )}
+        </div>
       </div>
 
 

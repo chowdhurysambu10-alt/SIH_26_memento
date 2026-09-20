@@ -1028,7 +1028,7 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
                     >
                       <FileText size={16} /> Proposal Submitted
                     </button>
-                  ) : c.status !== 'routed' ? (
+                  ) : (c.status !== 'routed' && c.status !== 'submitted') ? (
                     <button 
                       disabled
                       style={{

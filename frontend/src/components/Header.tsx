@@ -242,7 +242,6 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, platfor
                 Sign In
               </button>
             )}
-
             {/* Mobile Menu Dropdown for sections not in bottom nav */}
             <div className="mobile-only-menu" style={{ position: 'relative' }} ref={mobileMenuRef}>
               <style>

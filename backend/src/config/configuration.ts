@@ -9,6 +9,11 @@ export default () => ({
   },
   ai: {
     defaultProvider: process.env.DEFAULT_AI_PROVIDER || 'gemma',
+    gemini: {
+      apiKey: process.env.GEMINI_API_KEY || process.env.GEMMA_API_KEY || '',
+      model: process.env.GEMINI_IMAGE_MODEL || process.env.GEMINI_MODEL || 'gemini-1.5-flash',
+      apiUrl: process.env.GEMINI_API_URL || process.env.GEMMA_API_URL || 'https://generativelanguage.googleapis.com/v1beta/models',
+    },
     gemma: {
       apiKey: process.env.GEMMA_API_KEY || '',
       model: process.env.GEMMA_MODEL || 'gemma-2-9b-it',

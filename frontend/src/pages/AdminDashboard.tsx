@@ -13,9 +13,11 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
   const [users, setUsers] = useState<any[]>([]);
   const [posts, setPosts] = useState<DashboardChallenge[]>([]);
   const [verificationRequests, setVerificationRequests] = useState<any[]>([]);
+  const [institutions, setInstitutions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   
   const [editingPost, setEditingPost] = useState<DashboardChallenge | null>(null);
+  const [postStatusFilter, setPostStatusFilter] = useState<'all' | 'claims' | 'submitted' | 'under_action' | 'resolved'>('all');
   
   // Broadcast State
   const [broadcastRole, setBroadcastRole] = useState('all');
@@ -25,15 +27,12 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
   const [broadcasting, setBroadcasting] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editDesc, setEditDesc] = useState('');
-  
   // User Edit State
   const [editingUser, setEditingUser] = useState<any | null>(null);
   const [editUserName, setEditUserName] = useState('');
   const [editUserEmail, setEditUserEmail] = useState('');
   const [editUserContact, setEditUserContact] = useState('');
   const [editUserDistrict, setEditUserDistrict] = useState('');
-
-  const [institutions, setInstitutions] = useState<any[]>([]);
   const [editAssignedInstitutionId, setEditAssignedInstitutionId] = useState<string>('');
 
   // Settings State
@@ -94,7 +93,10 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
 
   useEffect(() => {
     if (activeView === 'users' || activeView === 'dashboard') fetchUsers();
-    if (activeView === 'posts' || activeView === 'dashboard') fetchPosts();
+    if (activeView === 'posts' || activeView === 'dashboard') {
+      fetchPosts();
+      fetchInstitutions();
+    }
     if (activeView === 'verification') fetchVerificationRequests();
     if (activeView === 'settings') fetchSettings();
   }, [activeView]);
@@ -336,6 +338,7 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
     setEditingPost(post);
     setEditTitle(post.title);
     setEditDesc(post.description);
+    setEditAssignedInstitutionId(post.assigned_institution_id || '');
   };
 
   const handleSavePostEdit = async () => {
@@ -365,7 +368,19 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
   const totalUsers = filteredUsers.length;
   const totalPosts = filteredPosts.length;
   const pendingVerifications = filteredVerificationRequests.length;
-  const pendingPosts = filteredPosts.filter(p => p.status === 'under_review').length;
+  const submittedPosts = filteredPosts.filter(p => p.status === 'submitted' || !p.status).length;
+  const pendingClaimsCount = filteredPosts.filter(p => p.status === 'under_review').length;
+  const underActionPosts = filteredPosts.filter(p => ['routed', 'team_formed', 'in_progress', 'under_action'].includes(p.status)).length;
+  const resolvedPosts = filteredPosts.filter(p => p.status === 'completed' || p.status === 'validated').length;
+  const allocatedPosts = filteredPosts.filter(p => p.assigned_institution_id || p.institutions).length;
+
+  const displayedPosts = filteredPosts.filter(p => {
+    if (postStatusFilter === 'claims') return p.status === 'under_review';
+    if (postStatusFilter === 'submitted') return p.status === 'submitted' || !p.status;
+    if (postStatusFilter === 'under_action') return ['routed', 'team_formed', 'in_progress', 'under_action'].includes(p.status);
+    if (postStatusFilter === 'resolved') return p.status === 'completed' || p.status === 'validated';
+    return true;
+  });
 
   const recentUsers = [...filteredUsers].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()).slice(0, 5);
   const recentPosts = [...posts].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()).slice(0, 5);
@@ -389,7 +404,7 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
         </div>
         
         {/* Metric Cards Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginBottom: '32px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '32px' }}>
           <div style={{ background: '#fff', padding: '24px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)', position: 'relative', overflow: 'hidden' }}>
             <div style={{ position: 'absolute', top: 0, right: 0, width: '100px', height: '100px', background: 'radial-gradient(circle, rgba(37,99,235,0.05) 0%, rgba(255,255,255,0) 70%)', transform: 'translate(30%, -30%)' }}></div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
@@ -424,27 +439,53 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
           </div>
 
           <div style={{ background: '#fff', padding: '24px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', top: 0, right: 0, width: '100px', height: '100px', background: 'radial-gradient(circle, rgba(99,102,241,0.05) 0%, rgba(255,255,255,0) 70%)', transform: 'translate(30%, -30%)' }}></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{ width: '56px', height: '56px', borderRadius: '14px', background: '#eef2ff', color: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Clock size={28} />
+              </div>
+              <div>
+                <div style={{ color: '#64748b', fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Awaiting Action</div>
+                <div style={{ fontSize: '28px', fontWeight: 800, color: '#6366f1', lineHeight: 1 }}>{submittedPosts}</div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ background: '#fff', padding: '24px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', top: 0, right: 0, width: '100px', height: '100px', background: 'radial-gradient(circle, rgba(234,179,8,0.05) 0%, rgba(255,255,255,0) 70%)', transform: 'translate(30%, -30%)' }}></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{ width: '56px', height: '56px', borderRadius: '14px', background: '#fefce8', color: '#ca8a04', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Activity size={28} />
+              </div>
+              <div>
+                <div style={{ color: '#64748b', fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Under Action</div>
+                <div style={{ fontSize: '28px', fontWeight: 800, color: '#ca8a04', lineHeight: 1 }}>{underActionPosts}</div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ background: '#fff', padding: '24px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)', position: 'relative', overflow: 'hidden' }}>
             <div style={{ position: 'absolute', top: 0, right: 0, width: '100px', height: '100px', background: 'radial-gradient(circle, rgba(245,158,11,0.05) 0%, rgba(255,255,255,0) 70%)', transform: 'translate(30%, -30%)' }}></div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               <div style={{ width: '56px', height: '56px', borderRadius: '14px', background: '#fffbeb', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <ShieldCheck size={28} />
               </div>
               <div>
-                <div style={{ color: '#64748b', fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Pending Verifications</div>
+                <div style={{ color: '#64748b', fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Verifications</div>
                 <div style={{ fontSize: '28px', fontWeight: 800, color: '#0f172a', lineHeight: 1 }}>{pendingVerifications}</div>
               </div>
             </div>
           </div>
 
           <div style={{ background: '#fff', padding: '24px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)', position: 'relative', overflow: 'hidden' }}>
-            <div style={{ position: 'absolute', top: 0, right: 0, width: '100px', height: '100px', background: 'radial-gradient(circle, rgba(139,92,246,0.05) 0%, rgba(255,255,255,0) 70%)', transform: 'translate(30%, -30%)' }}></div>
+            <div style={{ position: 'absolute', top: 0, right: 0, width: '100px', height: '100px', background: 'radial-gradient(circle, rgba(37,99,235,0.05) 0%, rgba(255,255,255,0) 70%)', transform: 'translate(30%, -30%)' }}></div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ width: '56px', height: '56px', borderRadius: '14px', background: '#f5f3ff', color: '#8b5cf6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Clock size={28} />
+              <div style={{ width: '56px', height: '56px', borderRadius: '14px', background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Building2 size={28} />
               </div>
               <div>
-                <div style={{ color: '#64748b', fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Posts Under Review</div>
-                <div style={{ fontSize: '28px', fontWeight: 800, color: '#0f172a', lineHeight: 1 }}>{pendingPosts}</div>
+                <div style={{ color: '#64748b', fontSize: '13px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Occupied / Assigned</div>
+                <div style={{ fontSize: '28px', fontWeight: 800, color: '#2563eb', lineHeight: 1 }}>{allocatedPosts}</div>
               </div>
             </div>
           </div>
@@ -1018,55 +1059,303 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
               </tbody>
             </table>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left' }}>
-                  <th style={{ padding: '16px', color: '#475569', fontWeight: 600 }}>Title</th>
-                  <th style={{ padding: '16px', color: '#475569', fontWeight: 600 }}>Status</th>
-                  <th style={{ padding: '16px', color: '#475569', fontWeight: 600 }}>Category</th>
-                  <th style={{ padding: '16px', color: '#475569', fontWeight: 600 }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredPosts.map((p, i) => (
-                  <tr key={p.id} style={{ borderBottom: i < filteredPosts.length - 1 ? '1px solid #e2e8f0' : 'none' }}>
-                    <td style={{ padding: '16px', color: '#0f172a', fontWeight: 500 }}>{p.title}</td>
-                    <td style={{ padding: '16px' }}>
-                      <select 
-                        value={p.status} 
-                        onChange={(e) => handleUpdatePostStatus(p.id, e.target.value)}
-                        style={{ padding: '6px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '13px', background: '#eff6ff', color: '#2563eb', fontWeight: 600 }}
-                      >
-                        <option value="submitted">Submitted</option>
-                        <option value="under_review">Under Review</option>
-                        <option value="routed">Routed</option>
-                        <option value="team_formed">Team Formed</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="completed">Completed</option>
-                        <option value="validated">Validated</option>
-                      </select>
-                    </td>
-                    <td style={{ padding: '16px', color: '#64748b' }}>{p.category || 'Uncategorized'}</td>
-                    <td style={{ padding: '16px', display: 'flex', gap: '8px' }}>
-                      <button 
-                        onClick={() => handleEditPost(p)}
-                        style={{ background: 'transparent', border: 'none', color: '#2563eb', cursor: 'pointer' }}
-                        title="Edit Post"
-                      >
-                        <Edit2 size={18} />
-                      </button>
-                      <button 
-                        onClick={() => handleDeletePost(p.id)}
-                        style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer' }}
-                        title="Delete Post"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </td>
+            <div>
+              {/* Filter Tabs */}
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: '#475569', marginRight: '4px' }}>Filter Status:</span>
+                <button
+                  type="button"
+                  onClick={() => setPostStatusFilter('all')}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    border: '1px solid',
+                    borderColor: postStatusFilter === 'all' ? '#2563eb' : '#cbd5e1',
+                    background: postStatusFilter === 'all' ? '#eff6ff' : '#fff',
+                    color: postStatusFilter === 'all' ? '#2563eb' : '#475569',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  All ({filteredPosts.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPostStatusFilter('claims')}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    border: '1px solid',
+                    borderColor: postStatusFilter === 'claims' ? '#f59e0b' : '#cbd5e1',
+                    background: postStatusFilter === 'claims' ? '#fef3c7' : '#fff',
+                    color: postStatusFilter === 'claims' ? '#b45309' : '#475569',
+                    fontWeight: 700,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  Claim Requests ({pendingClaimsCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPostStatusFilter('submitted')}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    border: '1px solid',
+                    borderColor: postStatusFilter === 'submitted' ? '#6366f1' : '#cbd5e1',
+                    background: postStatusFilter === 'submitted' ? '#eef2ff' : '#fff',
+                    color: postStatusFilter === 'submitted' ? '#4f46e5' : '#475569',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Awaiting Action ({submittedPosts})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPostStatusFilter('under_action')}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    border: '1px solid',
+                    borderColor: postStatusFilter === 'under_action' ? '#ca8a04' : '#cbd5e1',
+                    background: postStatusFilter === 'under_action' ? '#fefce8' : '#fff',
+                    color: postStatusFilter === 'under_action' ? '#a16207' : '#475569',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Under Action ({underActionPosts})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPostStatusFilter('resolved')}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    border: '1px solid',
+                    borderColor: postStatusFilter === 'resolved' ? '#10b981' : '#cbd5e1',
+                    background: postStatusFilter === 'resolved' ? '#ecfdf5' : '#fff',
+                    color: postStatusFilter === 'resolved' ? '#047857' : '#475569',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Resolved ({resolvedPosts})
+                </button>
+              </div>
+
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left' }}>
+                    <th style={{ padding: '16px', color: '#475569', fontWeight: 600 }}>Title</th>
+                    <th style={{ padding: '16px', color: '#475569', fontWeight: 600 }}>Status</th>
+                    <th style={{ padding: '16px', color: '#475569', fontWeight: 600 }}>Category</th>
+                    <th style={{ padding: '16px', color: '#475569', fontWeight: 600 }}>Occupied / Allocated Institution</th>
+                    <th style={{ padding: '16px', color: '#475569', fontWeight: 600 }}>Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {displayedPosts.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} style={{ padding: '36px', textAlign: 'center', color: '#64748b' }}>
+                        No posts found for this filter.
+                      </td>
+                    </tr>
+                  ) : (
+                    displayedPosts.map((p, i) => {
+                      const occupiedInst = institutions.find(inst => 
+                        inst.id === p.assigned_institution_id || 
+                        (inst.name && p.institutions?.name && inst.name.toLowerCase() === p.institutions.name.toLowerCase()) ||
+                        inst.name === p.assigned_institution_id
+                      );
+                      const occupiedInstName = p.institutions?.name || occupiedInst?.name || (institutions.find(inst => inst.id === p.assigned_institution_id)?.name);
+                      const selectedInstValue = occupiedInst?.id || p.assigned_institution_id || '';
+
+                      return (
+                        <tr key={p.id} style={{ borderBottom: i < displayedPosts.length - 1 ? '1px solid #e2e8f0' : 'none' }}>
+                          <td style={{ padding: '16px', color: '#0f172a', fontWeight: 500, maxWidth: '260px' }}>
+                            <div style={{ fontWeight: 600 }}>{p.title}</div>
+                            {p.district && <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>{p.district}</div>}
+                          </td>
+                          <td style={{ padding: '16px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-start' }}>
+                              {p.status === 'under_review' ? (
+                                <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }}>
+                                  CLAIM PENDING VERIFICATION
+                                </span>
+                              ) : (p.status === 'submitted' || !p.status) ? (
+                                <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', background: '#eef2ff', color: '#4f46e5', border: '1px solid #c7d2fe' }}>
+                                  AWAITING ACTION
+                                </span>
+                              ) : ['routed', 'team_formed', 'in_progress', 'under_action'].includes(p.status) ? (
+                                <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', background: '#fefce8', color: '#a16207', border: '1px solid #fef08a' }}>
+                                  UNDER ACTION ({(p.status || '').replace('_', ' ').toUpperCase()})
+                                </span>
+                              ) : (
+                                <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0' }}>
+                                  RESOLVED
+                                </span>
+                              )}
+                              <select 
+                                value={p.status} 
+                                onChange={(e) => handleUpdatePostStatus(p.id, e.target.value)}
+                                style={{ padding: '5px 8px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '12px', background: '#fff', color: '#0f172a', fontWeight: 500 }}
+                              >
+                                <option value="submitted">Submitted (Awaiting Action)</option>
+                                <option value="under_review">Under Review (Claim Pending)</option>
+                                <option value="in_progress">Under Action / In Progress</option>
+                                <option value="routed">Routed</option>
+                                <option value="team_formed">Team Formed</option>
+                                <option value="completed">Completed</option>
+                                <option value="validated">Validated</option>
+                              </select>
+                            </div>
+                          </td>
+                          <td style={{ padding: '16px', color: '#64748b' }}>{p.category || 'Uncategorized'}</td>
+                          
+                          {/* Occupied / Allocated Institution Column */}
+                          <td style={{ padding: '16px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-start' }}>
+                              {occupiedInstName ? (
+                                <span style={{ 
+                                  fontSize: '12px', 
+                                  fontWeight: 700, 
+                                  padding: '4px 10px', 
+                                  borderRadius: '8px', 
+                                  background: p.status === 'under_review' ? '#fffbeb' : '#eff6ff', 
+                                  color: p.status === 'under_review' ? '#d97706' : '#1d4ed8', 
+                                  border: `1px solid ${p.status === 'under_review' ? '#fde68a' : '#bfdbfe'}`,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  maxWidth: '240px'
+                                }}>
+                                  <Building2 size={13} style={{ flexShrink: 0 }} />
+                                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={occupiedInstName}>
+                                    {occupiedInstName} {p.status === 'under_review' ? '(Claim Pending)' : ''}
+                                  </span>
+                                </span>
+                              ) : (
+                                <span style={{ 
+                                  fontSize: '11px', 
+                                  fontWeight: 600, 
+                                  padding: '3px 8px', 
+                                  borderRadius: '6px', 
+                                  background: '#f8fafc', 
+                                  color: '#94a3b8', 
+                                  border: '1px dashed #cbd5e1' 
+                                }}>
+                                  Unallocated
+                                </span>
+                              )}
+
+                              {/* Interactive Allocation Dropdown */}
+                              <select
+                                value={selectedInstValue}
+                                onChange={(e) => handleAllocateInstitution(p.id, e.target.value || null)}
+                                style={{
+                                  padding: '6px 10px',
+                                  borderRadius: '6px',
+                                  border: selectedInstValue ? '1px solid #86efac' : '1px solid #cbd5e1',
+                                  fontSize: '12px',
+                                  background: selectedInstValue ? '#f0fdf4' : '#fff',
+                                  color: selectedInstValue ? '#166534' : '#334155',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  maxWidth: '240px',
+                                  outline: 'none'
+                                }}
+                                title="Allocate or change assigned institution"
+                              >
+                                <option value="">{selectedInstValue ? '-- Remove Allocation --' : '-- Allocate Institution --'}</option>
+                                {institutions.map(inst => (
+                                  <option key={inst.id} value={inst.id}>
+                                    {inst.name} ({inst.district || inst.type || 'University'})
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </td>
+
+                          <td style={{ padding: '16px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              {p.status === 'under_review' ? (
+                                <button 
+                                  type="button"
+                                  onClick={() => handleVerifyAndAssign(p.id, p.assigned_institution_id)}
+                                  style={{ 
+                                    padding: '6px 14px', 
+                                    background: '#10b981', 
+                                    color: '#fff', 
+                                    border: 'none', 
+                                    borderRadius: '6px', 
+                                    fontSize: '12px', 
+                                    fontWeight: 700, 
+                                    cursor: 'pointer', 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: '5px',
+                                    boxShadow: '0 2px 4px rgba(16, 185, 129, 0.25)'
+                                  }}
+                                  title="Verify claim and officially assign this problem to the university"
+                                >
+                                  <CheckCircle size={14} /> Verify & Assign
+                                </button>
+                              ) : (p.status === 'submitted' || !p.status) ? (
+                                <button 
+                                  type="button"
+                                  onClick={() => handleUpdatePostStatus(p.id, 'in_progress')}
+                                  style={{ 
+                                    padding: '6px 12px', 
+                                    background: '#2563eb', 
+                                    color: '#fff', 
+                                    border: 'none', 
+                                    borderRadius: '6px', 
+                                    fontSize: '12px', 
+                                    fontWeight: 600, 
+                                    cursor: 'pointer', 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: '4px',
+                                    boxShadow: '0 1px 2px rgba(37, 99, 235, 0.2)'
+                                  }}
+                                  title="Allow this problem into Under Action"
+                                >
+                                  <CheckCircle size={14} /> Allow Action
+                                </button>
+                              ) : null}
+                              <button 
+                                onClick={() => handleEditPost(p)}
+                                style={{ background: 'transparent', border: 'none', color: '#2563eb', cursor: 'pointer', padding: '4px' }}
+                                title="Edit Post"
+                              >
+                                <Edit2 size={18} />
+                              </button>
+                              <button 
+                                onClick={() => handleDeletePost(p.id)}
+                                style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
+                                title="Delete Post"
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}
@@ -1091,12 +1380,31 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
                 onChange={(e) => setEditTitle(e.target.value)}
               />
             </div>
+
+            <div className="form-group" style={{ marginBottom: '16px' }}>
+              <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Building2 size={14} /> Allocated Institution
+              </label>
+              <select
+                className="input-field"
+                value={editAssignedInstitutionId}
+                onChange={(e) => setEditAssignedInstitutionId(e.target.value)}
+                style={{ background: '#fff' }}
+              >
+                <option value="">-- None (Unallocated) --</option>
+                {institutions.map(inst => (
+                  <option key={inst.id} value={inst.id}>
+                    {inst.name} ({inst.district || inst.type})
+                  </option>
+                ))}
+              </select>
+            </div>
             
             <div className="form-group" style={{ marginBottom: '24px' }}>
               <label className="form-label">Description</label>
               <textarea 
                 className="input-field" 
-                rows={6}
+                rows={5}
                 value={editDesc}
                 onChange={(e) => setEditDesc(e.target.value)}
               />

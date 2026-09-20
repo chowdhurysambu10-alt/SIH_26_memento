@@ -68,10 +68,10 @@ export const authApi = {
     return { success: true, message: 'Verification request submitted for admin review' };
   },
 
-  requestOtp: (email: string, contact?: string): Promise<{ success: boolean; message: string }> => {
+  requestOtp: (email: string): Promise<{ success: boolean; message: string }> => {
     return apiClient('/auth/request-otp', {
       method: 'POST',
-      body: JSON.stringify({ email, contact }),
+      body: JSON.stringify({ email }),
     });
   },
 

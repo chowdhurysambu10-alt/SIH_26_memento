@@ -1,4 +1,4 @@
-const API_BASE_URL = '/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 import { dispatchNetworkStart, dispatchNetworkEnd, dispatchNetworkError } from '../utils/networkEvents';
 
 export interface ApiResponse<T = any> {

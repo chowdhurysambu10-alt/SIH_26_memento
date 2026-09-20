@@ -198,9 +198,9 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
       return;
     }
 
-    if (!title.trim() || !description.trim()) {
-      setError('Please provide a challenge title and description.');
-      showAlert('Please provide a challenge title and description.', 'error');
+    if (!title.trim() || !description.trim() || !locationText.trim()) {
+      setError('Please provide a title, description, and exact location.');
+      showAlert('Please provide a title, description, and exact location.', 'error');
       return;
     }
 
@@ -282,11 +282,11 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
   };
 
   return (
-    <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '24px 20px 80px' }}>
-      <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '32px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
-          <div style={{ marginBottom: '24px' }}>
-            <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a' }}>Submit a Societal Challenge</h2>
-            <p style={{ color: '#64748b', fontSize: '14.5px', marginTop: '4px' }}>
+    <div className="problem-entry-wrapper" style={{ maxWidth: '1000px', margin: '0 auto', padding: '24px 20px 80px' }}>
+      <div className="problem-entry-card" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '32px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
+          <div className="problem-entry-header" style={{ marginBottom: '24px' }}>
+            <h2 className="problem-entry-title" style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a' }}>Submit a Societal Challenge</h2>
+            <p className="problem-entry-subtitle" style={{ color: '#64748b', fontSize: '14.5px', marginTop: '4px', lineHeight: 1.5 }}>
               Report local civic, environmental, agricultural, or infrastructure challenges. Powered by automated AI classification & routing.
             </p>
           </div>
@@ -367,7 +367,7 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
             </div>
 
             <div className="input-group" style={{ marginBottom: '24px' }}>
-              <label htmlFor="p-location">Exact Location (Optional)</label>
+              <label htmlFor="p-location">Exact Location *</label>
               <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                 <input
                   id="p-location"
@@ -377,6 +377,7 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
                   value={locationText}
                   onChange={(e) => setLocationText(e.target.value)}
                   style={{ flex: '1 1 200px', minWidth: '200px' }}
+                  required
                 />
                 <button
                   type="button"

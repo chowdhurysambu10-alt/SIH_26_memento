@@ -164,12 +164,26 @@ export class UsersService {
   async deleteUser(userId: string) {
     const admin = this.supabaseService.getAdminClient();
     
+    // 1. Clean up dependent records to bypass Foreign Key constraints
+    try {
+      await admin.from('challenge_supports').delete().eq('user_id', userId);
+      await admin.from('notifications').delete().eq('recipient_id', userId);
+      await admin.from('proposals').delete().eq('institution_id', userId);
+      await admin.from('challenges').delete().eq('submitted_by', userId);
+      
+      // Delete the public user profile record
+      await admin.from('users').delete().eq('id', userId);
+    } catch (cleanupError: any) {
+      console.warn(`Warning during user data cleanup: ${cleanupError.message}`);
+    }
+
+    // 2. Delete the actual authentication account
     const { error: authError } = await admin.auth.admin.deleteUser(userId);
     
     if (authError) {
       throw new BadRequestException({
         statusCode: 400,
-        message: authError.message,
+        message: authError.message || 'Database error deleting user',
         errorCode: 'USER_DELETE_FAILED',
       });
     }

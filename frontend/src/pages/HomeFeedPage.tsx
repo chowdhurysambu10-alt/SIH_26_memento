@@ -239,12 +239,12 @@ export const HomeFeedPage: React.FC<{ onNavigateLogin: () => void; onNavigateSub
 
         {challenges.length > 0 && (
           <div className="challenge-list">
-            {challenges.map((c, i) => (
+            {challenges.map((c) => (
               <div 
-                key={`${c.id}-${i}`}
+                key={c.id}
                 style={{ 
                   contentVisibility: 'auto', 
-                  containIntrinsicSize: '0 300px' // Native browser DOM virtualization!
+                  containIntrinsicSize: '0 300px'
                 }}
               >
                 <FeedItem

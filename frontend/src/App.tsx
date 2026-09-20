@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect, Suspense, lazy } from 'react';
 import { Plus } from 'lucide-react';
-import { DesktopModeWarning } from './components/DesktopModeWarning';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { UIProvider } from './context/UIContext';
 import { Header, NavTab } from './components/Header';
@@ -69,8 +68,9 @@ export function AppContent() {
   const [platformSettings, setPlatformSettings] = useState<any>(null);
 
   useEffect(() => {
+    const apiBase = import.meta.env.VITE_API_BASE_URL || '/api/v1';
     const fetchSettings = () => {
-      fetch(`/api/v1/settings?t=${Date.now()}`)
+      fetch(`${apiBase}/settings?t=${Date.now()}`)
         .then(res => res.ok ? res.json() : null)
         .then(resData => { 
           if (resData) {
@@ -171,7 +171,6 @@ export function AppContent() {
 
   return (
     <div className="app-container" style={{ position: 'relative' }}>
-      <DesktopModeWarning />
       {platformSettings?.systemBannerText && (
         <div style={{ background: '#f59e0b', color: '#fff', padding: '12px', textAlign: 'center', fontWeight: 600, fontSize: '14px', position: 'sticky', top: 0, zIndex: 1000 }}>
           {platformSettings.systemBannerText}
@@ -181,27 +180,25 @@ export function AppContent() {
         <Header activeTab={activeTab} setActiveTab={setActiveTab} platformSettings={platformSettings} />
       )}
 
-      <Suspense fallback={<PageFallback />}>
-        {activeTab === 'home' && <LandingPage onNavigate={(tab) => setActiveTab(tab)} />}
+      <main className="app-main-content">
+        <Suspense fallback={<PageFallback />}>
+          {activeTab === 'home' && <LandingPage onNavigate={(tab) => setActiveTab(tab)} />}
 
-        {activeTab === 'feed' && <HomeFeedPage onNavigateLogin={() => setActiveTab('login')} onNavigateSubmit={() => setActiveTab('submit')} />}
+          {activeTab === 'feed' && <HomeFeedPage onNavigateLogin={() => setActiveTab('login')} onNavigateSubmit={() => setActiveTab('submit')} />}
 
-        {activeTab === 'top-problems' && <TopProblemsDashboard />}
+          {activeTab === 'top-problems' && <TopProblemsDashboard />}
 
-        {activeTab === 'submit' && (
-          <ProblemEntryDashboard onNavigateLogin={() => setActiveTab('login')} />
-        )}
+          {activeTab === 'submit' && (
+            <ProblemEntryDashboard onNavigateLogin={() => setActiveTab('login')} />
+          )}
 
-        {activeTab === 'statistics' && <StatisticsPage />}
+          {activeTab === 'statistics' && <StatisticsPage />}
 
-        {activeTab === 'community' && <CommunityPage platformSettings={platformSettings} />}
+          {activeTab === 'community' && <CommunityPage platformSettings={platformSettings} />}
 
-        {activeTab === 'admin-dashboard' && <AdminPortal />}
-        {activeTab === 'institution-dashboard' && <InstitutionPortal />}
-        {activeTab === 'student-dashboard' && <StudentPortal />}
-
-        {activeTab === 'about' && <AboutPage />}
-      </Suspense>
+          {activeTab === 'about' && <AboutPage />}
+        </Suspense>
+      </main>
 
       {/* Mobile Bottom Nav (visible on mobile, hidden on desktop via CSS) */}
       {!['admin-dashboard', 'institution-dashboard', 'student-dashboard', 'login'].includes(activeTab) && (
