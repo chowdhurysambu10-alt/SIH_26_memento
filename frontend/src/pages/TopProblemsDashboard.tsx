@@ -14,6 +14,7 @@ import {
   RotateCw,
   Award,
   X,
+  ThumbsUp,
 } from 'lucide-react';
 import { Lightbox } from '../components/Lightbox';
 
@@ -47,6 +48,16 @@ export const TopProblemsDashboard: React.FC = () => {
   const [status, setStatus] = useState<string>('all');
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'all'>('all');
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const [supportedMap, setSupportedMap] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setSupportedMap({});
+    } else {
+      const saved = JSON.parse(localStorage.getItem('supported_challenges') || '{}');
+      setSupportedMap(saved);
+    }
+  }, [isAuthenticated]);
 
   const [isFilterExpanded, setIsFilterExpanded] = useState<boolean>(false);
 
@@ -84,16 +95,33 @@ export const TopProblemsDashboard: React.FC = () => {
       return;
     }
 
+    const currentSupported = !!supportedMap[id];
+    const nextSupported = !currentSupported;
+
+    // Optimistic update
+    setSupportedMap((prev) => {
+      const updated = { ...prev, [id]: nextSupported };
+      localStorage.setItem('supported_challenges', JSON.stringify(updated));
+      return updated;
+    });
+
     try {
       const res = await challengesApi.supportChallenge(id);
       const newCount = res?.support_count;
+      const actualSupported = res?.is_supported !== undefined ? res.is_supported : nextSupported;
+
+      setSupportedMap((prev) => {
+        const updated = { ...prev, [id]: actualSupported };
+        localStorage.setItem('supported_challenges', JSON.stringify(updated));
+        return updated;
+      });
 
       setChallenges((prev) => {
         const updated = prev.map((c) => {
           if (c.id === id) {
             return {
               ...c,
-              support_count: newCount !== undefined ? newCount : (Number(c.support_count) || 0) + 1,
+              support_count: newCount !== undefined ? newCount : (Number(c.support_count) || 0) + (nextSupported ? 1 : -1),
             };
           }
           return c;
@@ -106,6 +134,12 @@ export const TopProblemsDashboard: React.FC = () => {
       });
     } catch (err) {
       console.warn('Support toggle failed:', err);
+      // Revert on error
+      setSupportedMap((prev) => {
+        const reverted = { ...prev, [id]: currentSupported };
+        localStorage.setItem('supported_challenges', JSON.stringify(reverted));
+        return reverted;
+      });
     }
   };
 
@@ -570,14 +604,19 @@ export const TopProblemsDashboard: React.FC = () => {
 
                   {/* Actions */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px', borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
-                    <button
-                      className="interaction-btn"
-                      onClick={() => handleSupport(challenge.id)}
-                      style={{ color: '#ef4444' }}
-                    >
-
-                      <span>Support ({supports})</span>
-                    </button>
+                    {(() => {
+                      const isSupported = !!supportedMap[challenge.id];
+                      return (
+                        <button
+                          type="button"
+                          className={`interaction-btn ${isSupported ? 'support-btn active' : ''}`}
+                          onClick={() => handleSupport(challenge.id)}
+                        >
+                          <ThumbsUp size={15} fill={isSupported ? 'currentColor' : 'none'} />
+                          <span>{isSupported ? 'Supported' : 'Support'} ({supports})</span>
+                        </button>
+                      );
+                    })()}
                     <span style={{ fontSize: '12.5px', color: '#94a3b8' }}>
                       Submitted {new Date(challenge.created_at).toLocaleDateString()}
                     </span>
