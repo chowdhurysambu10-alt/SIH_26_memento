@@ -879,6 +879,91 @@ label, .form-label {
   .problem-entry-subtitle {
     font-size: 13.5px !important;
   }
+
+  /* Statistics / Civic Dashboard Mobile Responsive */
+  .light-dashboard {
+    padding: 20px 14px 90px !important;
+  }
+
+  .light-header-row {
+    margin-bottom: 20px !important;
+  }
+
+  .light-header-row h1 {
+    font-size: 22px !important;
+  }
+
+  .light-metrics-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 12px !important;
+    margin-bottom: 24px !important;
+  }
+
+  .light-metric-card {
+    padding: 16px 14px !important;
+    border-radius: 14px !important;
+  }
+
+  .light-metric-label {
+    font-size: 11px !important;
+    margin-bottom: 8px !important;
+  }
+
+  .light-metric-value {
+    font-size: 26px !important;
+  }
+
+  .light-charts-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+    margin-bottom: 24px !important;
+  }
+
+  .light-chart-card {
+    padding: 18px 14px !important;
+    border-radius: 16px !important;
+  }
+
+  .light-split-layout {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+
+  .light-list-container {
+    height: auto !important;
+    max-height: 380px !important;
+    padding: 16px 12px !important;
+    border-radius: 16px !important;
+  }
+
+  .light-detail-pane {
+    height: auto !important;
+    padding: 20px 16px !important;
+    border-radius: 16px !important;
+  }
+
+  .light-detail-id {
+    font-size: 20px !important;
+  }
+
+  .status-timeline {
+    margin-top: 20px !important;
+    padding: 16px 14px !important;
+  }
+
+  .light-item-title {
+    font-size: 14px !important;
+  }
+
+  .light-item-sub {
+    font-size: 12px !important;
+  }
+
+  .light-action-btn {
+    padding: 10px 14px !important;
+    font-size: 13.5px !important;
+    border-radius: 10px !important;
+  }
 }
 
 /* ==================================================
