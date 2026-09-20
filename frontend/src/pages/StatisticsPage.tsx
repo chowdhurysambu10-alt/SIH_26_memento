@@ -315,7 +315,9 @@ export const StatisticsPage: React.FC<StatisticsPageProps> = ({ hideMyProblems =
         {selectedChallenge ? (
           <div className="light-detail-pane">
             <div className="light-detail-header" style={{ marginBottom: 0 }}>
-              <div className="light-detail-id">Issue #{selectedChallenge.id.substring(0, 8)}</div>
+              <div className="light-detail-id" title={selectedChallenge.title}>
+                {selectedChallenge.title.length > 25 ? selectedChallenge.title.substring(0, 25) + '...' : selectedChallenge.title}
+              </div>
             </div>
 
             {/* Tracker Timeline - purely tracking like Flipkart */}

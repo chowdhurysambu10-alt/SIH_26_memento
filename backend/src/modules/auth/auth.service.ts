@@ -9,6 +9,7 @@ import { SupabaseService } from '../supabase/supabase.service';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as nodemailer from 'nodemailer';
+import * as crypto from 'crypto';
 import { SignupDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
 import { SettingsService } from '../settings/settings.service';
@@ -273,8 +274,8 @@ export class AuthService {
       await this.checkMobileRateLimit();
     }
 
-    // Generate a 6-digit random number
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate a secure 6-digit random number
+    const otp = crypto.randomInt(100000, 1000000).toString();
     
     // Store in memory for 10 minutes against the USER'S EMAIL
     this.otpStore.set(email.trim(), {

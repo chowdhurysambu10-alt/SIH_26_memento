@@ -14,6 +14,7 @@ import {
   RotateCw,
   Award,
   X,
+  ThumbsUp,
 } from 'lucide-react';
 import { Lightbox } from '../components/Lightbox';
 
@@ -47,6 +48,24 @@ export const TopProblemsDashboard: React.FC = () => {
   const [status, setStatus] = useState<string>('all');
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'all'>('all');
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const [supportedMap, setSupportedMap] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setSupportedMap({});
+    } else {
+      const saved = JSON.parse(localStorage.getItem('supported_challenges') || '{}');
+      setSupportedMap(saved);
+    }
+  }, [isAuthenticated]);
+
+  const [isFilterExpanded, setIsFilterExpanded] = useState<boolean>(false);
+
+  const activeFilterCount =
+    (district !== 'All Districts' ? 1 : 0) +
+    (category !== 'All Categories' ? 1 : 0) +
+    (status !== 'all' ? 1 : 0) +
+    (timeRange !== 'all' ? 1 : 0);
 
   const fetchTopProblems = async () => {
     setLoading(true);
@@ -76,16 +95,33 @@ export const TopProblemsDashboard: React.FC = () => {
       return;
     }
 
+    const currentSupported = !!supportedMap[id];
+    const nextSupported = !currentSupported;
+
+    // Optimistic update
+    setSupportedMap((prev) => {
+      const updated = { ...prev, [id]: nextSupported };
+      localStorage.setItem('supported_challenges', JSON.stringify(updated));
+      return updated;
+    });
+
     try {
       const res = await challengesApi.supportChallenge(id);
       const newCount = res?.support_count;
+      const actualSupported = res?.is_supported !== undefined ? res.is_supported : nextSupported;
+
+      setSupportedMap((prev) => {
+        const updated = { ...prev, [id]: actualSupported };
+        localStorage.setItem('supported_challenges', JSON.stringify(updated));
+        return updated;
+      });
 
       setChallenges((prev) => {
         const updated = prev.map((c) => {
           if (c.id === id) {
             return {
               ...c,
-              support_count: newCount !== undefined ? newCount : (Number(c.support_count) || 0) + 1,
+              support_count: newCount !== undefined ? newCount : (Number(c.support_count) || 0) + (nextSupported ? 1 : -1),
             };
           }
           return c;
@@ -98,6 +134,12 @@ export const TopProblemsDashboard: React.FC = () => {
       });
     } catch (err) {
       console.warn('Support toggle failed:', err);
+      // Revert on error
+      setSupportedMap((prev) => {
+        const reverted = { ...prev, [id]: currentSupported };
+        localStorage.setItem('supported_challenges', JSON.stringify(reverted));
+        return reverted;
+      });
     }
   };
 
@@ -119,17 +161,78 @@ export const TopProblemsDashboard: React.FC = () => {
           </p>
         </div>
 
-        <button
-          className="btn btn-outline"
-          onClick={fetchTopProblems}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13.5px' }}
-        >
-          <RotateCw size={14} /> Refresh
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={fetchTopProblems}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              fontSize: '13.5px',
+              padding: '0 14px',
+              height: '38px',
+              lineHeight: 1,
+              borderRadius: '8px',
+              cursor: 'pointer',
+            }}
+          >
+            <RotateCw size={14} style={{ display: 'block', flexShrink: 0 }} />
+            <span style={{ lineHeight: 1 }}>Refresh</span>
+          </button>
+
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={() => setIsFilterExpanded(!isFilterExpanded)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              fontSize: '13.5px',
+              padding: '0 14px',
+              height: '38px',
+              lineHeight: 1,
+              borderRadius: '8px',
+              background: isFilterExpanded ? '#eff6ff' : '#ffffff',
+              borderColor: isFilterExpanded ? '#2563eb' : '#e2e8f0',
+              color: isFilterExpanded ? '#2563eb' : '#0f172a',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <Filter size={14} style={{ display: 'block', flexShrink: 0 }} color={isFilterExpanded ? '#2563eb' : '#475569'} />
+            <span style={{ lineHeight: 1 }}>Filter</span>
+            {activeFilterCount > 0 && (
+              <span
+                style={{
+                  background: '#2563eb',
+                  color: '#ffffff',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  padding: '2px 6px',
+                  borderRadius: '10px',
+                  lineHeight: 1,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginLeft: '2px',
+                }}
+              >
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Filter Bar */}
       <div
+        className={`top-problems-filter-bar ${isFilterExpanded ? 'expanded' : 'collapsed'}`}
         style={{
           background: '#ffffff',
           border: '1px solid #e2e8f0',
@@ -137,9 +240,6 @@ export const TopProblemsDashboard: React.FC = () => {
           padding: '18px 20px',
           marginBottom: '28px',
           boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '14px',
           alignItems: 'center',
         }}
       >
@@ -229,24 +329,54 @@ export const TopProblemsDashboard: React.FC = () => {
                   transition: 'transform 0.2s, box-shadow 0.2s',
                 }}
               >
-                {/* Ranking Rank */}
-                <div
-                  style={{
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '10px',
-                    background: index < 3 ? '#fef3c7' : '#f1f5f9',
-                    color: index < 3 ? '#b45309' : '#64748b',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 800,
-                    fontSize: '17px',
-                    flexShrink: 0,
-                  }}
-                >
-                  {index < 3 ? <Award size={20} /> : `#${index + 1}`}
-                </div>
+                {/* Ranking Rank (#1, #2, #3...) */}
+                {(() => {
+                  let badgeBg = '#f1f5f9';
+                  let badgeColor = '#475569';
+                  let badgeBorder = '1px solid #e2e8f0';
+                  let badgeShadow = 'none';
+
+                  if (index === 0) {
+                    badgeBg = 'linear-gradient(135deg, #fef08a 0%, #facc15 100%)';
+                    badgeColor = '#78350f';
+                    badgeBorder = '1px solid #eab308';
+                    badgeShadow = '0 2px 6px rgba(234, 179, 8, 0.3)';
+                  } else if (index === 1) {
+                    badgeBg = 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)';
+                    badgeColor = '#334155';
+                    badgeBorder = '1px solid #cbd5e1';
+                    badgeShadow = '0 2px 6px rgba(100, 116, 139, 0.2)';
+                  } else if (index === 2) {
+                    badgeBg = 'linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%)';
+                    badgeColor = '#9a3412';
+                    badgeBorder = '1px solid #fdba74';
+                    badgeShadow = '0 2px 6px rgba(249, 115, 22, 0.25)';
+                  }
+
+                  return (
+                    <div
+                      style={{
+                        width: '42px',
+                        height: '42px',
+                        borderRadius: '12px',
+                        background: badgeBg,
+                        color: badgeColor,
+                        border: badgeBorder,
+                        boxShadow: badgeShadow,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 900,
+                        fontSize: '16px',
+                        flexShrink: 0,
+                        letterSpacing: '-0.5px',
+                      }}
+                      title={`Rank #${index + 1}`}
+                    >
+                      #{index + 1}
+                    </div>
+                  );
+                })()}
 
                 {/* Content */}
                 <div style={{ flex: 1 }}>
@@ -275,11 +405,114 @@ export const TopProblemsDashboard: React.FC = () => {
                       </span>
                     )}
 
+                    {/* Highlighted Status Badge */}
+                    {(() => {
+                      const st = (challenge.status || 'SUBMITTED').toLowerCase();
+                      const isCompleted = st === 'completed' || st === 'validated' || st === 'resolved';
+                      const isInProgress = ['in_progress', 'team_formed', 'under_action', 'routed'].includes(st);
+                      const isUnderReview = st === 'under_review';
 
+                      if (isCompleted) {
+                        return (
+                          <span
+                            style={{
+                              marginLeft: 'auto',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '4px 12px',
+                              borderRadius: '20px',
+                              fontSize: '11.5px',
+                              fontWeight: 800,
+                              background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
+                              color: '#065f46',
+                              border: '1px solid #6ee7b7',
+                              boxShadow: '0 2px 5px rgba(16, 185, 129, 0.2)',
+                              letterSpacing: '0.6px',
+                              textTransform: 'uppercase',
+                            }}
+                          >
+                            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 4px #10b981' }} />
+                            COMPLETED
+                          </span>
+                        );
+                      }
 
-                    <span className="status" style={{ marginLeft: 'auto' }}>
-                      {(challenge.status || 'SUBMITTED').replace('_', ' ').toUpperCase()}
-                    </span>
+                      if (isInProgress) {
+                        return (
+                          <span
+                            style={{
+                              marginLeft: 'auto',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '4px 12px',
+                              borderRadius: '20px',
+                              fontSize: '11.5px',
+                              fontWeight: 800,
+                              background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+                              color: '#1d4ed8',
+                              border: '1px solid #93c5fd',
+                              boxShadow: '0 2px 5px rgba(37, 99, 235, 0.15)',
+                              letterSpacing: '0.6px',
+                              textTransform: 'uppercase',
+                            }}
+                          >
+                            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#2563eb', boxShadow: '0 0 4px #2563eb' }} />
+                            {st === 'in_progress' ? 'IN PROGRESS' : st.replace('_', ' ').toUpperCase()}
+                          </span>
+                        );
+                      }
+
+                      if (isUnderReview) {
+                        return (
+                          <span
+                            style={{
+                              marginLeft: 'auto',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '4px 12px',
+                              borderRadius: '20px',
+                              fontSize: '11.5px',
+                              fontWeight: 800,
+                              background: 'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)',
+                              color: '#854d0e',
+                              border: '1px solid #fde047',
+                              boxShadow: '0 2px 5px rgba(202, 138, 4, 0.15)',
+                              letterSpacing: '0.6px',
+                              textTransform: 'uppercase',
+                            }}
+                          >
+                            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#eab308' }} />
+                            UNDER REVIEW
+                          </span>
+                        );
+                      }
+
+                      return (
+                        <span
+                          style={{
+                            marginLeft: 'auto',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '4px 12px',
+                            borderRadius: '20px',
+                            fontSize: '11.5px',
+                            fontWeight: 700,
+                            background: '#f8fafc',
+                            color: '#475569',
+                            border: '1px solid #cbd5e1',
+                            letterSpacing: '0.5px',
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#94a3b8' }} />
+                          SUBMITTED
+                        </span>
+                      );
+                    })()}
                   </div>
 
                   {/* Side-by-side row: Description on left, smaller photo on right */}
@@ -371,14 +604,19 @@ export const TopProblemsDashboard: React.FC = () => {
 
                   {/* Actions */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px', borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
-                    <button
-                      className="interaction-btn"
-                      onClick={() => handleSupport(challenge.id)}
-                      style={{ color: '#ef4444' }}
-                    >
-
-                      <span>Support ({supports})</span>
-                    </button>
+                    {(() => {
+                      const isSupported = !!supportedMap[challenge.id];
+                      return (
+                        <button
+                          type="button"
+                          className={`interaction-btn ${isSupported ? 'support-btn active' : ''}`}
+                          onClick={() => handleSupport(challenge.id)}
+                        >
+                          <ThumbsUp size={15} fill={isSupported ? 'currentColor' : 'none'} />
+                          <span>{isSupported ? 'Supported' : 'Support'} ({supports})</span>
+                        </button>
+                      );
+                    })()}
                     <span style={{ fontSize: '12.5px', color: '#94a3b8' }}>
                       Submitted {new Date(challenge.created_at).toLocaleDateString()}
                     </span>

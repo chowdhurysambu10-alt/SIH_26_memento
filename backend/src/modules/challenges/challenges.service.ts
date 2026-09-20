@@ -77,8 +77,8 @@ export class ChallengesService implements OnModuleInit {
       throw new ForbiddenException('The platform is currently in maintenance mode. New submissions are disabled temporarily.');
     }
 
-    if (settings.enforceGeolocation && (!dto.latitude || !dto.longitude)) {
-      throw new BadRequestException('Geolocation is strictly enforced. Please provide latitude and longitude coordinates.');
+    if (settings.enforceGeolocation && (!dto.latitude || !dto.longitude) && !dto.location_text) {
+      throw new BadRequestException('Geolocation is strictly enforced. Please provide latitude and longitude coordinates, or a valid location link.');
     }
 
     // 1. Process uploaded file(s)

@@ -298,7 +298,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess, onBack }) => {
               </div>
 
               {/* Toggle */}
-              {!isForgotPassword && (
+              {!isForgotPassword && activeRole.id !== 'admin' && (
                 <div style={styles.toggleContainer}>
                   <button
                     type="button"

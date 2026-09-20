@@ -3,6 +3,7 @@ import { ClassificationService } from './classification.service';
 import { GemmaApiProvider } from './providers/gemma-api.provider';
 
 @Module({
+  controllers: [],
   providers: [ClassificationService, GemmaApiProvider],
   exports: [ClassificationService],
 })
