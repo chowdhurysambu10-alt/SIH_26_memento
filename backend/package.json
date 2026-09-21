@@ -27,6 +27,7 @@
     "@supabase/supabase-js": "^2.48.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
+    "heic-convert": "^2.1.0",
     "nodemailer": "^10.0.9",
     "quickemailverification": "^1.0.4",
     "reflect-metadata": "^0.2.2",

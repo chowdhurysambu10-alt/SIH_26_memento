@@ -20,18 +20,42 @@ import exifr from 'exifr';
 import { WEST_BENGAL_DISTRICTS, JHARKHAND_DISTRICTS } from '../constants/districts';
 
 const validateImageSecurity = async (file: File): Promise<{ valid: boolean; error?: string }> => {
-  if (!file.type.startsWith('image/')) return { valid: true };
+  const isHeic =
+    file.name.toLowerCase().endsWith('.heic') ||
+    file.name.toLowerCase().endsWith('.heif') ||
+    file.type === 'image/heic' ||
+    file.type === 'image/heif';
+
+  // If non-image and not HEIC, bypass browser EXIF checks
+  if (!file.type.startsWith('image/') && !isHeic) return { valid: true };
 
   try {
-    const exifData = await exifr.parse(file, ['Make', 'Model', 'FNumber', 'ExposureTime', 'ISO', 'Software']);
+    const exifData = await exifr
+      .parse(file, ['Make', 'Model', 'FNumber', 'ExposureTime', 'ISO', 'Software'])
+      .catch(() => null);
 
-    if (exifData?.Software && (exifData.Software.toLowerCase().includes('midjourney') || exifData.Software.toLowerCase().includes('dall-e') || exifData.Software.toLowerCase().includes('stable diffusion'))) {
-       return { valid: false, error: 'AI generation software signature detected in image metadata.' };
+    if (
+      exifData?.Software &&
+      (exifData.Software.toLowerCase().includes('midjourney') ||
+        exifData.Software.toLowerCase().includes('dall-e') ||
+        exifData.Software.toLowerCase().includes('stable diffusion'))
+    ) {
+      return { valid: false, error: 'AI generation software signature detected in image metadata.' };
     }
 
-    const hasHardwareMetrics = exifData && (exifData.FNumber || exifData.ExposureTime || exifData.ISO);
+    // HEIC mobile photos are normalized and validated by backend AI forensic engine
+    if (isHeic) {
+      return { valid: true };
+    }
+
+    const hasHardwareMetrics =
+      exifData && (exifData.FNumber || exifData.ExposureTime || exifData.ISO);
 
     if (!hasHardwareMetrics) {
+      // If camera Make or Model exists, accept as legitimate camera photo
+      if (exifData?.Make || exifData?.Model) {
+        return { valid: true };
+      }
       return {
         valid: false,
         error: 'PRIVATE_SHARE_ERROR',
@@ -40,6 +64,7 @@ const validateImageSecurity = async (file: File): Promise<{ valid: boolean; erro
 
     return { valid: true };
   } catch (err) {
+    if (isHeic) return { valid: true };
     console.error('EXIF validation error:', err);
     return {
       valid: false,
@@ -433,11 +458,23 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                         />
                       ) : (
-                        <img
-                          src={preview.url}
-                          alt={preview.file.name}
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
+                        <div style={{ width: '100%', height: '100%', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9' }}>
+                          <img
+                            src={preview.url}
+                            alt={preview.file.name}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', top: 0, left: 0 }}
+                            onError={(e) => {
+                              // If browser cannot render HEIC natively, hide broken image icon
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                          {(preview.file.name.toLowerCase().endsWith('.heic') || preview.file.name.toLowerCase().endsWith('.heif')) && (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', zIndex: 0, padding: '8px', textAlign: 'center' }}>
+                              <Camera size={24} color="#2563eb" />
+                              <span style={{ fontSize: '11px', fontWeight: 600, color: '#1e40af', background: '#dbeafe', padding: '2px 6px', borderRadius: '4px' }}>HEIC Photo</span>
+                            </div>
+                          )}
+                        </div>
                       )}
                       {/* AI Check status badge */}
                       <button
@@ -573,7 +610,7 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
               <input
                 type="file"
                 ref={fileInputRef}
-                accept="image/*,video/*"
+                accept="image/*,video/*,.heic,.heif,.HEIC,.HEIF,image/heic,image/heif"
                 multiple
                 style={{ display: 'none' }}
                 onChange={async (e) => {
@@ -605,7 +642,7 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
               <input
                 type="file"
                 ref={fileInputCameraRef}
-                accept="image/*,video/*"
+                accept="image/*,video/*,.heic,.heif,.HEIC,.HEIF,image/heic,image/heif"
                 capture="environment"
                 style={{ display: 'none' }}
                 onChange={async (e) => {

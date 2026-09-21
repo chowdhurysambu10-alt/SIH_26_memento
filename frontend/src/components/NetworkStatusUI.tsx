@@ -8,15 +8,22 @@ export const NetworkStatusUI: React.FC = () => {
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
   useEffect(() => {
-    const handleStart = () => setActiveRequests(prev => prev + 1);
-    const handleEnd = () => setActiveRequests(prev => Math.max(0, prev - 1));
+    let timerId: ReturnType<typeof setTimeout> | null = null;
+    const handleStart = () => {
+      setTimeout(() => setActiveRequests(prev => prev + 1), 0);
+    };
+    const handleEnd = () => {
+      setTimeout(() => setActiveRequests(prev => Math.max(0, prev - 1)), 0);
+    };
     const handleError = (e: any) => {
-      setErrorMsg(e.detail?.message || 'An unexpected error occurred');
-      
-      // Auto-dismiss API errors after 5 seconds if we are online
-      if (navigator.onLine) {
-        setTimeout(() => setErrorMsg(null), 5000);
-      }
+      const msg = e.detail?.message || 'An unexpected error occurred';
+      setTimeout(() => {
+        setErrorMsg(msg);
+        if (navigator.onLine) {
+          if (timerId) clearTimeout(timerId);
+          timerId = setTimeout(() => setErrorMsg(null), 5000);
+        }
+      }, 0);
     };
 
     const handleOffline = () => setIsOffline(true);

@@ -12,6 +12,8 @@ import { ImageValidationService } from '../ai/image-validation.service';
 import { SettingsService } from '../settings/settings.service';
 import { CreateChallengeDto } from './dto/create-challenge.dto';
 import { CompressionUtil } from '../../utils/compression.util';
+import { MediaTypeUtil } from '../../utils/media-type.util';
+import { HeicConverterUtil } from '../../utils/heic-converter.util';
 import * as xlsx from 'xlsx';
 import { FilterChallengeDto } from './dto/filter-challenge.dto';
 import { OverrideRoutingDto } from './dto/override-routing.dto';
@@ -91,7 +93,26 @@ export class ChallengesService implements OnModuleInit {
       }
       let uploadBuffer = file.buffer;
       let originalName = file.originalname;
-      let mimeType = file.mimetype;
+      let mimeType = MediaTypeUtil.resolveEffectiveMimeType(
+        file.buffer,
+        file.mimetype,
+        file.originalname,
+      );
+
+      // Normalize HEIC/HEIF files to standard JPEG for AI analysis and browser viewing
+      if (MediaTypeUtil.isHeic(uploadBuffer, originalName, mimeType)) {
+        try {
+          this.logger.log(`Normalizing HEIC/HEIF photo "${originalName}" to standard JPEG...`);
+          uploadBuffer = await HeicConverterUtil.convertHeicToJpeg(uploadBuffer);
+          mimeType = 'image/jpeg';
+          originalName = originalName.replace(/\.(heic|heif)$/i, '.jpg');
+        } catch (heicErr: any) {
+          this.logger.error(`HEIC conversion failed for "${file.originalname}": ${heicErr.message}`);
+          throw new BadRequestException(
+            `Unable to process HEIC image: ${heicErr.message || 'File corrupted or unsupported.'}`,
+          );
+        }
+      }
 
       // Validate image authenticity using Gemini API (detects screenshots and AI-generated imagery)
       if (mimeType && mimeType.startsWith('image/')) {
@@ -115,7 +136,7 @@ export class ChallengesService implements OnModuleInit {
       try {
         if (mimeType.startsWith('image/')) {
           const sharp = require('sharp');
-          uploadBuffer = await sharp(file.buffer)
+          uploadBuffer = await sharp(uploadBuffer)
             .resize({ width: 1920, withoutEnlargement: true })
             .webp({ quality: 80 })
             .toBuffer();
@@ -1334,13 +1355,33 @@ export class ChallengesService implements OnModuleInit {
    * Throws BadRequestException if invalid, or returns the validation result.
    */
   async validateUploadedImage(file: Express.Multer.File) {
-    if (!file) {
+    if (!file || !file.buffer) {
       throw new BadRequestException('No image file provided for validation.');
     }
-    const validation = await this.imageValidationService.validateImage(
+    let uploadBuffer = file.buffer;
+    let originalName = file.originalname;
+    let mimeType = MediaTypeUtil.resolveEffectiveMimeType(
       file.buffer,
       file.mimetype,
       file.originalname,
+    );
+
+    if (MediaTypeUtil.isHeic(uploadBuffer, originalName, mimeType)) {
+      try {
+        uploadBuffer = await HeicConverterUtil.convertHeicToJpeg(uploadBuffer);
+        mimeType = 'image/jpeg';
+        originalName = originalName.replace(/\.(heic|heif)$/i, '.jpg');
+      } catch (heicErr: any) {
+        throw new BadRequestException(
+          `Unable to process HEIC image: ${heicErr.message || 'File corrupted or unsupported.'}`,
+        );
+      }
+    }
+
+    const validation = await this.imageValidationService.validateImage(
+      uploadBuffer,
+      mimeType,
+      originalName,
     );
 
     if (!validation.isValid) {

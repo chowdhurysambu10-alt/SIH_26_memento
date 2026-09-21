@@ -12,6 +12,9 @@ import { ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public } from '../../common/decorators/public.decorator';
 import { ConfigService } from '@nestjs/config';
 
+import { MediaTypeUtil } from '../../utils/media-type.util';
+import { HeicConverterUtil } from '../../utils/heic-converter.util';
+
 @ApiTags('Image Verification')
 @Controller('image-check')
 export class ImageCheckController {
@@ -29,8 +32,16 @@ export class ImageCheckController {
     FileInterceptor('file', {
       limits: { fileSize: 10 * 1024 * 1024 },
       fileFilter: (req, file, cb) => {
-        if (!file.mimetype.startsWith('image/')) {
-          return cb(new HttpException('Only image files are allowed', HttpStatus.BAD_REQUEST), false);
+        const isImageMime = file.mimetype && file.mimetype.startsWith('image/');
+        const isImageExt = Boolean(
+          file.originalname &&
+            file.originalname.match(/\.(jpe?g|png|webp|heic|heif)$/i),
+        );
+        if (!isImageMime && !isImageExt) {
+          return cb(
+            new HttpException('Only image files are allowed', HttpStatus.BAD_REQUEST),
+            false,
+          );
         }
         cb(null, true);
       },
@@ -54,8 +65,23 @@ export class ImageCheckController {
     }
 
     try {
-      const base64Image = file.buffer.toString('base64');
-      const mimeType = file.mimetype;
+      let imageBuffer = file.buffer;
+      let mimeType = MediaTypeUtil.resolveEffectiveMimeType(
+        file.buffer,
+        file.mimetype,
+        file.originalname,
+      );
+
+      if (MediaTypeUtil.isHeic(imageBuffer, file.originalname, mimeType)) {
+        try {
+          imageBuffer = await HeicConverterUtil.convertHeicToJpeg(imageBuffer);
+          mimeType = 'image/jpeg';
+        } catch (convErr: any) {
+          this.logger.warn(`HEIC conversion error in image-check: ${convErr.message}`);
+        }
+      }
+
+      const base64Image = imageBuffer.toString('base64');
 
       const prompt = `You are an AI image forensics expert. Analyze this image and determine if it was AI-generated (Midjourney, DALL-E, Stable Diffusion, Firefly, etc.) or a real photograph.
 

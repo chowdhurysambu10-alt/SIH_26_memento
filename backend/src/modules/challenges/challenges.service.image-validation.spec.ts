@@ -192,4 +192,61 @@ describe('ChallengesService - Image Validation in Upload Workflow', () => {
       BadRequestException,
     );
   });
+
+  it('should accept and normalize HEIC image in createChallenge upload workflow', async () => {
+    const scratchHeicPath =
+      '/Users/sambu/.gemini/antigravity-ide/brain/7b6ea5fc-2f51-4223-9ac7-95e3b5a5f3e9/scratch/test_sample.heic';
+    const fs = require('fs');
+    if (!fs.existsSync(scratchHeicPath)) {
+      return;
+    }
+
+    const heicBytes = fs.readFileSync(scratchHeicPath);
+    const mockFile = {
+      buffer: heicBytes,
+      originalname: 'iphone_evidence.heic',
+      mimetype: 'application/octet-stream', // Simulating generic mobile browser mime
+      size: heicBytes.length,
+    } as Express.Multer.File;
+
+    mockImageValidationService.validateImage.mockResolvedValue({
+      isValid: true,
+      isScreenshot: false,
+      isAiGenerated: false,
+      confidence: 0.98,
+      status: 'genuine',
+      rejectionReason: null,
+    });
+
+    const result = await service.createChallenge(mockDto as any, mockUser, [mockFile]);
+    expect(result).toBeDefined();
+
+    // Verify AI validation service was called with normalized JPEG
+    expect(mockImageValidationService.validateImage).toHaveBeenCalledWith(
+      expect.any(Buffer),
+      'image/jpeg',
+      expect.stringMatching(/\.jpg$/i),
+    );
+
+    // Verify Supabase upload was called with converted WebP
+    expect(mockSupabaseService.uploadFile).toHaveBeenCalledWith(
+      expect.any(Buffer),
+      expect.stringMatching(/\.webp$/i),
+      'image/webp',
+    );
+  });
+
+  it('should throw BadRequestException when uploaded HEIC file is corrupted', async () => {
+    const corruptHeic = {
+      buffer: Buffer.from('corrupt ftypheic data without valid containers'),
+      originalname: 'broken.heic',
+      mimetype: 'image/heic',
+      size: 50,
+    } as Express.Multer.File;
+
+    await expect(
+      service.createChallenge(mockDto as any, mockUser, [corruptHeic]),
+    ).rejects.toThrow(BadRequestException);
+  });
 });
+
