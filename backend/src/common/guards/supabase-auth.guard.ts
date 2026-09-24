@@ -22,14 +22,17 @@ export class SupabaseAuthGuard implements CanActivate {
       context.getClass(),
     ]);
 
-    if (isPublic) {
-      return true;
-    }
+
 
     const request = context.switchToHttp().getRequest();
     const authHeader = request.headers['authorization'];
 
+    // If no token is provided:
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      // Allow if public
+      if (isPublic) {
+        return true;
+      }
       throw new UnauthorizedException({
         statusCode: 401,
         message: 'Missing or invalid Authorization header',
@@ -44,6 +47,20 @@ export class SupabaseAuthGuard implements CanActivate {
         await this.supabaseService.getAdminClient().auth.getUser(token);
 
       if (authError || !authData?.user) {
+        // If it's a network error or rate limit, don't force a hard logout
+        if (authError && authError.status && authError.status !== 401) {
+           throw new UnauthorizedException({
+             statusCode: 401,
+             message: 'Failed to verify token due to upstream error',
+             errorCode: 'UPSTREAM_ERROR',
+           });
+        }
+        
+        if (isPublic) {
+          // If public and token is invalid, just proceed without user
+          return true;
+        }
+
         throw new UnauthorizedException({
           statusCode: 401,
           message: 'Invalid or expired session token',

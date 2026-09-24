@@ -1893,7 +1893,13 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
 
   // 6. COLLABORATION VIEW
   if (activeView === 'collaboration') {
-    const otherInstitutions = institutions.filter(inst => inst.id !== activeOrgId && inst.id !== user?.id && inst.id !== currentInstitution?.id);
+    const otherInstitutions = institutions.filter(inst => 
+      inst.id !== activeOrgId && 
+      inst.id !== user?.id && 
+      inst.id !== currentInstitution?.id &&
+      inst.name !== currentInstitution?.name &&
+      inst.name !== user?.name
+    );
     
     // Determine inbound engagements
     const myChallenges = challenges.filter(c => c.org_id === activeOrgId || c.institutions?.id === activeOrgId || (Array.isArray(c.institutions) && c.institutions.some((i:any) => i.id === activeOrgId)));
