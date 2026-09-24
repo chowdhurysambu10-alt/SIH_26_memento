@@ -51,7 +51,7 @@ export const authApi = {
     return apiClient<AuthUser>('/users/me');
   },
 
-  updateProfile: (updates: { name?: string; email?: string }): Promise<AuthUser> => {
+  updateProfile: (updates: { name?: string; email?: string; contact?: string; district?: string }): Promise<AuthUser> => {
     return apiClient<AuthUser>('/users/me', {
       method: 'PATCH',
       body: JSON.stringify(updates),

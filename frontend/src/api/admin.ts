@@ -9,6 +9,25 @@ export const adminApi = {
     return apiClient<any[]>(`/users${qs.toString() ? `?${qs.toString()}` : ''}`);
   },
 
+  // --- Student Verification ---
+  submitStudentVerification: async (institution_name: string, student_id_card_url: string): Promise<any> => {
+    return apiClient<any>('/users/verify', {
+      method: 'POST',
+      body: JSON.stringify({ institution_name, student_id_card_url })
+    });
+  },
+
+  getPendingStudentVerifications: async (): Promise<any[]> => {
+    return apiClient<any[]>('/users/verify/pending', { suppressGlobalError: true } as any);
+  },
+
+  updateStudentVerificationStatus: async (id: string, status: 'approved' | 'rejected'): Promise<any> => {
+    return apiClient<any>(`/users/verify/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status })
+    });
+  },
+
   getAllChallenges: async (): Promise<any[]> => {
     const res = await apiClient<any>('/challenges?limit=100');
     return Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : []);
@@ -30,7 +49,32 @@ export const adminApi = {
   getVerificationRequests: async (): Promise<any[]> => {
     try {
       const users = await adminApi.getAllUsers();
-      return (users || []).filter((u: any) => !u.verified);
+      const unverifiedUsers = (users || []).filter((u: any) => !u.verified);
+      
+      let studentVerifs: any[] = [];
+      try {
+        studentVerifs = await adminApi.getPendingStudentVerifications();
+      } catch (e) {
+        console.warn('Could not fetch student verifications', e);
+      }
+      
+      const mappedStudentVerifs = studentVerifs.map(sv => ({
+        id: sv.id,
+        name: sv.user?.name || 'Unknown Student',
+        role: 'student',
+        email: sv.user?.email || '',
+        is_student_verification: true,
+        verification_data: {
+          institution: sv.institution_name,
+          student_id_card_url: sv.student_id_card_url,
+          submitted_at: sv.submitted_at
+        }
+      }));
+
+      // Only show users who are not students in the unverifiedUsers list (since students use the new table)
+      const otherUnverified = unverifiedUsers.filter(u => u.role !== 'student');
+      
+      return [...mappedStudentVerifs, ...otherUnverified];
     } catch {
       return [];
     }

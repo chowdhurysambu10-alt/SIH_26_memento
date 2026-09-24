@@ -59,7 +59,7 @@ export class CollaborationController {
   }
 
   @Post('engagements')
-  @Roles(UserRole.INDUSTRY_PARTNER, UserRole.SUPER_ADMIN)
+  @Roles(UserRole.INDUSTRY_PARTNER, UserRole.UNIVERSITY_ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Submit an industry partnership/funding engagement request' })
   async createEngagement(
     @Body() dto: CreateEngagementDto,

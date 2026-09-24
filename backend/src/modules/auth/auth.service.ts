@@ -10,6 +10,7 @@ import { SignupDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
 import { SettingsService } from '../settings/settings.service';
 import { Inject, forwardRef } from '@nestjs/common';
+import { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 
 interface VerifiedRecoverySession {
   userId: string;
@@ -89,7 +90,7 @@ export class AuthService {
     try {
       let finalOrgId = dto.org_id || null;
 
-      // Auto-create an institution for university_admin if not provided
+      // Auto-create an institution for university_admin if not provided, OR link via domain matching
       if (dto.role === 'university_admin' && !finalOrgId) {
         const { data: newInst, error: instError } = await admin.from('institutions').insert({
           id: userId, // Use user id as institution id for 1-to-1 mapping
@@ -375,5 +376,102 @@ export class AuthService {
       success: true,
       message: 'Your password has been reset successfully. You can now log in.',
     };
+  }
+
+  async createSubInstance(name: string, user: AuthenticatedUser) {
+    if (user.role !== 'university_admin') {
+      throw new UnauthorizedException('Only institution admins can create sub-instances.');
+    }
+    const admin = this.supabaseService.getAdminClient();
+    
+    const emailParts = user.email.split('@');
+    if (emailParts.length !== 2) throw new BadRequestException('Invalid user email');
+    
+    const safeName = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const uniqueSuffix = Math.floor(Math.random() * 1000).toString();
+    const aliasEmail = `${emailParts[0]}+${safeName}${uniqueSuffix}@${emailParts[1]}`;
+    
+    const newPassword = Math.random().toString(36).slice(-8) + 'Aa1!';
+    
+    const { data: authData, error: authError } = await admin.auth.admin.createUser({
+      email: aliasEmail,
+      password: newPassword,
+      email_confirm: true,
+      user_metadata: {
+        name: name,
+        role: 'university_admin',
+        org_id: user.org_id,
+      },
+    });
+
+    if (authError) {
+      throw new BadRequestException(authError.message);
+    }
+
+    const { error: profileError } = await admin.from('users').insert({
+      id: authData.user.id,
+      name: name,
+      email: aliasEmail,
+      role: 'university_admin',
+      org_id: user.org_id,
+      verified: true,
+    });
+
+    if (profileError) {
+      this.logger.warn(`Failed to create sub-instance profile: ${profileError.message}`);
+    }
+
+    return {
+      email: aliasEmail,
+      password: newPassword,
+      name,
+    };
+  }
+
+  async getSubInstances(user: AuthenticatedUser) {
+    if (user.role !== 'university_admin' || !user.org_id) {
+      return [];
+    }
+    const admin = this.supabaseService.getAdminClient();
+    const { data, error } = await admin
+      .from('users')
+      .select('id, name, email, created_at')
+      .eq('org_id', user.org_id)
+      .eq('role', 'university_admin')
+      .neq('id', user.id); // Exclude the caller themselves
+      
+    if (error) {
+      throw new BadRequestException('Failed to fetch sub-instances');
+    }
+    return data || [];
+  }
+
+  async deleteSubInstance(id: string, user: AuthenticatedUser) {
+    if (user.role !== 'university_admin' || !user.org_id) {
+      throw new UnauthorizedException('Not authorized to delete sub-instances.');
+    }
+    const admin = this.supabaseService.getAdminClient();
+    
+    // Ensure the instance belongs to the same org
+    const { data: targetUser } = await admin
+      .from('users')
+      .select('org_id')
+      .eq('id', id)
+      .single();
+      
+    if (!targetUser || targetUser.org_id !== user.org_id) {
+      throw new UnauthorizedException('Cannot delete this instance.');
+    }
+
+    // Delete from public.users table
+    await admin.from('users').delete().eq('id', id);
+    
+    // Delete from Supabase Auth
+    const { error: authError } = await admin.auth.admin.deleteUser(id);
+    if (authError) {
+      this.logger.warn(`Failed to delete sub-instance from auth: ${authError.message}`);
+    }
+    
+    return { success: true, message: 'Instance removed successfully' };
   }
 }

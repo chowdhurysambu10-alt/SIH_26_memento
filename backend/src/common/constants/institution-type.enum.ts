@@ -9,6 +9,10 @@ export enum IndustryEngagementType {
   MENTORSHIP = 'mentorship',
   TECHNOLOGY = 'technology',
   INTERNSHIPS = 'internships',
+  RESEARCH = 'research',
+  TRAINING = 'training',
+  RESOURCES = 'resources',
+  OTHER = 'other',
 }
 
 export enum EngagementStatus {

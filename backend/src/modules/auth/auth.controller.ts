@@ -1,10 +1,12 @@
-import { Body, Controller, Post, HttpCode, HttpStatus } from '@nestjs/common';
+import { Body, Controller, Post, Get, Delete, Param, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { SignupDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
 import { Public } from '../../common/decorators/public.decorator';
-
+import { UseGuards } from '@nestjs/common';
+import { SupabaseAuthGuard } from '../../common/guards/supabase-auth.guard';
+import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
@@ -49,5 +51,26 @@ export class AuthController {
   @ApiOperation({ summary: 'Verify OTP and reset password' })
   async resetPassword(@Body() dto: { email: string; newPassword?: string }) {
     return this.authService.resetPassword(dto.email, dto.newPassword);
+  }
+
+  @Post('create-sub-instance')
+  @UseGuards(SupabaseAuthGuard)
+  @ApiOperation({ summary: 'Create a sub-instance for an institution with same base email' })
+  async createSubInstance(@Body() dto: { name: string }, @CurrentUser() user: AuthenticatedUser) {
+    return this.authService.createSubInstance(dto.name, user);
+  }
+
+  @Get('sub-instances')
+  @UseGuards(SupabaseAuthGuard)
+  @ApiOperation({ summary: 'Get all sub-instances created by this institution' })
+  async getSubInstances(@CurrentUser() user: AuthenticatedUser) {
+    return this.authService.getSubInstances(user);
+  }
+
+  @Delete('sub-instances/:id')
+  @UseGuards(SupabaseAuthGuard)
+  @ApiOperation({ summary: 'Delete a sub-instance' })
+  async deleteSubInstance(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.authService.deleteSubInstance(id, user);
   }
 }

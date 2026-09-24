@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import exifr from 'exifr';
 
-import { WEST_BENGAL_DISTRICTS, JHARKHAND_DISTRICTS } from '../constants/districts';
+import { JHARKHAND_DISTRICTS } from '../constants/districts';
 
 const validateImageSecurity = async (file: File): Promise<{ valid: boolean; error?: string }> => {
   const isHeic =
@@ -184,7 +184,7 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
 
   // Submission Form State
   const [title, setTitle] = useState('');
-  const [district, setDistrict] = useState('Kolkata');
+  const [district, setDistrict] = useState('Ranchi');
   const [category, setCategory] = useState('Let AI Automatically Classify');
   const [description, setDescription] = useState('');
   const [files, setFiles] = useState<File[]>([]);
@@ -356,11 +356,6 @@ export const ProblemEntryDashboard: React.FC<{ onNavigateLogin: () => void }> = 
               <div>
                 <label className="form-label">District *</label>
                 <select className="input-field" value={district} onChange={(e) => setDistrict(e.target.value)}>
-                  <optgroup label="West Bengal">
-                    {WEST_BENGAL_DISTRICTS.map((d) => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </optgroup>
                   <optgroup label="Jharkhand">
                     {JHARKHAND_DISTRICTS.map((d) => (
                       <option key={d} value={d}>{d}</option>

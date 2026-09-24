@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Post,
   Patch,
   Delete,
   Body,
@@ -79,5 +80,35 @@ export class UsersController {
   @ApiOperation({ summary: 'Delete a user account (Super Admin only)' })
   async deleteUser(@Param('id') id: string) {
     return this.usersService.deleteUser(id);
+  }
+
+  // --- Student Verifications ---
+
+  @Post('verify')
+  @Roles(UserRole.STUDENT)
+  @ApiOperation({ summary: 'Submit student verification documents' })
+  async submitVerification(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: { institution_name: string; student_id_card_url: string }
+  ) {
+    return this.usersService.submitStudentVerification(user, dto.institution_name, dto.student_id_card_url);
+  }
+
+  @Get('verify/pending')
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Get all pending student verifications' })
+  async getPendingVerifications(@CurrentUser() user: AuthenticatedUser) {
+    return this.usersService.getPendingStudentVerifications(user);
+  }
+
+  @Patch('verify/:id/status')
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Approve or reject a student verification' })
+  async updateVerificationStatus(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: { status: 'approved' | 'rejected' }
+  ) {
+    return this.usersService.updateStudentVerificationStatus(user, id, dto.status);
   }
 }

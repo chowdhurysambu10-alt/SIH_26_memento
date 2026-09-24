@@ -87,14 +87,17 @@ export class ChallengesController {
     return this.challengesService.getTopFeaturedProblem();
   }
 
-  @Get(':id')
-  @Public()
-  @ApiOperation({ summary: 'Get details of a single challenge by ID' })
-  async getChallengeById(
+  @Post(':id/manual-team-member')
+  @Roles(UserRole.UNIVERSITY_ADMIN)
+  @ApiOperation({
+    summary: 'Manually add an offline student to a team (Institution only)',
+  })
+  async addManualTeamMember(
     @Param('id') id: string,
+    @Body() dto: any, // { name, email, contact, role }
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.challengesService.getChallengeById(id, user);
+    return this.challengesService.addManualTeamMember(id, dto, user);
   }
 
   @Post(':id/override-routing')
@@ -137,6 +140,93 @@ export class ChallengesController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.challengesService.updateStatus(id, dto, user);
+  }
+
+  @Patch(':id/vacancy')
+  @Roles(UserRole.UNIVERSITY_ADMIN, UserRole.FACULTY)
+  @ApiOperation({
+    summary: 'Release or close vacancies for students to apply to this assigned problem',
+  })
+  async releaseVacancy(
+    @Param('id') id: string,
+    @Body() dto: { vacancies_released: boolean },
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.challengesService.releaseVacancy(id, dto.vacancies_released, user);
+  }
+
+  // --- STUDENT APPLICATIONS ENDPOINTS ---
+
+  @Get('my-applications')
+  @Roles(UserRole.STUDENT)
+  @ApiOperation({
+    summary: 'Get all applications submitted by the current student',
+  })
+  async getMyApplications(@CurrentUser() user: AuthenticatedUser) {
+    return this.challengesService.getStudentApplications(user.id);
+  }
+
+  @Get('institution/applications')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.UNIVERSITY_ADMIN, UserRole.FACULTY)
+  @ApiOperation({
+    summary: 'Get all student applications for challenges assigned to an institution',
+  })
+  async getInstitutionApplications(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('institutionId') institutionId?: string,
+  ) {
+    return this.challengesService.getInstitutionApplications(user, institutionId);
+  }
+
+  @Patch('applications/:id/status')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.UNIVERSITY_ADMIN, UserRole.FACULTY)
+  @ApiOperation({
+    summary: 'Update student application status (approved, rejected, pending)',
+  })
+  async updateApplicationStatus(
+    @Param('id') id: string,
+    @Body() dto: { status: 'approved' | 'rejected' | 'pending' | 'waitlisted'; appRole?: string },
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.challengesService.updateApplicationStatus(id, dto.status, user, dto.appRole);
+  }
+
+  @Post(':id/apply')
+  @Roles(UserRole.STUDENT)
+  @ApiOperation({
+    summary: 'Submit a student application to a project',
+  })
+  async applyToChallenge(
+    @Param('id') id: string,
+    @Body() dto: any,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.challengesService.applyToChallenge(id, dto, user);
+  }
+
+  @Post(':id/offer')
+  @Roles(UserRole.UNIVERSITY_ADMIN, UserRole.FACULTY)
+  @ApiOperation({
+    summary: 'Send a direct offer to a student for a project',
+  })
+  async sendDirectOffer(
+    @Param('id') id: string,
+    @Body() dto: { studentEmail: string; role: string; message: string },
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.challengesService.sendDirectOffer(id, dto, user);
+  }
+
+  @Get(':id/applications')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.UNIVERSITY_ADMIN, UserRole.FACULTY)
+  @ApiOperation({
+    summary: 'Get all student applications for a project',
+  })
+  async getChallengeApplications(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.challengesService.getChallengeApplications(id, user);
   }
 
   // --- TENDER / PROPOSAL SYSTEM ENDPOINTS ---
@@ -236,6 +326,16 @@ export class ChallengesController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.challengesService.purgeArchivedChallenges(challengeIds, user);
+  }
+
+  @Get(':id')
+  @Public()
+  @ApiOperation({ summary: 'Get details of a single challenge by ID' })
+  async getChallengeById(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.challengesService.getChallengeById(id, user);
   }
 
   @Patch(':id')

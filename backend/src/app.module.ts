@@ -10,6 +10,7 @@ import { CollaborationModule } from './modules/collaboration/collaboration.modul
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { SettingsModule } from './modules/settings/settings.module';
+import { MessagingModule } from './modules/messaging/messaging.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { SettingsModule } from './modules/settings/settings.module';
     NotificationsModule,
     AnalyticsModule,
     SettingsModule,
+    MessagingModule,
   ],
 })
 export class AppModule {}

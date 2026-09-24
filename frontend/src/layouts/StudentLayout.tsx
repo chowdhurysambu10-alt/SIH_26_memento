@@ -10,7 +10,11 @@ import {
   Search,
   Menu,
   ShieldAlert,
-  Home
+  Home,
+  Mail,
+  Users,
+  FileText,
+  Briefcase
 } from 'lucide-react';
 import { NotificationsModal } from '../components/NotificationsModal';
 import { VerificationRequestModal } from '../components/VerificationRequestModal';
@@ -31,9 +35,11 @@ export const StudentLayout: React.FC<StudentLayoutProps> = ({ children, activeVi
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
   const navItems = [
-    { id: 'dashboard', label: 'My Submissions', icon: LayoutDashboard },
-    { id: 'opportunities', label: 'Opportunities', icon: Trophy },
-    { id: 'credits', label: 'Academic Credits', icon: BookOpen },
+    { id: 'my-applications', label: 'My Applications', icon: FileText },
+    { id: 'workspace', label: 'My Workspace', icon: Users },
+    { id: 'apply-project', label: 'Apply for a Project', icon: BookOpen },
+    { id: 'portfolio', label: 'Certifications', icon: Trophy },
+    { id: 'mailing', label: 'mmtomail', icon: Mail },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
@@ -104,6 +110,18 @@ export const StudentLayout: React.FC<StudentLayoutProps> = ({ children, activeVi
             >
               <Home size={20} />
               {isSidebarOpen && <span style={{ fontSize: '15px', fontWeight: 600 }}>Public Updates</span>}
+            </button>
+
+            <button
+              onClick={() => window.dispatchEvent(new CustomEvent('navigate', { detail: 'community' }))}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '12px', padding: '12px',
+                background: 'transparent', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer',
+                width: '100%', justifyContent: isSidebarOpen ? 'flex-start' : 'center', marginBottom: '8px'
+              }}
+            >
+              <Users size={20} />
+              {isSidebarOpen && <span style={{ fontSize: '15px', fontWeight: 600 }}>Community</span>}
             </button>
             
             <button

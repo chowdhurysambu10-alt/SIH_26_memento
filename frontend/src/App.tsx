@@ -49,7 +49,23 @@ function InstitutionPortal() {
 }
 
 function StudentPortal() {
-  const [activeView, setActiveView] = useState('dashboard');
+  const [activeView, setActiveView] = useState(() => {
+    const requested = sessionStorage.getItem('studentPortalView');
+    if (requested) {
+      sessionStorage.removeItem('studentPortalView');
+      return requested;
+    }
+    return 'apply-project';
+  });
+
+  useEffect(() => {
+    const handleStudentNav = (e: any) => {
+      setActiveView(e.detail);
+    };
+    window.addEventListener('navigate-student', handleStudentNav);
+    return () => window.removeEventListener('navigate-student', handleStudentNav);
+  }, []);
+
   return (
     <StudentLayout activeView={activeView} setActiveView={setActiveView}>
       <StudentDashboard activeView={activeView} />
@@ -63,7 +79,7 @@ export function AppContent() {
     const validTabs = ['home', 'feed', 'top-problems', 'submit', 'statistics', 'community', 'helpdesk', 'about', 'login', 'admin-dashboard', 'institution-dashboard', 'student-dashboard'];
     return validTabs.includes(hash) ? (hash as NavTab) : 'home';
   });
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, loading } = useAuth();
   const hasRouted = useRef(false);
   const [platformSettings, setPlatformSettings] = useState<any>(null);
 
@@ -143,6 +159,10 @@ export function AppContent() {
     }
   }, [isAuthenticated, user, activeTab]);
 
+  if (loading) {
+    return <PageFallback />;
+  }
+
   if (activeTab === 'login') {
     return (
       <Suspense fallback={<PageFallback />}>
@@ -160,6 +180,7 @@ export function AppContent() {
   }
 
   if (['admin-dashboard', 'institution-dashboard', 'student-dashboard'].includes(activeTab)) {
+    if (!isAuthenticated) return <PageFallback />;
     return (
       <Suspense fallback={<PageFallback />}>
         {activeTab === 'admin-dashboard' && <AdminPortal />}

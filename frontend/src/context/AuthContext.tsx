@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { AuthUser, authApi, SignupPayload } from '../api/auth';
 import { useUI } from './UIContext';
+import { messagingApi } from '../api/messaging';
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -83,6 +84,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     if (!(await showConfirm('Are you sure you want to sign out?'))) return;
+    
+    // Wipe temporary email messages from backend for security FIRST (before removing token)
+    try {
+      await messagingApi.deleteAlias();
+    } catch (e) {
+      console.error('Failed to wipe temporary messages on logout', e);
+    }
+
     localStorage.removeItem('supabase_access_token');
     localStorage.removeItem('supabase_refresh_token');
     localStorage.removeItem('user_data');
@@ -90,6 +99,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Clear localized civic data upon logout to maintain privacy
     localStorage.removeItem('civic_watchlist');
     localStorage.removeItem('supported_challenges');
+    
+    // Also clear from local storage
+    sessionStorage.removeItem('student_temp_mail');
+    sessionStorage.removeItem('student_temp_mail_key');
     
     setToken(null);
     setUser(null);

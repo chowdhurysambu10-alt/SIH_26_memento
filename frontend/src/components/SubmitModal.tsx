@@ -12,7 +12,7 @@ interface SubmitModalProps {
 
 export const SubmitModal: React.FC<SubmitModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const [title, setTitle] = useState('');
-  const [district, setDistrict] = useState('Kolkata');
+  const [district, setDistrict] = useState('Ranchi');
   const [description, setDescription] = useState('');
   const [solution, setSolution] = useState('');
   const [files, setFiles] = useState<File[]>([]);
@@ -62,7 +62,7 @@ export const SubmitModal: React.FC<SubmitModalProps> = ({ isOpen, onClose, onSuc
       onClose();
       // Reset
       setTitle('');
-      setDistrict('Kolkata');
+      setDistrict('Ranchi');
       setDescription('');
       setSolution('');
       setFiles([]);
@@ -110,21 +110,18 @@ export const SubmitModal: React.FC<SubmitModalProps> = ({ isOpen, onClose, onSuc
 
             <div className="input-group">
               <label htmlFor="district">District *</label>
-              <input
+              <select
                 id="district"
-                type="text"
                 className="input-field"
-                placeholder="e.g. Kolkata, Howrah, Darjeeling, Ranchi..."
-                list="district-datalist"
                 value={district}
                 onChange={(e) => setDistrict(e.target.value)}
                 required
-              />
-              <datalist id="district-datalist">
+              >
+                <option value="" disabled>Select a district</option>
                 {ALL_DISTRICTS.map((d) => (
-                  <option key={d} value={d} />
+                  <option key={d} value={d}>{d}</option>
                 ))}
-              </datalist>
+              </select>
             </div>
 
             <div className="input-group">

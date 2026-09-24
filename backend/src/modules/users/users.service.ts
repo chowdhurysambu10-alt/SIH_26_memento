@@ -3,13 +3,17 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Logger
 } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { UserRole } from '../../common/constants/roles.enum';
 import { NotificationsService } from '../notifications/notifications.service';
+import { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly notificationsService: NotificationsService,
@@ -189,5 +193,82 @@ export class UsersService {
     }
 
     return { success: true, message: 'User deleted successfully' };
+  }
+
+  // --- Student Verifications ---
+
+  async submitStudentVerification(user: AuthenticatedUser, institution_name: string, id_card_url: string) {
+    const admin = this.supabaseService.getAdminClient();
+
+    // Upsert verification (re-verifying overwrites the previous one)
+    const { error } = await admin.from('student_verifications').upsert({
+      user_id: user.id,
+      institution_name,
+      student_id_card_url: id_card_url,
+      status: 'pending',
+      submitted_at: new Date().toISOString()
+    }, { onConflict: 'user_id' });
+
+    if (error) {
+      this.logger.error(`Failed to submit student verification: ${error.message}`);
+      throw new BadRequestException('Failed to submit verification request.');
+    }
+
+    return { success: true };
+  }
+
+  async getPendingStudentVerifications(user: AuthenticatedUser) {
+    if (user.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can review student verifications.');
+    }
+
+    const admin = this.supabaseService.getAdminClient();
+    const { data, error } = await admin.from('student_verifications')
+      .select('*, user:users!user_id(name, email, contact)')
+      .eq('status', 'pending')
+      .order('submitted_at', { ascending: false });
+
+    if (error) {
+      // Table may not exist yet — return empty array gracefully so admin page doesn't crash
+      this.logger.warn(`Could not fetch student verifications (table may not exist yet): ${error.message}`);
+      return [];
+    }
+
+    return data ?? [];
+  }
+
+  async updateStudentVerificationStatus(user: AuthenticatedUser, verificationId: string, status: 'approved' | 'rejected') {
+    if (user.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only Super Admins can update student verifications.');
+    }
+
+    const admin = this.supabaseService.getAdminClient();
+    const { data: verification, error: fetchError } = await admin.from('student_verifications').select('*').eq('id', verificationId).single();
+    
+    if (fetchError || !verification) {
+      throw new NotFoundException('Verification request not found.');
+    }
+
+    const { error: updateError } = await admin.from('student_verifications').update({
+      status,
+      reviewed_at: new Date().toISOString(),
+      reviewed_by: user.id
+    }).eq('id', verificationId);
+
+    if (updateError) {
+      throw new BadRequestException('Failed to update verification status.');
+    }
+
+    if (status === 'approved') {
+      await admin.from('users').update({ verified: true }).eq('id', verification.user_id);
+    }
+
+    // Optional: Send notification
+    const { data: userData } = await admin.from('users').select('name, email').eq('id', verification.user_id).single();
+    if (userData?.email) {
+      this.notificationsService.sendVerificationEmail(userData.email, userData.name, status === 'approved' ? 'verify' : 'reject', 'student');
+    }
+
+    return { success: true };
   }
 }

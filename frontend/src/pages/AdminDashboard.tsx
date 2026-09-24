@@ -6,7 +6,7 @@ import { StatisticsPage } from './StatisticsPage';
 import { TenderReviewDashboard } from './TenderReviewDashboard';
 import { useUI } from '../context/UIContext';
 import { useAutoRefresh } from '../hooks/useAutoRefresh';
-import { Users, FileText, Trash2, Edit2, ShieldAlert, X, ShieldCheck, Megaphone, Clock, ChevronRight, Activity, Bell, CheckCircle, Building2, Mail } from 'lucide-react';
+import { Users, FileText, Trash2, Edit2, ShieldAlert, X, ShieldCheck, Megaphone, Clock, ChevronRight, Activity, Bell, CheckCircle, Building2, Mail, UserCheck } from 'lucide-react';
 
 export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (view: string) => void, searchQuery?: string }> = ({ activeView, setActiveView, searchQuery = '' }) => {
   const { showAlert, showConfirm, setGlobalLoading } = useUI();
@@ -15,6 +15,7 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
   const [verificationRequests, setVerificationRequests] = useState<any[]>([]);
   const [institutions, setInstitutions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({ students: true, institutions: true, admins: true });
   
   const [editingPost, setEditingPost] = useState<DashboardChallenge | null>(null);
   const [postStatusFilter, setPostStatusFilter] = useState<'all' | 'claims' | 'submitted' | 'under_action' | 'resolved'>('all');
@@ -218,10 +219,15 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
     }
   };
 
-  const handleVerifyUser = async (id: string, action: 'verify' | 'reject' | 'reverify', isFromRequestsView = false) => {
+  const handleVerifyUser = async (id: string, action: 'verify' | 'reject' | 'reverify', isFromRequestsView = false, isStudentVerification = false) => {
     try {
       setGlobalLoading(true);
-      await adminApi.verifyUser(id, action);
+      if (isStudentVerification && (action === 'verify' || action === 'reject')) {
+        await adminApi.updateStudentVerificationStatus(id, action === 'verify' ? 'approved' : 'rejected');
+      } else {
+        await adminApi.verifyUser(id, action);
+      }
+      
       if (isFromRequestsView) {
         fetchVerificationRequests();
       } else {
@@ -806,81 +812,131 @@ export const AdminDashboard: React.FC<{ activeView: string, setActiveView?: (vie
     );
   }
 
-  if (activeView === 'verification') {
+  if (activeView === 'confirmed-teams') {
     return (
       <div>
         <div style={{ marginBottom: '24px' }}>
-          <h2 style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a', margin: '0 0 8px' }}>
-            Verification Requests
+          <h2 style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a', margin: '0 0 8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <UserCheck size={24} color="#0f172a" /> Confirmed Teams
           </h2>
-          <p style={{ fontSize: '15px', color: '#64748b', margin: 0 }}>
-            Review and approve pending verification applications from students and institutions.
-          </p>
+          <p style={{ color: '#64748b', margin: 0 }}>View and manage student volunteer teams that have been confirmed for tasks.</p>
         </div>
         
+        <div style={{ padding: '48px', textAlign: 'center', color: '#64748b', background: '#fff', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+          <UserCheck size={48} color="#cbd5e1" style={{ marginBottom: '16px' }} />
+          <p style={{ fontSize: '18px', fontWeight: 600, color: '#334155', margin: '0 0 8px' }}>Confirmed Teams Coming Soon</p>
+          <p style={{ margin: 0 }}>This section will display all teams fully assigned to active problems.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (activeView === 'verification') {
+    const studentVerifRequests = verificationRequests.filter((r: any) => r.is_student_verification);
+    const institutionRequests = verificationRequests.filter((r: any) => !r.is_student_verification && ['university_admin', 'pri_ulb_official', 'govt_viewer'].includes(r.role));
+    const adminRequests = verificationRequests.filter((r: any) => !r.is_student_verification && !['university_admin', 'pri_ulb_official', 'govt_viewer', 'student', 'citizen'].includes(r.role));
+
+    const toggleSection = (key: string) => setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
+
+    const renderCard = (req: any) => (
+      <div key={req.id} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '18px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>{req.name}</span>
+            <span style={{ fontSize: '11px', padding: '2px 8px', background: req.is_student_verification ? '#fef3c7' : '#eff6ff', color: req.is_student_verification ? '#d97706' : '#2563eb', borderRadius: '10px', fontWeight: 600, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+              {req.role.replace(/_/g, ' ')}
+            </span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '10px', background: '#f8fafc', padding: '12px', borderRadius: '8px' }}>
+            <div>
+              <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', marginBottom: '2px' }}>Email</div>
+              <div style={{ fontSize: '13px', color: '#0f172a', wordBreak: 'break-all' }}>{req.email || '-'}</div>
+            </div>
+            {req.contact && (
+              <div>
+                <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', marginBottom: '2px' }}>Contact</div>
+                <div style={{ fontSize: '13px', color: '#0f172a' }}>{req.contact}</div>
+              </div>
+            )}
+            {req.district && (
+              <div>
+                <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', marginBottom: '2px' }}>District</div>
+                <div style={{ fontSize: '13px', color: '#0f172a' }}>{req.district}</div>
+              </div>
+            )}
+            {Object.entries(req.verification_data || {}).map(([key, value]) => {
+              if (key === 'type') return null;
+              return (
+                <div key={key}>
+                  <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', marginBottom: '2px' }}>{key.replace(/_/g, ' ')}</div>
+                  <div style={{ fontSize: '13px', color: '#0f172a' }}>
+                    {typeof value === 'string' && value.startsWith('http') ? (
+                      <a href={value} target="_blank" rel="noreferrer" style={{ color: '#2563eb', textDecoration: 'underline', fontWeight: 500 }}>View ↗</a>
+                    ) : ((value as React.ReactNode) || '-')}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '120px' }}>
+          <button onClick={() => handleVerifyUser(req.id, 'verify', true, req.is_student_verification)} style={{ padding: '6px 12px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '7px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', fontSize: '12px' }}>
+            <ShieldCheck size={13} /> Verify
+          </button>
+          {!req.is_student_verification && (
+            <button onClick={() => handleVerifyUser(req.id, 'reverify', true)} style={{ padding: '6px 12px', background: '#fff', color: '#ea580c', border: '1px solid #fed7aa', borderRadius: '7px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', fontSize: '12px' }}>
+              <Mail size={13} /> Re-verify
+            </button>
+          )}
+          <button onClick={() => { if (window.confirm(`Reject ${req.name}?`)) handleVerifyUser(req.id, 'reject', true, req.is_student_verification); }} style={{ padding: '6px 12px', background: '#fff', color: '#ef4444', border: '1px solid #fca5a5', borderRadius: '7px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', fontSize: '12px' }}>
+            <ShieldAlert size={13} /> Reject
+          </button>
+        </div>
+      </div>
+    );
+
+    const AccordionSection = ({ sectionKey, icon, title, color, items }: { sectionKey: string, icon: React.ReactNode, title: string, color: string, items: any[] }) => {
+      const isOpen = openSections[sectionKey];
+      return (
+        <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', marginBottom: '12px' }}>
+          {/* Header - clickable */}
+          <button
+            onClick={() => toggleSection(sectionKey)}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', background: isOpen ? '#f8fafc' : '#fff', border: 'none', cursor: 'pointer', transition: 'background 0.15s' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              {icon}
+              <span style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>{title}</span>
+              <span style={{ background: items.length > 0 ? color : '#94a3b8', color: '#fff', borderRadius: '20px', padding: '1px 10px', fontSize: '12px', fontWeight: 700 }}>{items.length}</span>
+            </div>
+            <span style={{ fontSize: '18px', color: '#94a3b8', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', lineHeight: 1 }}>▾</span>
+          </button>
+          {/* Scrollable body */}
+          {isOpen && (
+            <div style={{ padding: '12px 14px', background: '#fafafa', maxHeight: '420px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', borderTop: '1px solid #e2e8f0' }}>
+              {items.length === 0 ? (
+                <p style={{ color: '#94a3b8', fontSize: '14px', margin: '8px 0', textAlign: 'center' }}>No pending requests in this category.</p>
+              ) : items.map(renderCard)}
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    return (
+      <div>
+        <div style={{ marginBottom: '20px' }}>
+          <h2 style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a', margin: '0 0 6px' }}>Verification Requests</h2>
+          <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>Review and approve pending verification applications from students, institutions, and admins.</p>
+        </div>
+
         {loading ? (
           <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Loading requests...</div>
-        ) : filteredVerificationRequests.length === 0 ? (
-          <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '60px 20px', textAlign: 'center' }}>
-            <ShieldCheck size={48} color="#94a3b8" style={{ margin: '0 auto 16px' }} />
-            <h3 style={{ margin: '0 0 8px', color: '#475569', fontSize: '18px' }}>No Pending Requests</h3>
-            <p style={{ color: '#94a3b8', margin: 0 }}>You're all caught up!</p>
-          </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {filteredVerificationRequests.map(req => (
-              <div key={req.id} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                    <h3 style={{ margin: 0, fontSize: '18px', color: '#0f172a' }}>{req.name}</h3>
-                    <span style={{ fontSize: '12px', padding: '4px 8px', background: '#eff6ff', color: '#2563eb', borderRadius: '12px', fontWeight: 600 }}>
-                      {req.role.replace('_', ' ').toUpperCase()}
-                    </span>
-                  </div>
-                  
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', background: '#f8fafc', padding: '16px', borderRadius: '8px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Email Address</span>
-                      <span style={{ fontSize: '14px', color: '#0f172a' }}>{req.email}</span>
-                    </div>
-                    {Object.entries(req.verification_data || {}).map(([key, value]) => {
-                      if (key === 'type') return null; // skip the internal type discriminator
-                      return (
-                        <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>{key.replace(/([A-Z])/g, ' $1').trim()}</span>
-                          <span style={{ fontSize: '14px', color: '#0f172a' }}>{value as React.ReactNode || '-'}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '24px', minWidth: '160px' }}>
-                  <button 
-                    onClick={() => handleVerifyUser(req.id, 'verify', true)}
-                    style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}
-                  >
-                    <ShieldCheck size={16} /> Verify
-                  </button>
-                  <button 
-                    onClick={() => handleVerifyUser(req.id, 'reverify', true)}
-                    style={{ padding: '8px 16px', background: '#fff', color: '#ea580c', border: '1px solid #fed7aa', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}
-                  >
-                    <Mail size={16} /> Re-verify
-                  </button>
-                  <button 
-                    onClick={() => {
-                      if (window.confirm(`Are you sure you want to REJECT and BAN ${req.name}?`)) {
-                        handleVerifyUser(req.id, 'reject', true);
-                      }
-                    }}
-                    style={{ padding: '8px 16px', background: '#fff', color: '#ef4444', border: '1px solid #fca5a5', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}
-                  >
-                    <ShieldAlert size={16} /> Reject
-                  </button>
-                </div>
-              </div>
-            ))}
+          <div>
+            <AccordionSection sectionKey="students" icon={<CheckCircle size={17} color="#d97706" />} title="Student Verifications" color="#d97706" items={studentVerifRequests} />
+            <AccordionSection sectionKey="institutions" icon={<Building2 size={17} color="#2563eb" />} title="Institution / Authority Verifications" color="#2563eb" items={institutionRequests} />
+            <AccordionSection sectionKey="admins" icon={<UserCheck size={17} color="#7c3aed" />} title="New Admin / Other Verifications" color="#7c3aed" items={adminRequests} />
           </div>
         )}
       </div>

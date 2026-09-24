@@ -2,8 +2,10 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  InternalServerErrorException,
   Logger,
   NotFoundException,
+  UnauthorizedException,
   OnModuleInit,
 } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
@@ -133,19 +135,7 @@ export class ChallengesService implements OnModuleInit {
         }
       }
 
-      try {
-        if (mimeType.startsWith('image/')) {
-          const sharp = require('sharp');
-          uploadBuffer = await sharp(uploadBuffer)
-            .resize({ width: 1920, withoutEnlargement: true })
-            .webp({ quality: 80 })
-            .toBuffer();
-          originalName = originalName.replace(/\.[^/.]+$/, "") + ".webp";
-          mimeType = 'image/webp';
-        }
-      } catch (e) {
-        this.logger.warn(`Image compression failed for ${file.originalname}: ${e.message}`);
-      }
+      // High-quality image upload: preserving original file buffer and mimeType without downscaling/compression.
 
       try {
         const uploadRes = await this.supabaseService.uploadFile(
@@ -364,17 +354,20 @@ export class ChallengesService implements OnModuleInit {
     if (filter.sort_by === 'priority') {
       query = query
         .order('priority_score', { ascending: false, nullsFirst: false })
-        .order('priority_score', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false });
     } else if (filter.sort_by === 'recent') {
       if (cursorObj && cursorObj.created_at) {
         query = query.lt('created_at', cursorObj.created_at);
       }
       query = query.order('created_at', { ascending: false });
+    } else if (filter.sort_by === 'support') {
+      query = query
+        .order('support_count', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false });
     } else {
       // Default: Most supported on top, followed by priority and recency
       query = query
-        .order('priority_score', { ascending: false, nullsFirst: false })
+        .order('support_count', { ascending: false, nullsFirst: false })
         .order('priority_score', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false });
     }
@@ -399,13 +392,18 @@ export class ChallengesService implements OnModuleInit {
       if (filter.sort_by === 'priority') {
         fallback = fallback
           .order('priority_score', { ascending: false, nullsFirst: false })
-          .order('priority_score', { ascending: false, nullsFirst: false });
+          .order('created_at', { ascending: false });
       } else if (filter.sort_by === 'recent') {
         fallback = fallback.order('created_at', { ascending: false });
+      } else if (filter.sort_by === 'support') {
+        fallback = fallback
+          .order('support_count', { ascending: false, nullsFirst: false })
+          .order('created_at', { ascending: false });
       } else {
         fallback = fallback
+          .order('support_count', { ascending: false, nullsFirst: false })
           .order('priority_score', { ascending: false, nullsFirst: false })
-          .order('priority_score', { ascending: false, nullsFirst: false });
+          .order('created_at', { ascending: false });
       }
 
       const fallbackQuery = await fallback.range(offset, offset + limit - 1);
@@ -1202,6 +1200,34 @@ export class ChallengesService implements OnModuleInit {
     return { success: true, archived: challenges.length, excelBase64, fileName, challengeIds };
   }
 
+  async releaseVacancy(id: string, isReleased: boolean, user: AuthenticatedUser) {
+    const admin = this.supabaseService.getAdminClient();
+
+    // Verify challenge exists and institution owns it (if not super admin)
+    const { data: challenge, error } = await admin.from('challenges').select('assigned_institution_id, ai_classification').eq('id', id).single();
+    
+    if (error || !challenge) {
+      throw new NotFoundException('Challenge not found');
+    }
+
+    if (user.role !== UserRole.SUPER_ADMIN && user.org_id !== challenge.assigned_institution_id) {
+      throw new ForbiddenException('Only the assigned institution can release/close vacancies for this problem.');
+    }
+
+    // Safely update the ai_classification JSONB object
+    const updatedAiClass = { ...(challenge.ai_classification || {}), vacancies_released: isReleased };
+
+    const { error: updateError } = await admin.from('challenges')
+      .update({ ai_classification: updatedAiClass })
+      .eq('id', id);
+
+    if (updateError) {
+      throw new BadRequestException('Failed to update vacancy status: ' + updateError.message);
+    }
+
+    return { success: true };
+  }
+
   async purgeArchivedChallenges(challengeIds: string[], user: AuthenticatedUser) {
     if (!challengeIds || challengeIds.length === 0) {
       return { success: true, count: 0 };
@@ -1347,6 +1373,341 @@ export class ChallengesService implements OnModuleInit {
     const supportBoost = Math.min(10, Math.round(Math.log2(1 + supportCount) * 3));
     const score = Math.round(hierarchicalBase * 0.6) + aiContribution + supportBoost;
     return Math.min(100, Math.max(1, score));
+  }
+
+  // --- STUDENT APPLICATIONS VIA DATABASE ---
+
+  /**
+   * Students apply to a project by inserting a row into the student_applications table.
+   */
+  async applyToChallenge(id: string, dto: any, user: AuthenticatedUser) {
+    const admin = this.supabaseService.getAdminClient();
+
+    // Verify the challenge exists and is open (vacancies released)
+    const { data: challenge, error } = await admin.from('challenges').select('status, ai_classification').eq('id', id).single();
+    if (error || !challenge) {
+      throw new NotFoundException('Challenge not found');
+    }
+    if (challenge.ai_classification?.vacancies_released !== true) {
+      throw new BadRequestException('This project is not currently accepting student applications.');
+    }
+
+    const { error: insertError } = await admin.from('student_applications').insert({
+      challenge_id: id,
+      student_id: user.id,
+      app_email: dto.appEmail,
+      app_mobile: dto.appMobile,
+      app_age: dto.appAge,
+      app_grad_year: dto.appGradYear,
+      app_institution: dto.appInstitution,
+      app_major: dto.appMajor,
+      app_cv: dto.appCv,
+      app_linkedin: dto.appLinkedin,
+      app_github: dto.appGithub,
+      app_portfolio: dto.appPortfolio,
+      app_motivation: dto.appMotivation,
+      app_role: dto.appRole,
+      app_solution: dto.appSolution
+    });
+
+    if (insertError) {
+      this.logger.error(`Failed to submit application: ${insertError.message}`);
+      throw new InternalServerErrorException('Failed to submit application.');
+    }
+
+    return { success: true, message: 'Application submitted successfully.' };
+  }
+
+  async addManualTeamMember(challengeId: string, dto: any, user: AuthenticatedUser) {
+    const admin = this.supabaseService.getAdminClient();
+
+    // Verify challenge belongs to this institution
+    const { data: challenge } = await admin.from('challenges').select('org_id').eq('id', challengeId).single();
+    if (!challenge || challenge.org_id !== user.org_id) {
+      throw new UnauthorizedException('Not authorized to modify this challenge');
+    }
+
+    // 1. Create a shadow user
+    const dummyEmail = `offline_${Date.now()}_${Math.random().toString(36).substring(7)}@offline.local`;
+    const { data: authData, error: authError } = await admin.auth.admin.createUser({
+      email: dto.email || dummyEmail,
+      password: require('crypto').randomUUID(), // random password
+      email_confirm: true,
+      user_metadata: {
+        name: dto.name,
+        role: 'student',
+        is_offline: true
+      }
+    });
+
+    if (authError) throw new InternalServerErrorException(authError.message);
+
+    const studentId = authData.user.id;
+
+    // 2. Insert into public.users
+    await admin.from('users').insert({
+      id: studentId,
+      name: dto.name,
+      email: dto.email || dummyEmail,
+      contact: dto.contact || null,
+      role: 'student'
+    });
+
+    // 3. Insert into student_applications as approved
+    const roleString = `${dto.memberType || 'Member'} (${dto.occupation || 'Student'}): ${dto.post || 'Volunteer'}`;
+    let motivationString = 'Manually added by institution.';
+    if (dto.address) motivationString += `\nAddress: ${dto.address}`;
+    if (dto.employeeCode) motivationString += `\nEmployee Code: ${dto.employeeCode}`;
+
+    const { error: appError } = await admin.from('student_applications').insert({
+      challenge_id: challengeId,
+      student_id: studentId,
+      status: 'approved',
+      app_role: roleString,
+      app_institution: user.name || 'Assigned Institution',
+      app_motivation: motivationString
+    });
+
+    if (appError) throw new InternalServerErrorException(appError.message);
+
+    return { success: true };
+  }
+
+  /**
+   * Send a direct offer to a student for a project
+   */
+  async sendDirectOffer(challengeId: string, dto: { studentEmail: string; role: string; message: string }, user: AuthenticatedUser) {
+    const admin = this.supabaseService.getAdminClient();
+    
+    // Find student by email
+    const { data: student, error: studentErr } = await admin
+      .from('users')
+      .select('*')
+      .eq('email', dto.studentEmail)
+      .single();
+
+    if (studentErr || !student) {
+      throw new NotFoundException('Student not found with this email.');
+    }
+
+    if (student.role !== 'student') {
+      throw new BadRequestException('The user with this email is not a student.');
+    }
+
+    // Create application with status 'offered'
+    const { error: appError } = await admin.from('student_applications').insert({
+      challenge_id: challengeId,
+      student_id: student.id,
+      status: 'offered',
+      app_role: dto.role,
+      app_institution: user.name || 'Assigned Institution',
+      app_motivation: dto.message || 'Direct Offer from Institution'
+    });
+
+    if (appError) {
+      if (appError.code === '23505') {
+        throw new BadRequestException('This student already has an application or offer for this project.');
+      }
+      throw new InternalServerErrorException(appError.message);
+    }
+
+    return { success: true };
+  }
+
+  /**
+   * Get all applications submitted by a specific student
+   */
+  async getStudentApplications(studentId: string) {
+    const admin = this.supabaseService.getAdminClient();
+    const { data, error } = await admin
+      .from('student_applications')
+      .select('*, challenge:challenges(id, title, category, district, status)')
+      .eq('student_id', studentId)
+      .order('submitted_at', { ascending: false });
+    if (error) {
+      this.logger.error(`Failed to get student applications: ${error.message}`);
+      return [];
+    }
+    return data || [];
+  }
+
+  /**
+   * Get all student applications across an institution's initiatives or associated with the institution
+   */
+  async getInstitutionApplications(user: AuthenticatedUser, institutionId?: string) {
+    const admin = this.supabaseService.getAdminClient();
+
+    // Determine target institution id
+    const targetInstId = (user.role === UserRole.SUPER_ADMIN && institutionId)
+      ? institutionId
+      : (user.org_id || user.id || institutionId);
+
+    // If super admin and no specific institution is requested, return all applications
+    const isSuperAdminAll = user.role === UserRole.SUPER_ADMIN && !institutionId;
+
+    // Fetch applications with joined challenge and student details
+    const { data: applications, error: listError } = await admin
+      .from('student_applications')
+      .select('*, challenge:challenges(id, title, category, district, assigned_institution_id, status), student:users!student_id(id, name, email, contact, verified)')
+      .order('submitted_at', { ascending: false });
+
+    if (listError) {
+      this.logger.error(`Failed to list institution applications: ${listError.message}`);
+      return [];
+    }
+
+    if (!applications || applications.length === 0) {
+      return [];
+    }
+
+    if (isSuperAdminAll) {
+      return applications;
+    }
+
+    // Also get institution name if available for matching student's app_institution
+    let instName = '';
+    if (targetInstId) {
+      const { data: inst } = await admin.from('institutions').select('name').eq('id', targetInstId).maybeSingle();
+      if (inst?.name) instName = inst.name.toLowerCase();
+    }
+    if (!instName && user.name) {
+      instName = user.name.toLowerCase();
+    }
+
+    // Filter applications where:
+    // 1) challenge.assigned_institution_id matches targetInstId or user.org_id or user.id
+    // 2) OR student's app_institution matches instName
+    const filtered = applications.filter((app: any) => {
+      const assignedId = app.challenge?.assigned_institution_id;
+      const matchesChallengeOwner = assignedId && (
+        assignedId === targetInstId ||
+        assignedId === user.org_id ||
+        assignedId === user.id
+      );
+
+      const matchesStudentInst = instName && app.app_institution && (
+        app.app_institution.toLowerCase().includes(instName) ||
+        instName.includes(app.app_institution.toLowerCase())
+      );
+
+      return matchesChallengeOwner || matchesStudentInst;
+    });
+
+    return filtered;
+  }
+
+  /**
+   * Update student application status (approved / rejected / pending)
+   */
+  async updateApplicationStatus(applicationId: string, status: string, user: AuthenticatedUser, appRole?: string) {
+    const admin = this.supabaseService.getAdminClient();
+
+    if (!['approved', 'rejected', 'pending', 'waitlisted'].includes(status)) {
+      throw new BadRequestException('Invalid status. Must be approved, rejected, pending, or waitlisted.');
+    }
+
+    // Fetch the application
+    const { data: application, error: fetchErr } = await admin
+      .from('student_applications')
+      .select('*, challenge:challenges(id, title, assigned_institution_id)')
+      .eq('id', applicationId)
+      .single();
+
+    if (fetchErr || !application) {
+      throw new NotFoundException('Student application not found.');
+    }
+
+    // Check permissions: SUPER_ADMIN or assigned institution
+    const assignedId = application.challenge?.assigned_institution_id;
+    const isOwner = user.role === UserRole.SUPER_ADMIN ||
+      assignedId === user.org_id ||
+      assignedId === user.id;
+
+    if (!isOwner) {
+      throw new ForbiddenException('Only the assigned institution or admin can review this application.');
+    }
+
+    const updatePayload: any = { status };
+    if (appRole) {
+      updatePayload.app_role = appRole;
+    }
+
+    const { error: updateErr } = await admin
+      .from('student_applications')
+      .update(updatePayload)
+      .eq('id', applicationId);
+
+    if (updateErr) {
+      this.logger.error(`Failed to update application status: ${updateErr.message}`);
+      throw new InternalServerErrorException('Failed to update application status.');
+    }
+
+    // Notify student if student_id is present
+    if (application.student_id) {
+      const challengeTitle = application.challenge?.title || 'the initiative';
+      const notificationTitle = status === 'approved'
+        ? 'Application Approved! 🎉'
+        : status === 'rejected'
+        ? 'Application Update'
+        : status === 'waitlisted'
+        ? 'Application Waitlisted 🕒'
+        : 'Application Under Review';
+
+      const notificationMsg = status === 'approved'
+        ? `Congratulations! Your volunteer application for "${challengeTitle}" has been approved.`
+        : status === 'rejected'
+        ? `Thank you for your interest. Your application for "${challengeTitle}" was not selected at this time.`
+        : status === 'waitlisted'
+        ? `Your application for "${challengeTitle}" has been placed on the waitlist. We will notify you if a position opens up.`
+        : `Your application for "${challengeTitle}" status has been set to pending review.`;
+
+      try {
+        await admin.from('notifications').insert({
+          recipient_id: application.student_id,
+          title: notificationTitle,
+          message: notificationMsg,
+          type: 'general',
+          is_read: false,
+          created_at: new Date().toISOString()
+        });
+      } catch (notifErr: any) {
+        this.logger.warn(`Could not send student notification: ${notifErr.message}`);
+      }
+    }
+
+    return { success: true, message: `Application status updated to ${status}.` };
+  }
+
+  /**
+   * Institutions view applications by fetching from the student_applications table.
+   */
+  async getChallengeApplications(id: string, user: AuthenticatedUser) {
+    const admin = this.supabaseService.getAdminClient();
+
+    // Verify the user owns the challenge
+    const { data: challenge, error } = await admin.from('challenges').select('assigned_institution_id').eq('id', id).single();
+    if (error || !challenge) {
+      throw new NotFoundException('Challenge not found');
+    }
+    const isAllowed = user.role === UserRole.SUPER_ADMIN ||
+      challenge.assigned_institution_id === user.org_id ||
+      challenge.assigned_institution_id === user.id;
+
+    if (!isAllowed) {
+      throw new ForbiddenException('Only the assigned institution can view these applications.');
+    }
+
+    const { data: applications, error: listError } = await admin.from('student_applications')
+      .select('*, student:users!student_id(id, name, email, contact, verified)')
+      .eq('challenge_id', id)
+      .order('submitted_at', { ascending: false });
+
+    if (listError) {
+      this.logger.error(`Failed to list applications: ${listError.message}`);
+      return [];
+    }
+
+    return applications || [];
   }
 
   /**

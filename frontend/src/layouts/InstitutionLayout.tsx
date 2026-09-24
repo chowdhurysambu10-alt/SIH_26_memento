@@ -10,7 +10,11 @@ import {
   Menu,
   Building,
   Home,
-  FileText
+  FileText,
+  Users,
+  ClipboardList,
+  Handshake,
+  Briefcase
 } from 'lucide-react';
 import { NotificationsModal } from '../components/NotificationsModal';
 import { useNotifications } from '../hooks/useNotifications';
@@ -32,6 +36,10 @@ export const InstitutionLayout: React.FC<InstitutionLayoutProps> = ({ children, 
     { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
     { id: 'challenges', label: 'Assigned Challenges', icon: CheckSquare },
     { id: 'summary', label: 'Daily Summary', icon: FileText },
+    { id: 'student-review', label: 'Requests & Offers', icon: ClipboardList },
+    { id: 'team', label: 'Team Formation', icon: Users },
+    { id: 'collaboration', label: 'Collaboration', icon: Handshake },
+    { id: 'workspace', label: 'My Workspace', icon: Briefcase },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 

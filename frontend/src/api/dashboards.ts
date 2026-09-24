@@ -11,12 +11,17 @@ export interface DashboardChallenge {
   priority_score?: number;
   status: 'submitted' | 'under_action' | 'resolved' | 'under_review' | 'routed' | 'team_formed' | 'claimed' | 'in_progress' | 'completed' | 'validated' | 'rejected';
   user_id?: string;
+  org_id?: string;
   created_at: string;
   ai_summary?: string;
   ai_confidence?: number;
   model_used?: string;
   media_urls?: string[];
   assigned_institution_id?: string | null;
+  ai_classification?: {
+    vacancies_released?: boolean;
+    [key: string]: any;
+  };
   institutions?: {
     id: string;
     name: string;
@@ -42,6 +47,7 @@ export interface DashboardChallenge {
 
     ai_confidence: number;
     ai_summary: string;
+    vacancies_released?: boolean;
     created_at: string;
   }[];
 }
@@ -115,19 +121,16 @@ export const dashboardsApi = {
 
   // 3. Claim Challenge for Organizations
   getClaimableChallenges: async (): Promise<DashboardChallenge[]> => {
-    const result = await apiClient<any>('/challenges?limit=100');
-    const items = Array.isArray(result) ? result : (Array.isArray(result?.data) ? result.data : []);
-    return items.filter((c: any) => 
-      Boolean(c.assigned_institution_id) ||
-      c.status === 'submitted' || 
-      c.status === 'under_review' || 
-      c.status === 'routed' || 
-      c.status === 'team_formed' || 
-      c.status === 'in_progress' ||
-      c.status === 'under_action' ||
-      c.status === 'completed' ||
-      c.status === 'resolved'
-    );
+    try {
+      const result = await apiClient<any>('/challenges?limit=100');
+      const items = Array.isArray(result) ? result : (Array.isArray(result?.data) ? result.data : []);
+      return items.filter((c: any) => 
+        c?.assigned_institution_id && c?.ai_classification?.vacancies_released === true
+      );
+    } catch (e) {
+      console.error('Failed to get claimable challenges:', e);
+      return [];
+    }
   },
 
   claimChallenge: async (challengeId: string, orgId?: string, notes?: string): Promise<any> => {
@@ -138,6 +141,13 @@ export const dashboardsApi = {
         assigned_institution_id: orgId,
         notes: notes || 'Claim requested by institution. Awaiting Admin verification.',
       }),
+    });
+  },
+
+  releaseVacancy: async (challengeId: string, isReleased: boolean): Promise<any> => {
+    return apiClient<any>(`/challenges/${challengeId}/vacancy`, {
+      method: 'PATCH',
+      body: JSON.stringify({ vacancies_released: isReleased })
     });
   },
 
@@ -197,5 +207,121 @@ export const dashboardsApi = {
     return apiClient<any>(`/challenges/${challengeId}/proposals/clean-rejected`, {
       method: 'PATCH',
     });
+  },
+
+  // --- Student Applications via Storage ---
+  applyToChallenge: async (challengeId: string, payload: any): Promise<any> => {
+    return apiClient<any>(`/challenges/${challengeId}/apply`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  getChallengeApplications: async (challengeId: string): Promise<any[]> => {
+    try {
+      return await apiClient<any[]>(`/challenges/${challengeId}/applications`, {
+        method: 'GET',
+        suppressGlobalError: true,
+      } as any);
+    } catch (e) {
+      console.error('Failed to get student applications:', e);
+      return [];
+    }
+  },
+
+  getInstitutionApplications: async (institutionId?: string): Promise<any[]> => {
+    try {
+      const query = institutionId ? `?institutionId=${encodeURIComponent(institutionId)}` : '';
+      return await apiClient<any[]>(`/challenges/institution/applications${query}`, {
+        method: 'GET',
+        suppressGlobalError: true,
+      } as any);
+    } catch (e) {
+      console.error('Failed to get institution student applications:', e);
+      return [];
+    }
+  },
+
+  updateApplicationStatus: async (applicationId: string, status: 'approved' | 'rejected' | 'pending' | 'waitlisted', appRole?: string): Promise<any> => {
+    return apiClient<any>(`/challenges/applications/${applicationId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status, appRole }),
+    });
+  },
+
+  sendDirectOffer: async (challengeId: string, studentEmail: string, role: string, message: string): Promise<any> => {
+    return apiClient<any>(`/challenges/${challengeId}/offer`, {
+      method: 'POST',
+      body: JSON.stringify({ studentEmail, role, message }),
+    });
+  },
+
+  getMyApplications: async (): Promise<any[]> => {
+    try {
+      return await apiClient<any[]>(`/challenges/my-applications`, {
+        method: 'GET',
+        suppressGlobalError: true,
+      } as any);
+    } catch (e) {
+      console.error('Failed to get my student applications:', e);
+      return [];
+    }
+  },
+
+  addManualTeamMember: async (challengeId: string, payload: { name: string; email?: string; contact?: string; role?: string }): Promise<any> => {
+    return apiClient<any>(`/challenges/${challengeId}/manual-team-member`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  createEngagement: async (payload: { challenge_id: string; engagement_type: string; proposal_notes: string }): Promise<any> => {
+    return apiClient<any>('/collaboration/engagements', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // --- Collaboration: Milestones & Teams ---
+
+  /** Fetch all milestones for a project_team (project_id = team.id) */
+  getMilestonesForProject: async (projectId: string): Promise<any[]> => {
+    try {
+      // Milestones are linked to project_teams.id via project_id column
+      return await apiClient<any[]>(`/collaboration/milestones/${projectId}`, {
+        method: 'GET',
+        suppressGlobalError: true,
+      } as any);
+    } catch {
+      return [];
+    }
+  },
+
+  /** Create a new milestone (student can create for their project) */
+  createMilestone: async (payload: { project_id: string; title: string; description?: string; due_date?: string }): Promise<any> => {
+    return apiClient<any>('/collaboration/milestones', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  /** Submit a deliverable URL for a milestone (sends it to senior for approval) */
+  submitMilestoneDeliverable: async (milestoneId: string, deliverable_url: string): Promise<any> => {
+    return apiClient<any>(`/collaboration/milestones/${milestoneId}/submit`, {
+      method: 'PATCH',
+      body: JSON.stringify({ deliverable_url }),
+    });
+  },
+
+  /** Get the project team for a challenge (includes milestones and member IDs) */
+  getTeamByChallenge: async (challengeId: string): Promise<any> => {
+    try {
+      return await apiClient<any>(`/collaboration/teams/challenge/${challengeId}`, {
+        method: 'GET',
+        suppressGlobalError: true,
+      } as any);
+    } catch {
+      return [];
+    }
   },
 };

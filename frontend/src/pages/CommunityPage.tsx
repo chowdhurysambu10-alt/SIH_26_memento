@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import WidgetBot from '@widgetbot/react-embed';
 import { Joyride, Step } from 'react-joyride';
-import { HelpCircle } from 'lucide-react';
+import { HelpCircle, Mail, Copy } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 const DISCORD_SERVER_ID = import.meta.env.VITE_DISCORD_SERVER_ID || '1546942698760437894';
 const DISCORD_CHANNEL_MAIN = import.meta.env.VITE_DISCORD_CHANNEL_MAIN || '1546942699217879050';
@@ -13,6 +14,28 @@ export const CommunityPage: React.FC<{ platformSettings?: any }> = ({ platformSe
   const [activeChannel, setActiveChannel] = useState(DISCORD_CHANNEL_MAIN);
   const [runTour, setRunTour] = useState(false);
   const [chatLoaded, setChatLoaded] = useState(false);
+  const { user } = useAuth();
+  
+  const [alias, setAlias] = useState<string | null>(null);
+  const [secretKey, setSecretKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user?.role === 'student') {
+      const storedAlias = localStorage.getItem('student_temp_mail');
+      const storedKey = localStorage.getItem('student_temp_mail_key');
+      if (storedAlias && storedKey) {
+        setAlias(storedAlias);
+        setSecretKey(storedKey);
+      }
+    }
+  }, [user]);
+
+  const handleCopyAlias = () => {
+    if (alias) {
+      navigator.clipboard.writeText(alias);
+      alert('Alias copied to clipboard!');
+    }
+  };
 
   useEffect(() => {
     setChatLoaded(false);
@@ -96,14 +119,16 @@ export const CommunityPage: React.FC<{ platformSettings?: any }> = ({ platformSe
               Join the conversation, report issues, and collaborate with other innovators and citizens.
             </p>
           </div>
-          <button
-            onClick={() => setRunTour(true)}
-            className="btn btn-outline"
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#2563eb', borderColor: '#bfdbfe', background: '#eff6ff', padding: '8px 16px', whiteSpace: 'nowrap' }}
-          >
-            <HelpCircle size={18} />
-            Guide
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button
+              onClick={() => setRunTour(true)}
+              className="btn btn-outline"
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#2563eb', borderColor: '#bfdbfe', background: '#eff6ff', padding: '8px 16px', whiteSpace: 'nowrap' }}
+            >
+              <HelpCircle size={18} />
+              Guide
+            </button>
+          </div>
         </div>
 
         {/* Role tabs */}
@@ -136,6 +161,23 @@ export const CommunityPage: React.FC<{ platformSettings?: any }> = ({ platformSe
           >
             Community Rules
           </button>
+          {user?.role === 'student' && (
+            <button
+              onClick={() => {
+                if (alias) {
+                  handleCopyAlias();
+                }
+                sessionStorage.setItem('studentPortalView', 'mailing');
+                window.dispatchEvent(new CustomEvent('navigate-student', { detail: 'mailing' }));
+                window.dispatchEvent(new CustomEvent('navigate', { detail: 'student-dashboard' }));
+              }}
+              className="btn"
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#64748b', background: 'transparent', border: '1px solid #cbd5e1', padding: '8px 14px', fontSize: '13px', whiteSpace: 'nowrap', borderRadius: '8px' }}
+            >
+              {alias ? <Copy size={14} /> : <Mail size={14} />}
+              {alias ? 'Copy temporary mail id' : 'Get temporary mail id'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -143,8 +185,8 @@ export const CommunityPage: React.FC<{ platformSettings?: any }> = ({ platformSe
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
           {!chatLoaded ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#64748b' }}>
-               <div className="animate-spin" style={{ marginRight: '10px', width: '24px', height: '24px', border: '3px solid #e2e8f0', borderTopColor: '#2563eb', borderRadius: '50%' }}></div>
-               Connecting to Community Server...
+              <div className="animate-spin" style={{ marginRight: '10px', width: '24px', height: '24px', border: '3px solid #e2e8f0', borderTopColor: '#2563eb', borderRadius: '50%' }}></div>
+              Connecting to Community Server...
             </div>
           ) : (
             <WidgetBot

@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { Lightbox } from '../components/Lightbox';
 
-import { WEST_BENGAL_DISTRICTS, JHARKHAND_DISTRICTS } from '../constants/districts';
+import { JHARKHAND_DISTRICTS } from '../constants/districts';
 
 const CATEGORIES = [
   'All Categories',
@@ -249,11 +249,6 @@ export const TopProblemsDashboard: React.FC = () => {
           </label>
           <select value={district} onChange={(e) => setDistrict(e.target.value)} style={{ padding: '8px 12px', fontSize: '13.5px' }}>
             <option value="All Districts">All Districts</option>
-            <optgroup label="West Bengal">
-              {WEST_BENGAL_DISTRICTS.map((d) => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </optgroup>
             <optgroup label="Jharkhand">
               {JHARKHAND_DISTRICTS.map((d) => (
                 <option key={d} value={d}>{d}</option>

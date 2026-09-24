@@ -15,7 +15,8 @@ import {
   ShieldCheck,
   Megaphone,
   Home,
-  Building2
+  Building2,
+  UserCheck
 } from 'lucide-react';
 import { NotificationsModal } from '../components/NotificationsModal';
 import { useNotifications } from '../hooks/useNotifications';
@@ -39,6 +40,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeView, 
     { id: 'users', label: 'Users', icon: Users },
     { id: 'posts', label: 'Posts', icon: FileText },
     { id: 'tenders', label: 'Tenders & Bids', icon: Building2 },
+    { id: 'confirmed-teams', label: 'Confirmed Teams', icon: UserCheck },
     { id: 'verification', label: 'Verifications', icon: ShieldCheck },
     { id: 'notice-panel', label: 'Notices', icon: Megaphone },
     { id: 'ai-analysis', label: 'AI Analysis', icon: ShieldAlert },
