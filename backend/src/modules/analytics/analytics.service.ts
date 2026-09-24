@@ -113,14 +113,20 @@ export class AnalyticsService {
     const admin = this.supabaseService.getAdminClient();
 
     // Dynamically sync registered university_admin users into institutions table
+    // (Only sync ROOT institutions where id === org_id)
     try {
       const { data: registeredOrgUsers } = await admin
         .from('users')
-        .select('id, name, email, role, district')
+        .select('id, name, email, role, district, org_id')
         .eq('role', 'university_admin');
 
       if (registeredOrgUsers && registeredOrgUsers.length > 0) {
         for (const orgUser of registeredOrgUsers) {
+          // Skip sub-instances (faculty members)
+          if (orgUser.org_id && orgUser.org_id !== orgUser.id) {
+            continue;
+          }
+
           await admin.from('institutions').upsert(
             {
               id: orgUser.id,
