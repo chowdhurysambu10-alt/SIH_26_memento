@@ -895,17 +895,42 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
               <UserPlus size={18} color="#8b5cf6" /> Sub-Instances (Faculty)
             </h3>
             <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '16px' }}>Create sub-accounts for faculty members or departments to collaborate under your institution.</p>
-            <button
-              onClick={() => {
-                setInstanceModalOpen(true);
-                setGeneratedCredentials(null);
-                setInstanceName('');
-              }}
-              style={{ padding: '10px 20px', background: '#8b5cf6', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 600, fontSize: '14px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', width: '100%', justifyContent: 'center' }}
-            >
-              <UserPlus size={16} /> Make an Instance
-            </button>
-
+            {generatedCredentials ? (
+              <div style={{ padding: '16px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', marginBottom: '20px' }}>
+                <p style={{ margin: '0 0 12px', fontSize: '15px', fontWeight: 700, color: '#166534' }}>🎉 Instance Created Successfully!</p>
+                <div style={{ fontSize: '14px', color: '#14532d', marginBottom: '10px', background: '#dcfce7', padding: '8px 12px', borderRadius: '6px' }}><strong>Email:</strong> {generatedCredentials.email}</div>
+                <div style={{ fontSize: '14px', color: '#14532d', marginBottom: '12px', background: '#dcfce7', padding: '8px 12px', borderRadius: '6px' }}><strong>Password:</strong> {generatedCredentials.password}</div>
+                <p style={{ margin: '0 0 16px', fontSize: '12px', color: '#16a34a' }}>Please copy and save these credentials now. You can share them with the faculty member securely. They will log in using this exact email and password.</p>
+                <button 
+                  onClick={() => { setGeneratedCredentials(null); setInstanceName(''); }} 
+                  style={{ width: '100%', padding: '10px', borderRadius: '8px', background: '#8b5cf6', color: '#fff', fontWeight: 600, border: 'none', cursor: 'pointer' }}
+                >
+                  Create Another Instance
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleCreateInstance} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px', marginBottom: '20px' }}>
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>Instance Name / Faculty Name *</label>
+                  <input 
+                    required 
+                    type="text" 
+                    value={instanceName} 
+                    onChange={e => setInstanceName(e.target.value)} 
+                    placeholder="e.g. Computer Science Dept" 
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', outline: 'none' }} 
+                  />
+                </div>
+                <button 
+                  type="submit" 
+                  disabled={instanceSubmitting || !instanceName} 
+                  style={{ padding: '10px 16px', borderRadius: '8px', background: '#8b5cf6', color: '#fff', fontWeight: 600, border: 'none', cursor: (instanceSubmitting || !instanceName) ? 'not-allowed' : 'pointer', opacity: (instanceSubmitting || !instanceName) ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: '6px', width: '100%', justifyContent: 'center' }}
+                >
+                  {instanceSubmitting ? <RefreshCw size={16} className="animate-spin" /> : <UserPlus size={16} />}
+                  Generate Instance
+                </button>
+              </form>
+            )}
             {fetchingSubInstances ? (
               <div style={{ marginTop: '20px', fontSize: '13px', color: '#64748b' }}>Loading instances...</div>
             ) : (
@@ -3036,70 +3061,7 @@ export const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ acti
         </div>
       )}
 
-      {/* Make an Instance Modal */}
-      {instanceModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(4px)', padding: '20px' }}>
-          <div style={{ background: '#fff', width: '100%', maxWidth: '400px', borderRadius: '16px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', overflow: 'hidden' }}>
-            <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>
-              <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <UserPlus size={20} color="#8b5cf6" /> Make an Instance
-              </h3>
-              <button onClick={() => setInstanceModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
-                <X size={20} />
-              </button>
-            </div>
-            
-            {generatedCredentials ? (
-              <div style={{ padding: '24px' }}>
-                <div style={{ padding: '16px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', marginBottom: '20px' }}>
-                  <p style={{ margin: '0 0 12px', fontSize: '15px', fontWeight: 700, color: '#166534' }}>🎉 Instance Created Successfully!</p>
-                  <div style={{ fontSize: '14px', color: '#14532d', marginBottom: '10px', background: '#dcfce7', padding: '8px 12px', borderRadius: '6px' }}><strong>Email:</strong> {generatedCredentials.email}</div>
-                  <div style={{ fontSize: '14px', color: '#14532d', marginBottom: '12px', background: '#dcfce7', padding: '8px 12px', borderRadius: '6px' }}><strong>Password:</strong> {generatedCredentials.password}</div>
-                  <p style={{ margin: 0, fontSize: '12px', color: '#16a34a' }}>Please copy and save these credentials now. You can share them with the faculty member securely. They will log in using this exact email and password.</p>
-                </div>
-                <button 
-                  onClick={() => setInstanceModalOpen(false)} 
-                  style={{ width: '100%', padding: '12px', borderRadius: '8px', background: '#8b5cf6', color: '#fff', fontWeight: 600, border: 'none', cursor: 'pointer' }}
-                >
-                  Done
-                </button>
-              </div>
-            ) : (
-              <form onSubmit={handleCreateInstance} style={{ padding: '24px' }}>
-                <p style={{ fontSize: '14px', color: '#475569', marginBottom: '20px' }}>
-                  Create a sub-account for a faculty member or department. They will get a unique login but notifications will route to the main institutional email.
-                </p>
-                
-                <div style={{ marginBottom: '20px' }}>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>Instance Name / Faculty Name *</label>
-                  <input 
-                    required 
-                    type="text" 
-                    value={instanceName} 
-                    onChange={e => setInstanceName(e.target.value)} 
-                    placeholder="e.g. Computer Science Dept" 
-                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', outline: 'none' }} 
-                  />
-                </div>
 
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-                  <button type="button" onClick={() => setInstanceModalOpen(false)} style={{ padding: '10px 16px', borderRadius: '8px', background: '#f1f5f9', color: '#475569', fontWeight: 600, border: 'none', cursor: 'pointer' }}>
-                    Cancel
-                  </button>
-                  <button 
-                    type="submit" 
-                    disabled={instanceSubmitting || !instanceName} 
-                    style={{ padding: '10px 16px', borderRadius: '8px', background: '#8b5cf6', color: '#fff', fontWeight: 600, border: 'none', cursor: (instanceSubmitting || !instanceName) ? 'not-allowed' : 'pointer', opacity: (instanceSubmitting || !instanceName) ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: '6px' }}
-                  >
-                    {instanceSubmitting ? <RefreshCw size={16} className="animate-spin" /> : <UserPlus size={16} />}
-                    Generate Instance
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 };
