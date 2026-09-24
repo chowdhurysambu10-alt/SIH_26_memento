@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import WidgetBot from '@widgetbot/react-embed';
 import { Joyride, Step } from 'react-joyride';
-import { HelpCircle, Mail, Copy } from 'lucide-react';
+import { HelpCircle, Mail } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const DISCORD_SERVER_ID = import.meta.env.VITE_DISCORD_SERVER_ID || '1546942698760437894';
@@ -30,12 +30,7 @@ export const CommunityPage: React.FC<{ platformSettings?: any }> = ({ platformSe
     }
   }, [user]);
 
-  const handleCopyAlias = () => {
-    if (alias) {
-      navigator.clipboard.writeText(alias);
-      alert('Alias copied to clipboard!');
-    }
-  };
+
 
   useEffect(() => {
     setChatLoaded(false);
@@ -164,9 +159,6 @@ export const CommunityPage: React.FC<{ platformSettings?: any }> = ({ platformSe
           {user?.role === 'student' && (
             <button
               onClick={() => {
-                if (alias) {
-                  handleCopyAlias();
-                }
                 sessionStorage.setItem('studentPortalView', 'mailing');
                 window.dispatchEvent(new CustomEvent('navigate-student', { detail: 'mailing' }));
                 window.dispatchEvent(new CustomEvent('navigate', { detail: 'student-dashboard' }));
@@ -174,8 +166,8 @@ export const CommunityPage: React.FC<{ platformSettings?: any }> = ({ platformSe
               className="btn"
               style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#64748b', background: 'transparent', border: '1px solid #cbd5e1', padding: '8px 14px', fontSize: '13px', whiteSpace: 'nowrap', borderRadius: '8px' }}
             >
-              {alias ? <Copy size={14} /> : <Mail size={14} />}
-              {alias ? 'Copy temporary mail id' : 'Get temporary mail id'}
+              <Mail size={14} />
+              {alias ? 'Go to mmtomail' : 'Get temporary mail id'}
             </button>
           )}
         </div>
